@@ -106,3 +106,16 @@ Plots.heatmap(abs.(phi_real), aspectratio=1)
 Plots.heatmap(real.(phi_real), aspectratio=1)
 
 Plots.heatmap(imag.(phi_real), aspectratio=1)
+
+function fink_filter_bank(J,L)
+    fink_filter = Array{Float64, 4}(undef, J, L, 256, 256)
+    for j = 1:J-1
+        for l = 1:L
+            fink_filter[j,l,:,:]=fftshift(finklet(j-1,l-1))
+        end
+    end
+end
+
+@time fink_filter_bank(8,16)
+
+@time fink_filter_bank(8,16)
