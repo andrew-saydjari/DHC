@@ -119,3 +119,22 @@ end
 @time fink_filter_bank(8,16)
 
 @time fink_filter_bank(8,16)
+
+##
+using ColorSchemes
+
+Plots.heatmap(abs.(phi_real), aspectratio=1,c=:cubehelix)
+
+colorschemes[:cubehelix]
+
+findcolorscheme("cube")
+
+##
+
+Plots.heatmap(abs.(phi_real),
+    xlims=(1,256),
+    ylims=(1,256),
+    aspectratio=1,
+    axis=nothing,
+    border=:none,
+    c=:cubehelix)
