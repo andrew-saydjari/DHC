@@ -138,3 +138,15 @@ Plots.heatmap(abs.(phi_real),
     axis=nothing,
     border=:none,
     c=:cubehelix)
+
+using Profile
+
+##
+Profile.clear()
+@profile fink_filter_bank(8,16)
+
+Juno.profiler()
+
+Profile.print()
+
+@time fink_filter_bank(8,16)
