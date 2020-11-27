@@ -168,3 +168,15 @@ Juno.profiler()
 BenchmarkTools.DEFAULT_PARAMETERS.samples = 5
 BenchmarkTools.DEFAULT_PARAMETERS.seconds = 120
 @benchmark DHC(test_img,fink_filter_set,coeff_12_on =0, coeff_20_on = 1)
+
+##Trying out static speed ups
+
+function dual_conj_pre(A,B)
+    Atmp = SMatrix{256,256}(A)
+    Btmp = SMatrix{256,256}(B)
+    @. abs(Atmp.*Btmp)
+end
+
+@time dual_conj_pre(test_img,test_img)
+
+test_img_s = SMatrix{256,256}(test_img)
