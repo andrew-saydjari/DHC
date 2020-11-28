@@ -47,6 +47,73 @@ function fink_filter_bank(J,L)
     return fink_filter
 end
 
+# This saves some time
+# compute finklets for ALL j and a given l
+function finklet_allj(J, l, out)
+    # -------- set parameters
+    dθ   = π/8        # 8 angular bins hardwired
+    θ_l  = dθ*l
+    nx   = 256
+
+    # -------- allocate theta and logr arrays
+    θ    = zeros(nx, nx)
+    logr = zeros(nx, nx).+100
+    angmask = falses(nx, nx)
+    #angmask = BitArray{2}(undef, nx, nx)
+
+    # -------- loop over pixels
+    for x = 1:nx
+        for y = 1:nx
+            sx = x-nx/2-1
+            sy = y-nx/2-1
+            θ_pix  = mod(atan(sy, sx)+π -θ_l, 2*π)
+            θ_good = abs(θ_pix-π) <= dθ
+
+            # If this is a pixel we might use, calculate log2(r)
+            if θ_good
+                angmask[y, x] = θ_good
+                θ[y, x]       = θ_pix
+                r = sqrt(sx^2 + sy^2)
+                logr[y, x] = log2(max(1,r))
+            end
+        end
+    end
+
+    ang = cos.((θ[angmask].-π).*4)
+
+    # -------- allocate memory for output
+    #fink_filter_allj = Array{Float64, 3}(undef, nx, nx, J)
+
+    # -------- in Fourier plane, envelope of psi_j,l
+    for j = 1:J
+        jrad = 7-(j-1)
+        mask = (abs.(logr[angmask].-jrad) .<= 1)
+
+    # -------- radial part
+        thisrad = cos.((logr[angmask].-jrad).*π./2)
+        # mask times angular part times radial part
+        psi = zeros(256,256)
+        psi[angmask] = mask.*ang.*thisrad
+        #fink_filter_allj[:,:,j] = psi # mask.*ang.*rad
+
+        # The fftshift is costing 20 ms (total, for full filterbank)
+        out[:,:,j,l+1] = fftshift(psi)
+    end
+    return 0
+
+end
+
+
+
+function fink_filter_bank_fast(J,L)
+    fink_filter = Array{Float64, 4}(undef, 256, 256, J, L)
+    for l = 1:L
+        __ = finklet_allj(J,l-1,fink_filter)
+    end
+    return fink_filter
+end
+
+
 function had!(A,B)
     m,n = size(A)
     @assert (m,n) == size(B)
@@ -59,6 +126,8 @@ function had!(A,B)
 end
 
 fink_filter_set = fink_filter_bank(8,8)
+fink_filter_set2 = fink_filter_bank_fast(8,8)
+print(maximum(abs.(fink_filter_set - fink_filter_set2)))
 
 test_img = zeros(256,256)
 copyto!(test_img,fink_filter_set[:,:,1,3])
