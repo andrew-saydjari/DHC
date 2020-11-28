@@ -41,7 +41,7 @@ function fink_filter_bank(J,L)
     fink_filter = Array{Float64, 4}(undef, 256, 256, J, L)
     for l = 1:L
         for j = 1:J
-            fink_filter[:,:,j,l]=fftshift(finklet(j-1,l-1))
+            @inbounds fink_filter[:,:,j,l]=fftshift(finklet(j-1,l-1))
         end
     end
     return fink_filter
@@ -63,92 +63,107 @@ fink_filter_set = fink_filter_bank(8,8)
 test_img = zeros(256,256)
 copyto!(test_img,fink_filter_set[:,:,1,3])
 
-function DHC(image, filter_set; norm_on = 1, coeff_12_on =1, coeff_20_on = 1)
+function DHC(image::Array{Float64,2}, filter_set::Array{Float64,4}; norm_on = 1, coeff_12_on =1, coeff_20_on = 1)
     FFTW.set_num_threads(2)
-    (Nx, Ny) = size(image)
 
+    #Sizing
+    (Nx, Ny) = size(image)
     (_,_,J,L) = size(fink_filter_set)
 
     out_coeff = []
 
-    ## Coeff at (1,0)
-    #takes care of image normalization
+    #Preallocate Coeff Arrays
     S0 = zeros(2)
+    S1 = zeros(J,L)
+    if coeff_20_on == 1
+        S20 = zeros(Float64,J, L, J, L)
+    end
+    if coeff_12_on == 1
+        S12 = zeros(Float64,J, L, J, L)
+    end
+
+    if coeff_20_on == 1
+        im_rd_0_1 = zeros(Float64,Nx, Ny, J, L)
+    end
+    if coeff_12_on == 1
+        im_fdf_0_1 = zeros(Float64,Nx, Ny, J, L)
+    end
+
+    im_fd_0_1 = zeros(ComplexF64,Nx, Ny, J, L)
+
+    Atmp = zeros(ComplexF64,Nx,Ny)
+    Btmp = zeros(Float64,Nx,Ny)
+    Ctmp = zeros(Float64,Nx,Ny)
+    Dtmp = zeros(Float64,Nx,Ny)
+    Etmp = zeros(Float64,Nx,Ny)
+
+    ## 0th Order
     if norm_on == 1
-        S0[1] = mean(image)
-        norm_im = image.-S0[1]
-        S0[2] = BLAS.dot(norm_im,norm_im)/(Nx*Ny)
-        norm_im = norm_im./sqrt(Nx*Ny*S0[2])
+        @inbounds S0[1] = mean(image)
+        @inbounds norm_im = image.-S0[1]
+        @inbounds S0[2] = BLAS.dot(norm_im,norm_im)/(Nx*Ny)
+        @inbounds norm_im = norm_im./sqrt(Nx*Ny*S0[2])
     else
         norm_im = image
     end
 
     append!(out_coeff,S0)
 
-    ##Coeff at (1,1)
-    #store the fft of images and im*filters for later
+    ## 1st Order
     im_fd_0 = fft(norm_im)
 
-    S1 = zeros((J,L))
-    im_fd_0_1 = Array{ComplexF64,4}(undef, Nx, Ny, J, L)
     @views for l = 1:L
         for j = 1:J
-            im_fd_0_1[:,:,j,l] .= im_fd_0
+            @inbounds im_fd_0_1[:,:,j,l] .= im_fd_0
         end
     end
 
-    if coeff_20_on == 1
-        im_rd_0_1 = Array{Float64,4}(undef, Nx, Ny, J, L)
-    end
-
-    Atmp = zeros(ComplexF64,Nx,Ny)
-    Btmp = zeros(Float64,Nx,Ny)
-    Ctmp = zeros(Float64,Nx,Ny)
+    #Precompute loop for 2nd Order
     @views for l = 1:L
         for j = 1:J
-            had!(im_fd_0_1[:,:,j,l],filter_set[:,:,j,l]) #wavelet already in fft domain not shifted
-            Btmp .= abs.(im_fd_0_1[:,:,j,l])
-            S1[j,l]+=BLAS.dot(Btmp,Btmp) #normalization choice arb to make order unity
+            @inbounds had!(im_fd_0_1[:,:,j,l],filter_set[:,:,j,l]) #wavelet already in fft domain not shifted
+            @inbounds Btmp .= abs.(im_fd_0_1[:,:,j,l])
+            @inbounds S1[j,l]+=BLAS.dot(Btmp,Btmp) #normalization choice arb to make order unity
             if coeff_20_on == 1
-                Atmp .= ifft(im_fd_0_1[:,:,j,l])
-                im_rd_0_1[:,:,j,l] .= abs.(Atmp)
+                @inbounds Atmp .= ifft(im_fd_0_1[:,:,j,l])
+                @inbounds im_rd_0_1[:,:,j,l] .= abs.(Atmp)
+            end
+            if coeff_12_on == 1
+                @inbounds im_fdf_0_1[:,:,j,l] .= abs.(im_fd_0_1[:,:,j,l])
+                @inbounds im_fdf_0_1[:,:,j,l] .= fftshift(im_fdf_0_1[:,:,j,l])
             end
         end
     end
     append!(out_coeff,S1)
 
-    ##Coeff at (2,0)
-    if coeff_20_on == 1
-        S20 = zeros(Float64,J, L, J, L)
-        @views for l2 = 1:L
-            for j2 = 1:J
-                copyto!(Btmp, im_rd_0_1[:,:,j2,l2])
-                for l1 = 1:L
-                    for j1  = 1:J
-                        copyto!(Ctmp, im_rd_0_1[:,:,j1,l1])
-                        S20[j1,l1,j2,l2] += BLAS.dot(Btmp,Ctmp)
+    ## 2nd Order
+    @views for l2 = 1:L
+        for j2 = 1:J
+            if coeff_20_on == 1
+                @inbounds copyto!(Btmp, im_rd_0_1[:,:,j2,l2])
+            end
+            if coeff_12_on == 1
+                @inbounds copyto!(Dtmp, im_fdf_0_1[:,:,j2,l2])
+            end
+            for l1 = 1:L
+                for j1  = 1:J
+                    if coeff_20_on == 1
+                        @inbounds copyto!(Ctmp, im_rd_0_1[:,:,j1,l1])
+                        @inbounds S20[j1,l1,j2,l2] += BLAS.dot(Btmp,Ctmp)
+                    end
+                    if coeff_12_on == 1
+                        @inbounds copyto!(Etmp, im_fdf_0_1[:,:,j1,l1])
+                        @inbounds S12[j1,l1,j2,l2] += BLAS.dot(Dtmp,Etmp)
                     end
                 end
             end
         end
-
+    end
+    if coeff_20_on == 1
         append!(out_coeff,S20)
     end
-
-    ##Coeff at (1,2) level
     if coeff_12_on == 1
-        S12 = zeros(Float64,J, L, J, L)
-        for l2 = 1:L
-            for j2 = 1:J
-                not_rot_im = fftshift(im_fd_0_1[:,:,j1,l1])
-                for l1 = 1:L
-                    for j1 = 1:J
-                        S12[j1,l1,j2,l2] += sum(abs.(not_rot_im.*fftshift(im_fd_0_1[:,:,j2,l2])))
-                    end
-                end
-            end
-        end
-    append!(out_coeff,S12)
+        append!(out_coeff,S12)
     end
     return out_coeff
 end
@@ -165,3 +180,143 @@ Juno.profiler()
 BenchmarkTools.DEFAULT_PARAMETERS.samples = 5
 BenchmarkTools.DEFAULT_PARAMETERS.seconds = 120
 @benchmark DHC(test_img,fink_filter_set,coeff_12_on =0, coeff_20_on = 1)
+
+
+temp = DHC(test_img,fink_filter_set,coeff_12_on =1, coeff_20_on = 1)
+
+@time DHC(test_img,fink_filter_set,coeff_12_on =1, coeff_20_on = 1)
+
+Profile.clear()
+@profile DHC(test_img,fink_filter_set,coeff_12_on =1, coeff_20_on = 1)
+
+Juno.profiler()
+
+BenchmarkTools.DEFAULT_PARAMETERS.samples = 5
+BenchmarkTools.DEFAULT_PARAMETERS.seconds = 120
+@benchmark DHC(test_img,fink_filter_set,coeff_12_on =1, coeff_20_on = 1)
+
+## No if ands or buts about it...
+
+function DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
+    FFTW.set_num_threads(2)
+
+    #Sizing
+    (Nx, Ny) = size(image)
+    (_,_,J,L) = size(fink_filter_set)
+
+    out_coeff = []
+    #Preallocate Coeff Arrays
+    S0 = zeros(2)
+    S1 = zeros(J,L)
+    S20 = zeros(Float64,J, L, J, L)
+    S12 = zeros(Float64,J, L, J, L)
+    im_rd_0_1 = zeros(Float64,Nx, Ny, J, L)
+    im_fdf_0_1 = zeros(Float64,Nx, Ny, J, L)
+    im_fd_0_1 = zeros(ComplexF64,Nx, Ny, J, L)
+
+    Atmp = zeros(ComplexF64,Nx,Ny)
+    Btmp = zeros(Float64,Nx,Ny)
+    Ctmp = zeros(Float64,Nx,Ny)
+    Dtmp = zeros(Float64,Nx,Ny)
+    Etmp = zeros(Float64,Nx,Ny)
+
+    ## 0th Order
+    @inbounds S0[1] = mean(image)
+    @inbounds norm_im = image.-S0[1]
+    @inbounds S0[2] = BLAS.dot(norm_im,norm_im)/(Nx*Ny)
+    @inbounds norm_im = norm_im./sqrt(Nx*Ny*S0[2])
+    norm_im = image
+
+    append!(out_coeff,S0[:])
+
+    ## 1st Order
+    im_fd_0 = fft(norm_im)
+
+    @views for l = 1:L
+        for j = 1:J
+            @inbounds im_fd_0_1[:,:,j,l] .= im_fd_0
+        end
+    end
+
+    ## Main 1st Order and Precompute 2nd Order
+    @views for l = 1:L
+        for j = 1:J
+            @inbounds had!(im_fd_0_1[:,:,j,l],filter_set[:,:,j,l]) #wavelet already in fft domain not shifted
+            @inbounds Btmp .= abs.(im_fd_0_1[:,:,j,l])
+            @inbounds im_fdf_0_1[:,:,j,l] .= fftshift(Btmp)
+            @inbounds S1[j,l]+=BLAS.dot(Btmp,Btmp) #normalization choice arb to make order unity
+            @inbounds Atmp .= ifft(im_fd_0_1[:,:,j,l])
+            @inbounds im_rd_0_1[:,:,j,l] .= abs.(Atmp)
+
+        end
+    end
+    append!(out_coeff,S1[:])
+
+    ## 2nd Order
+    @views for l2 = 1:L
+        for j2 = 1:J
+                @inbounds copyto!(Btmp, im_rd_0_1[:,:,j2,l2])
+                @inbounds copyto!(Dtmp, im_fdf_0_1[:,:,j2,l2])
+            for l1 = 1:L
+                for j1  = 1:J
+                        @inbounds copyto!(Ctmp, im_rd_0_1[:,:,j1,l1])
+                        @inbounds copyto!(Etmp, im_fdf_0_1[:,:,j1,l1])
+                        @inbounds S20[j1,l1,j2,l2] += BLAS.dot(Btmp,Ctmp)
+                        @inbounds S12[j1,l1,j2,l2] += BLAS.dot(Dtmp,Etmp)
+                    end
+                end
+            end
+        end
+    append!(out_coeff,S20)
+    append!(out_coeff,S12)
+    return out_coeff
+end
+
+temp = DHC(test_img,fink_filter_set)
+
+@time DHC(test_img,fink_filter_set)
+
+Profile.clear()
+@profile DHC(test_img,fink_filter_set)
+
+Juno.profiler()
+
+BenchmarkTools.DEFAULT_PARAMETERS.samples = 10000
+BenchmarkTools.DEFAULT_PARAMETERS.seconds = 120
+@benchmark DHC(test_img,fink_filter_set,coeff_12_on =1, coeff_20_on = 1)
+
+1.682/8258
+8/1857
+
+##Seems the order in memory changes performance a bit...
+#Let me just check for a faster abs.() by hand and then call this good
+#for a bit
+
+function man_abs_dot!(A,B)
+    m,n = size(A)
+    @assert (m,n) == size(B)
+    for j in 1:n
+       for i in 1:m
+         @inbounds A[i,j] = abs(B[i,j])
+       end
+    end
+    return A
+end
+
+
+function wrapper(A,B)
+    A .= abs.(B)
+end
+
+@time man_abs_dot!(zeros(256,256),test_img)
+
+@time wrapper(zeros(256,256),test_img)
+
+compare_img = zeros(256,256)
+
+BenchmarkTools.DEFAULT_PARAMETERS.seconds = 10
+@benchmark wrapper($compare_img,test_img)
+
+@benchmark man_abs_dot!($compare_img,test_img)
+
+## Nope, not all that much faster... ok. Good night.
