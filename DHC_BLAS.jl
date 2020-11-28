@@ -50,54 +50,50 @@ end
 # This saves some time
 # compute finklets for ALL j and a given l
 function finklet_allj(J, l, out)
+
     # -------- set parameters
     dθ   = π/8        # 8 angular bins hardwired
     θ_l  = dθ*l
     nx   = 256
 
     # -------- allocate theta and logr arrays
-    θ    = zeros(nx, nx)
-    logr = zeros(nx, nx).+100
-    angmask = falses(nx, nx)
-    #angmask = BitArray{2}(undef, nx, nx)
+    θ       = zeros(nx, nx)
+    logr    = zeros(nx, nx)
+    anggood = falses(nx, nx)
 
+    dx = nx/2-1
     # -------- loop over pixels
     for x = 1:nx
+        sx = mod(x+dx,nx)-dx -1    # define sx,sy so that no fftshift() needed
         for y = 1:nx
-            sx = x-nx/2-1
-            sy = y-nx/2-1
+            sy = mod(y+dx,nx)-dx -1
             θ_pix  = mod(atan(sy, sx)+π -θ_l, 2*π)
             θ_good = abs(θ_pix-π) <= dθ
 
             # If this is a pixel we might use, calculate log2(r)
             if θ_good
-                angmask[y, x] = θ_good
+                anggood[y, x] = θ_good
                 θ[y, x]       = θ_pix
                 r = sqrt(sx^2 + sy^2)
                 logr[y, x] = log2(max(1,r))
             end
         end
     end
+    angmask = findall(anggood)
+    # -------- compute the wavelet in the Fourier domain
+    # -------- the angular factor is the same for all j
+    F_angular = cos.((θ[angmask].-π).*4)
 
-    ang = cos.((θ[angmask].-π).*4)
-
-    # -------- allocate memory for output
-    #fink_filter_allj = Array{Float64, 3}(undef, nx, nx, J)
-
-    # -------- in Fourier plane, envelope of psi_j,l
-    for j = 1:J
-        jrad = 7-(j-1)
-        mask = (abs.(logr[angmask].-jrad) .<= 1)
+    # -------- loop over j for the radial part
+    for j = 0:J-1
+        jrad = 7-j
+        Δj   = abs.(logr[angmask].-jrad)
+        rmask = (Δj .<= 1)
 
     # -------- radial part
-        thisrad = cos.((logr[angmask].-jrad).*π./2)
-        # mask times angular part times radial part
-        psi = zeros(256,256)
-        psi[angmask] = mask.*ang.*thisrad
-        #fink_filter_allj[:,:,j] = psi # mask.*ang.*rad
-
-        # The fftshift is costing 20 ms (total, for full filterbank)
-        out[:,:,j,l+1] = fftshift(psi)
+        F_radial = cos.(Δj[rmask] .* (π/2))
+        ind = angmask[rmask]
+        out[ind,j+1,l+1] = F_radial .* F_angular[rmask]
     end
     return 0
 
@@ -106,7 +102,7 @@ end
 
 
 function fink_filter_bank_fast(J,L)
-    fink_filter = Array{Float64, 4}(undef, 256, 256, J, L)
+    fink_filter = zeros(256, 256, J, L)
     for l = 1:L
         __ = finklet_allj(J,l-1,fink_filter)
     end
