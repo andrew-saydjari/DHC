@@ -37,6 +37,7 @@ function finklet(j, l)
     return psi
 end
 
+
 function fink_filter_bank(J,L)
     fink_filter = Array{Float64, 4}(undef, 256, 256, J, L)
     for l = 1:L
@@ -47,66 +48,64 @@ function fink_filter_bank(J,L)
     return fink_filter
 end
 
-# This saves some time
-# compute finklets for ALL j and a given l
-function finklet_allj(J, l, out)
+
+# Faster filter bank generation
+function fink_filter_bank_fast(J, L)
 
     # -------- set parameters
     dθ   = π/8        # 8 angular bins hardwired
-    θ_l  = dθ*l
     nx   = 256
+    dx   = nx/2-1
 
+    # -------- allocate output array
+    filt = zeros(256, 256, J, L)
     # -------- allocate theta and logr arrays
-    θ       = zeros(nx, nx)
-    logr    = zeros(nx, nx)
+    logr = zeros(nx, nx)
+    θ    = zeros(nx, nx)
+
+    for l = 0:L-1
+        θ_l     = dθ*l
+
+    # -------- allocate anggood BitArray
     anggood = falses(nx, nx)
 
-    dx = nx/2-1
     # -------- loop over pixels
-    for x = 1:nx
-        sx = mod(x+dx,nx)-dx -1    # define sx,sy so that no fftshift() needed
-        for y = 1:nx
-            sy = mod(y+dx,nx)-dx -1
-            θ_pix  = mod(atan(sy, sx)+π -θ_l, 2*π)
-            θ_good = abs(θ_pix-π) <= dθ
+        for x = 1:nx
+            sx = mod(x+dx,nx)-dx -1    # define sx,sy so that no fftshift() needed
+            for y = 1:nx
+                sy = mod(y+dx,nx)-dx -1
+                θ_pix  = mod(atan(sy, sx)+π -θ_l, 2*π)
+                θ_good = abs(θ_pix-π) <= dθ
 
             # If this is a pixel we might use, calculate log2(r)
-            if θ_good
-                anggood[y, x] = θ_good
-                θ[y, x]       = θ_pix
-                r = sqrt(sx^2 + sy^2)
-                logr[y, x] = log2(max(1,r))
+                if θ_good
+                    anggood[y, x] = θ_good
+                    θ[y, x]       = θ_pix
+                    r = sqrt(sx^2 + sy^2)
+                    logr[y, x] = log2(max(1,r))
+                end
             end
         end
-    end
-    angmask = findall(anggood)
+        angmask = findall(anggood)
     # -------- compute the wavelet in the Fourier domain
     # -------- the angular factor is the same for all j
-    F_angular = cos.((θ[angmask].-π).*4)
+        F_angular = cos.((θ[angmask].-π).*4)
 
     # -------- loop over j for the radial part
-    for j = 0:J-1
-        jrad = 7-j
-        Δj   = abs.(logr[angmask].-jrad)
-        rmask = (Δj .<= 1)
+        for j = 0:J-1
+            jrad  = 7-j
+            Δj    = abs.(logr[angmask].-jrad)
+            rmask = (Δj .<= 1)
 
     # -------- radial part
-        F_radial = cos.(Δj[rmask] .* (π/2))
-        ind = angmask[rmask]
-        out[ind,j+1,l+1] = F_radial .* F_angular[rmask]
+            F_radial = cos.(Δj[rmask] .* (π/2))
+            ind      = angmask[rmask]
+            filt[ind,j+1,l+1] = F_radial .* F_angular[rmask]
+        end
     end
-    return 0
 
-end
+    return filt
 
-
-
-function fink_filter_bank_fast(J,L)
-    fink_filter = zeros(256, 256, J, L)
-    for l = 1:L
-        __ = finklet_allj(J,l-1,fink_filter)
-    end
-    return fink_filter
 end
 
 
@@ -121,7 +120,7 @@ function had!(A,B)
     return A
 end
 
-fink_filter_set = fink_filter_bank(8,8)
+fink_filter_set  = fink_filter_bank(8,8)
 fink_filter_set2 = fink_filter_bank_fast(8,8)
 print(maximum(abs.(fink_filter_set - fink_filter_set2)))
 
