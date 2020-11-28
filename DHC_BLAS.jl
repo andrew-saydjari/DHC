@@ -8,6 +8,61 @@ using LinearAlgebra
 using StaticArrays
 using HybridArrays
 
+
+# %%code cell
+
+function finklet(j, l)
+    # -------- set filters
+    jrad = 7-j
+    dθ = π/8        # 8 angular bins hardwired
+    θ_l = dθ*l
+    # -------- define coordinates
+    nx = 256
+    xbox = LinRange(-nx/2, nx/2-1 , nx)
+    # make a 256x256 grid of X
+    sx = xbox' .* ones(nx)
+    sy = ones(nx)' .* xbox
+    r  = sqrt.((sx).^2 + (sy).^2)
+    θ  = mod.(atan.(sy, sx).+π .-θ_l,2*π)
+    nozeros = r .> 0
+    logr = log2.(r[nozeros])
+    r[nozeros] = logr
+    # -------- in Fourier plane, envelope of psi_j,l
+    mask = (abs.(θ.-π).<= dθ) .& (abs.(r.-jrad) .<= 1)
+    # -------- angular part
+    ang = cos.((θ.-π).*4)
+    # -------- radial part
+    rad = cos.((r.-jrad).*π./2)
+    psi = mask.*ang.*rad             #mask times angular part times radial part
+    return psi
+end
+
+function fink_filter_bank(J,L)
+    fink_filter = Array{Float64, 4}(undef, 256, 256, J, L)
+    for l = 1:L
+        for j = 1:J
+            fink_filter[:,:,j,l]=fftshift(finklet(j-1,l-1))
+        end
+    end
+    return fink_filter
+end
+
+function had!(A,B)
+    m,n = size(A)
+    @assert (m,n) == size(B)
+    for j in 1:n
+       for i in 1:m
+         @inbounds A[i,j] *= B[i,j]
+       end
+    end
+    return A
+end
+
+fink_filter_set = fink_filter_bank(8,8)
+
+test_img = zeros(256,256)
+copyto!(test_img,fink_filter_set[:,:,1,3])
+
 function DHC(image, filter_set; norm_on = 1, coeff_12_on =1, coeff_20_on = 1)
     FFTW.set_num_threads(2)
     (Nx, Ny) = size(image)
