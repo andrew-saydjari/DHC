@@ -57,17 +57,18 @@ function fink_filter_bank_fast(J, L)
     nx   = 256
     dx   = nx/2-1
 
-    # -------- allocate output array
+    # -------- allocate output array of zeros
     filt = zeros(256, 256, J, L)
+
     # -------- allocate theta and logr arrays
     logr = zeros(nx, nx)
     θ    = zeros(nx, nx)
 
     for l = 0:L-1
-        θ_l     = dθ*l
+        θ_l = dθ*l
 
     # -------- allocate anggood BitArray
-    anggood = falses(nx, nx)
+        anggood = falses(nx, nx)
 
     # -------- loop over pixels
         for x = 1:nx
@@ -103,9 +104,7 @@ function fink_filter_bank_fast(J, L)
             filt[ind,j+1,l+1] = F_radial .* F_angular[rmask]
         end
     end
-
     return filt
-
 end
 
 
@@ -265,18 +264,18 @@ function DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
     FFTW.set_num_threads(2)
 
     #Sizing
-    (Nx, Ny) = size(image)
+    (Nx, Ny)  = size(image)
     (_,_,J,L) = size(fink_filter_set)
 
     out_coeff = []
     #Preallocate Coeff Arrays
-    S0 = zeros(2)
-    S1 = zeros(J,L)
+    S0  = zeros(2)
+    S1  = zeros(J,L)
     S20 = zeros(Float64,J, L, J, L)
     S12 = zeros(Float64,J, L, J, L)
-    im_rd_0_1 = zeros(Float64,Nx, Ny, J, L)
+    im_rd_0_1  = zeros(Float64,Nx, Ny, J, L)
     im_fdf_0_1 = zeros(Float64,Nx, Ny, J, L)
-    im_fd_0_1 = zeros(ComplexF64,Nx, Ny, J, L)
+    im_fd_0_1  = zeros(ComplexF64,Nx, Ny, J, L)
 
     Atmp = zeros(ComplexF64,Nx,Ny)
     Btmp = zeros(Float64,Nx,Ny)
@@ -287,8 +286,13 @@ function DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
     ## 0th Order
     @inbounds S0[1] = mean(image)
     @inbounds norm_im = image.-S0[1]
-    @inbounds S0[2] = BLAS.dot(norm_im,norm_im)/(Nx*Ny)
+    # make this a vector before computing variance with BLAS.dot
+    # (This was a bug!)
+    norm_im_vec = reshape(norm_im, Nx*Ny)
+    @inbounds S0[2] = BLAS.dot(norm_im_vec,norm_im_vec)/(Nx*Ny)
     @inbounds norm_im = norm_im./sqrt(Nx*Ny*S0[2])
+
+    # Was this intentional to set this back to image?
     norm_im = image
 
     append!(out_coeff,S0[:])
@@ -308,7 +312,10 @@ function DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
             @inbounds had!(im_fd_0_1[:,:,j,l],filter_set[:,:,j,l]) #wavelet already in fft domain not shifted
             @inbounds Btmp .= abs.(im_fd_0_1[:,:,j,l])
             @inbounds im_fdf_0_1[:,:,j,l] .= fftshift(Btmp)
-            @inbounds S1[j,l]+=BLAS.dot(Btmp,Btmp) #normalization choice arb to make order unity
+            # I think you are doing a 256x256 matrix multiplication here
+            #@inbounds S1[j,l]+=BLAS.dot(Btmp,Btmp) #normalization choice arb to make order unity
+            # You mean this:  (and BLAS won't speed this up much)
+            S1[j,l] = sum(Btmp.*Btmp)
             @inbounds Atmp .= ifft(im_fd_0_1[:,:,j,l])
             @inbounds im_rd_0_1[:,:,j,l] .= abs.(Atmp)
 
@@ -333,6 +340,19 @@ function DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
         end
     append!(out_coeff,S20)
     append!(out_coeff,S12)
+
+    #DPF version of 2nd Order
+    Amat    = reshape(im_fdf_0_1, Nx*Ny, J*L)
+    FastS12 = reshape(Amat' * Amat, J, L, J, L)
+    diffS12 = S12-FastS12
+    println("minmax(diffS12)", minimum(diffS12), "   ", maximum(diffS12))
+
+    Amat    = reshape(im_rd_0_1, Nx*Ny, J*L)
+    FastS20 = reshape(Amat' * Amat, J, L, J, L)
+    diffS20 = S20-FastS20
+    println("minmax(diffS20)", minimum(diffS20), "   ", maximum(diffS20))
+
+
     return out_coeff
 end
 
@@ -384,3 +404,91 @@ BenchmarkTools.DEFAULT_PARAMETERS.seconds = 10
 @benchmark man_abs_dot!($compare_img,test_img)
 
 ## Nope, not all that much faster... ok. Good night.
+
+
+
+
+
+
+## No if ands or buts about it...
+
+function speedy_DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
+    FFTW.set_num_threads(2)
+
+    # array sizes
+    (Nx, Ny)  = size(image)
+    (_,_,J,L) = size(fink_filter_set)
+
+    out_coeff = []
+    # allocate coeff arrays
+    S0  = zeros(2)
+    S1  = zeros(J, L)
+    S20 = zeros(Float64, J, L, J, L)
+    S12 = zeros(Float64, J, L, J, L)
+    im_rd_0_1  = zeros(Float64,    Nx, Ny, J, L)
+    im_fdf_0_1 = zeros(Float64,    Nx, Ny, J, L)
+    #im_fd_0_1  = zeros(ComplexF64, Nx, Ny, J, L)
+
+    ## 0th Order
+    S0[1]   = mean(image)
+    norm_im = image.-S0[1]
+    S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
+    norm_im ./= sqrt(Nx*Ny*S0[2])
+
+    # Was this intentional to set this back to image?
+    norm_im = image
+
+    append!(out_coeff,S0[:])
+
+    ## 1st Order
+    im_fd_0 = fft(norm_im)
+
+    foo = zeros(ComplexF64,Nx,Ny)
+    ## Main 1st Order and Precompute 2nd Order
+    for l = 1:L
+        for j = 1:J
+            #@inbounds had!(im_fd_0_1[:,:,j,l],filter_set[:,:,j,l]) #wavelet already in fft domain not shifted
+            # @inbounds Btmp .= abs.(im_fd_0_1[:,:,j,l])
+            # We don't need an fftshift()
+            # @inbounds im_fdf_0_1[:,:,j,l] .= fftshift(Btmp)
+            copyto!(foo, im_fd_0 .* filter_set[:,:,j,l])
+            Btmp .= abs.(foo)
+            @inbounds im_fdf_0_1[:,:,j,l] .= Btmp
+            # I think you are doing a 256x256 matrix multiplication here
+            #@inbounds S1[j,l]+=BLAS.dot(Btmp,Btmp) #normalization choice arb to make order unity
+            # You mean this:  (and BLAS won't speed this up much)
+            # S1[j,l] = sum(Btmp.*Btmp)
+            S1[j,l] = sum([x^2 for x in Btmp])  #slightly faster? (no malloc)
+            #@inbounds Atmp .= ifft(foo)
+            @inbounds im_rd_0_1[:,:,j,l] .= abs.(ifft(foo))
+
+        end
+    end
+    append!(out_coeff,S1[:])
+
+
+    #DPF version of 2nd Order
+    Amat    = reshape(im_fdf_0_1, Nx*Ny, J*L)
+    S12 = reshape(Amat' * Amat, J, L, J, L)
+
+    Amat    = reshape(im_rd_0_1, Nx*Ny, J*L)
+    S20 = reshape(Amat' * Amat, J, L, J, L)
+
+    append!(out_coeff,S20)
+    append!(out_coeff,S12)
+
+
+    return out_coeff
+end
+
+
+temp1 = DHC(test_img,fink_filter_set)
+temp2 = speedy_DHC(test_img,fink_filter_set)
+
+
+@time speedy_DHC(test_img,fink_filter_set)
+
+Profile.clear()
+@profile speedy_DHC(test_img,fink_filter_set)
+
+Juno.profiler()
