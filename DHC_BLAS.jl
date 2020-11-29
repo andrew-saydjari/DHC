@@ -404,11 +404,70 @@ BenchmarkTools.DEFAULT_PARAMETERS.seconds = 10
 @benchmark man_abs_dot!($compare_img,test_img)
 
 ## Nope, not all that much faster... ok. Good night.
-
-
-
-
-
+function DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
+    FFTW.set_num_threads(2)
+    #Sizing
+    (Nx, Ny) = size(image)
+    (_,_,J,L) = size(fink_filter_set)
+    out_coeff = []
+    #Preallocate Coeff Arrays
+    S0 = zeros(2)
+    S1 = zeros(J,L)
+    S20 = zeros(Float64,J, L, J, L)
+    S12 = zeros(Float64,J, L, J, L)
+    im_rd_0_1 = zeros(Float64,Nx, Ny, J, L)
+    im_fdf_0_1 = zeros(Float64,Nx, Ny, J, L)
+    im_fd_0_1 = zeros(ComplexF64,Nx, Ny, J, L)
+    Atmp = zeros(ComplexF64,Nx,Ny)
+    Btmp = zeros(Float64,Nx,Ny)
+    Ctmp = zeros(Float64,Nx,Ny)
+    Dtmp = zeros(Float64,Nx,Ny)
+    Etmp = zeros(Float64,Nx,Ny)
+    ## 0th Order
+    @inbounds S0[1] = mean(image)
+    @inbounds norm_im = image.-S0[1]
+    @inbounds S0[2] = BLAS.dot(norm_im,norm_im)/(Nx*Ny)
+    @inbounds norm_im = norm_im./sqrt(Nx*Ny*S0[2])
+    norm_im = image
+    append!(out_coeff,S0[:])
+    ## 1st Order
+    im_fd_0 = fft(norm_im)
+    @views for l = 1:L
+        for j = 1:J
+            @inbounds im_fd_0_1[:,:,j,l] .= im_fd_0
+        end
+    end
+    ## Main 1st Order and Precompute 2nd Order
+    @views for l = 1:L
+        for j = 1:J
+            @inbounds had!(im_fd_0_1[:,:,j,l],filter_set[:,:,j,l]) #wavelet already in fft domain not shifted
+            @inbounds Btmp .= abs.(im_fd_0_1[:,:,j,l])
+            @inbounds im_fdf_0_1[:,:,j,l] .= fftshift(Btmp)
+            @inbounds S1[j,l]+=BLAS.dot(Btmp,Btmp) #normalization choice arb to make order unity
+            @inbounds Atmp .= ifft(im_fd_0_1[:,:,j,l])
+            @inbounds im_rd_0_1[:,:,j,l] .= abs.(Atmp)
+        end
+    end
+    append!(out_coeff,S1[:])
+    ## 2nd Order
+    @views for l2 = 1:L
+        for j2 = 1:J
+                @inbounds copyto!(Btmp, im_rd_0_1[:,:,j2,l2])
+                @inbounds copyto!(Dtmp, im_fdf_0_1[:,:,j2,l2])
+            for l1 = 1:L
+                for j1  = 1:J
+                        @inbounds copyto!(Ctmp, im_rd_0_1[:,:,j1,l1])
+                        @inbounds copyto!(Etmp, im_fdf_0_1[:,:,j1,l1])
+                        @inbounds S20[j1,l1,j2,l2] += BLAS.dot(Btmp,Ctmp)
+                        @inbounds S12[j1,l1,j2,l2] += BLAS.dot(Dtmp,Etmp)
+                    end
+                end
+            end
+        end
+    append!(out_coeff,S20)
+    append!(out_coeff,S12)
+    return out_coeff
+end
 
 ## No if ands or buts about it...
 
