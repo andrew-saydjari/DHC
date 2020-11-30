@@ -108,6 +108,30 @@ function fink_filter_bank_fast(J, L)
 end
 
 
+# Make a list of non-zero pixels for the (Fourier plane) filters
+function fink_filter_list(filt)
+    (ny,nx,J,L) = size(filt)
+
+    # Allocate output arrays
+    filtind = fill(CartesianIndex{2}[], J, L)
+    filtval = fill(Float64[], J, L)
+
+    # Loop over J,L and record non-zero values
+    for l=1:L
+        for j=1:J
+            f = @view filt[:,:,j,l]
+            ind = findall(f .> 1E-13)
+            val = f[ind]
+            filtind[j,l] = ind
+            filtval[j,l] = val
+        end
+    end
+    return [filtind, filtval]
+end
+
+filter_list = fink_filter_list(fink_filter_set)
+
+
 function had!(A,B)
     m,n = size(A)
     @assert (m,n) == size(B)
@@ -130,7 +154,7 @@ phi_r = real(ifft(phi))
 # check that the real-space function sums to 1 as expected.
 print(sum(phi_r))
 
-# really we should never use J=7 finklets, only use phi. 
+# really we should never use J=7 finklets, only use phi.
 
 test_img = zeros(256,256)
 copyto!(test_img,fink_filter_set[:,:,1,3])
@@ -480,12 +504,12 @@ end
 
 ## No if ands or buts about it...
 
-function speedy_DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
+function speedy_DHC(image::Array{Float64,2}, filter_set::Array{Float64,4}, filter_list)
     FFTW.set_num_threads(2)
 
     # array sizes
     (Nx, Ny)  = size(image)
-    (_,_,J,L) = size(fink_filter_set)
+    (_,_,J,L) = size(filter_set)
 
     out_coeff = []
     # allocate coeff arrays
@@ -493,8 +517,10 @@ function speedy_DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
     S1  = zeros(J, L)
     S20 = zeros(Float64, J, L, J, L)
     S12 = zeros(Float64, J, L, J, L)
-    im_rd_0_1  = zeros(Float64,    Nx, Ny, J, L)
-    im_fdf_0_1 = zeros(Float64,    Nx, Ny, J, L)
+    # im_rd_0_1  = zeros(Float64,    Nx, Ny, J, L)
+    im_fdf_0_1 = zeros(Float64,    Nx, Ny, J, L)   # this must be zeroed!
+    im_rd_0_1  = Array{Float64, 4}(undef, 256, 256, J, L)
+    # im_fdf_0_1 = Array{Float64, 4}(undef, 256, 256, J, L)
     #im_fd_0_1  = zeros(ComplexF64, Nx, Ny, J, L)
 
     ## 0th Order
@@ -511,8 +537,13 @@ function speedy_DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
     ## 1st Order
     im_fd_0 = fft(norm_im)
 
+    # unpack filter_list
+    f_ind = filter_list[1]  # (J, L) array of filters represented as index value pairs
+    f_val = filter_list[2]
+
     foo = zeros(ComplexF64,Nx,Ny)
     Btmp = zeros(Float64,Nx,Ny)
+    P   = plan_ifft(im_fd_0)
     ## Main 1st Order and Precompute 2nd Order
     for l = 1:L
         for j = 1:J
@@ -520,29 +551,46 @@ function speedy_DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
             # @inbounds Btmp .= abs.(im_fd_0_1[:,:,j,l])
             # We don't need an fftshift()
             # @inbounds im_fdf_0_1[:,:,j,l] .= fftshift(Btmp)
-            copyto!(foo, im_fd_0 .* filter_set[:,:,j,l])
-            Btmp .= abs.(foo)
-            @inbounds im_fdf_0_1[:,:,j,l] .= Btmp
+
+            # copyto!(foo, im_fd_0 .* filter_set[:,:,j,l])
+            S1tot = 0.0
+
+            f_i = f_ind[j,l]
+            f_v = f_val[j,l]
+            # for (ind, val) in zip(f_i, f_v)   # this is slower!
+            for i = 1:length(f_i)
+                ind      = f_i[i]
+                zval     = f_v[i] * im_fd_0[ind]
+                S1tot   += abs2(zval)
+                foo[ind] = zval
+                im_fdf_0_1[ind,j,l] = abs(zval)
+            end
+
+
+            # Btmp .= abs.(foo)
+            # @inbounds im_fdf_0_1[:,:,j,l] .= Btmp
             # I think you are doing a 256x256 matrix multiplication here
             #@inbounds S1[j,l]+=BLAS.dot(Btmp,Btmp) #normalization choice arb to make order unity
             # You mean this:  (and BLAS won't speed this up much)
             # S1[j,l] = sum(Btmp.*Btmp)
-            S1[j,l] = sum([x^2 for x in Btmp])  #slightly faster? (no malloc)
+            # S1[j,l] = sum([x^2 for x in Btmp])  #slightly faster? (no malloc)
+            S1[j,l] = S1tot
             #@inbounds Atmp .= ifft(foo)
-            @inbounds im_rd_0_1[:,:,j,l] .= abs.(ifft(foo))
-
+            #temp1 = P*foo   # ifft(foo)
+            #temp2 = abs2.(P*foo)
+            im_rd_0_1[:,:,j,l] .= abs2.(P*foo)
+            foo[f_ind[j,l]] .= 0
         end
     end
     append!(out_coeff,S1[:])
+    im_rd_0_1 .= sqrt.(im_rd_0_1)
 
 
     #DPF version of 2nd Order
-    Amat    = reshape(im_fdf_0_1, Nx*Ny, J*L)
-    S12 = reshape(Amat' * Amat, J, L, J, L)
-    println(typeof(Amat))
-    Amat    = reshape(im_rd_0_1, Nx*Ny, J*L)
-    S20 = reshape(BLAS.dot(Amat' , Amat), J, L, J, L)
-    println(typeof(Amat))
+    Amat = reshape(im_fdf_0_1, Nx*Ny, J*L)
+    S12  = reshape(Amat' * Amat, J, L, J, L)
+    Amat = reshape(im_rd_0_1, Nx*Ny, J*L)
+    S20  = reshape(Amat' * Amat, J, L, J, L)
 
     append!(out_coeff,S20)
     append!(out_coeff,S12)
@@ -551,14 +599,14 @@ function speedy_DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
     return out_coeff
 end
 
+#test_img = rand(256,256)
+#temp1 = DHC(test_img,fink_filter_set)
+temp2 = speedy_DHC(test_img,fink_filter_set,filter_list)
 
-temp1 = DHC(test_img,fink_filter_set)
-temp2 = speedy_DHC(test_img,fink_filter_set)
 
-
-@time speedy_DHC(test_img,fink_filter_set)
+@time speedy_DHC(test_img,fink_filter_set,filter_list);
 
 Profile.clear()
-@profile speedy_DHC(test_img,fink_filter_set)
+@profile speedy_DHC(test_img,fink_filter_set,filter_list)
 
 Juno.profiler()
