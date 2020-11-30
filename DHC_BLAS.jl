@@ -123,6 +123,15 @@ fink_filter_set  = fink_filter_bank(8,8)
 fink_filter_set2 = fink_filter_bank_fast(8,8)
 print(maximum(abs.(fink_filter_set - fink_filter_set2)))
 
+# Generate phi from an L=16 filter bank
+donut = fink_filter_bank_fast(8,16)
+phi   = sqrt.(reshape(sum(donut[:,:,8,:].^2,dims=[3,4]),256,256))
+phi_r = real(ifft(phi))
+# check that the real-space function sums to 1 as expected.
+print(sum(phi_r))
+
+# really we should never use J=7 finklets, only use phi. 
+
 test_img = zeros(256,256)
 copyto!(test_img,fink_filter_set[:,:,1,3])
 
@@ -503,6 +512,7 @@ function speedy_DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
     im_fd_0 = fft(norm_im)
 
     foo = zeros(ComplexF64,Nx,Ny)
+    Btmp = zeros(Float64,Nx,Ny)
     ## Main 1st Order and Precompute 2nd Order
     for l = 1:L
         for j = 1:J
@@ -529,9 +539,10 @@ function speedy_DHC(image::Array{Float64,2}, filter_set::Array{Float64,4})
     #DPF version of 2nd Order
     Amat    = reshape(im_fdf_0_1, Nx*Ny, J*L)
     S12 = reshape(Amat' * Amat, J, L, J, L)
-
+    println(typeof(Amat))
     Amat    = reshape(im_rd_0_1, Nx*Ny, J*L)
-    S20 = reshape(Amat' * Amat, J, L, J, L)
+    S20 = reshape(BLAS.dot(Amat' , Amat), J, L, J, L)
+    println(typeof(Amat))
 
     append!(out_coeff,S20)
     append!(out_coeff,S12)
