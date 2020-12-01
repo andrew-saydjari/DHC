@@ -504,24 +504,27 @@ end
 
 ## No if ands or buts about it...
 
-function speedy_DHC(image::Array{Float64,2}, filter_set::Array{Float64,4}, filter_list)
+# Todo list
+# Check if 2 threads really help FFT when computer is busy
+
+function speedy_DHC(image::Array{Float64,2}, filter_list)
+    # Use 2 threads for FFT
     FFTW.set_num_threads(2)
 
     # array sizes
     (Nx, Ny)  = size(image)
-    (_,_,J,L) = size(filter_set)
+    (J,L)     = size(filter_list[1])
 
-    out_coeff = []
     # allocate coeff arrays
-    S0  = zeros(2)
-    S1  = zeros(J, L)
+    out_coeff = []
+    S0  = zeros(Float64, 2)
+    S1  = zeros(Float64, J, L)
     S20 = zeros(Float64, J, L, J, L)
     S12 = zeros(Float64, J, L, J, L)
-    # im_rd_0_1  = zeros(Float64,    Nx, Ny, J, L)
-    im_fdf_0_1 = zeros(Float64,    Nx, Ny, J, L)   # this must be zeroed!
-    im_rd_0_1  = Array{Float64, 4}(undef, 256, 256, J, L)
-    # im_fdf_0_1 = Array{Float64, 4}(undef, 256, 256, J, L)
-    #im_fd_0_1  = zeros(ComplexF64, Nx, Ny, J, L)
+
+    # allocate image arrays for internal use
+    im_fdf_0_1 = zeros(Float64,           Nx, Ny, J, L)   # this must be zeroed!
+    im_rd_0_1  = Array{Float64, 4}(undef, Nx, Ny, J, L)
 
     ## 0th Order
     S0[1]   = mean(image)
@@ -529,84 +532,64 @@ function speedy_DHC(image::Array{Float64,2}, filter_set::Array{Float64,4}, filte
     S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
     norm_im ./= sqrt(Nx*Ny*S0[2])
 
-    # Was this intentional to set this back to image?
-    norm_im = image
-
     append!(out_coeff,S0[:])
 
     ## 1st Order
     im_fd_0 = fft(norm_im)
 
     # unpack filter_list
-    f_ind = filter_list[1]  # (J, L) array of filters represented as index value pairs
-    f_val = filter_list[2]
+    f_ind   = filter_list[1]  # (J, L) array of filters represented as index value pairs
+    f_val   = filter_list[2]
 
-    foo = zeros(ComplexF64,Nx,Ny)
-    Btmp = zeros(Float64,Nx,Ny)
-    P   = plan_ifft(im_fd_0)
+    zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
+
+    # make a FFTW "plan" for an array of the given size and type
+    P   = plan_ifft(im_fd_0)   # P is an operator, P*im is ifft(im)
+
     ## Main 1st Order and Precompute 2nd Order
     for l = 1:L
         for j = 1:J
-            #@inbounds had!(im_fd_0_1[:,:,j,l],filter_set[:,:,j,l]) #wavelet already in fft domain not shifted
-            # @inbounds Btmp .= abs.(im_fd_0_1[:,:,j,l])
-            # We don't need an fftshift()
-            # @inbounds im_fdf_0_1[:,:,j,l] .= fftshift(Btmp)
-
-            # copyto!(foo, im_fd_0 .* filter_set[:,:,j,l])
             S1tot = 0.0
-
-            f_i = f_ind[j,l]
-            f_v = f_val[j,l]
+            f_i = f_ind[j,l]  # CartesianIndex list for filter
+            f_v = f_val[j,l]  # Values for f_i
             # for (ind, val) in zip(f_i, f_v)   # this is slower!
             for i = 1:length(f_i)
-                ind      = f_i[i]
-                zval     = f_v[i] * im_fd_0[ind]
-                S1tot   += abs2(zval)
-                foo[ind] = zval
+                ind       = f_i[i]
+                zval      = f_v[i] * im_fd_0[ind]
+                S1tot    += abs2(zval)
+                zarr[ind] = zval
                 im_fdf_0_1[ind,j,l] = abs(zval)
             end
-
-
-            # Btmp .= abs.(foo)
-            # @inbounds im_fdf_0_1[:,:,j,l] .= Btmp
-            # I think you are doing a 256x256 matrix multiplication here
-            #@inbounds S1[j,l]+=BLAS.dot(Btmp,Btmp) #normalization choice arb to make order unity
-            # You mean this:  (and BLAS won't speed this up much)
-            # S1[j,l] = sum(Btmp.*Btmp)
-            # S1[j,l] = sum([x^2 for x in Btmp])  #slightly faster? (no malloc)
             S1[j,l] = S1tot
-            #@inbounds Atmp .= ifft(foo)
-            #temp1 = P*foo   # ifft(foo)
-            #temp2 = abs2.(P*foo)
-            im_rd_0_1[:,:,j,l] .= abs2.(P*foo)
-            foo[f_ind[j,l]] .= 0
+            im_rd_0_1[:,:,j,l] .= abs2.(P*zarr)
+            zarr[f_ind[j,l]]   .= 0
         end
     end
-    append!(out_coeff,S1[:])
+    append!(out_coeff, S1[:])
+
+    # we stored the abs()^2, so take sqrt (this is faster to do all at once)
     im_rd_0_1 .= sqrt.(im_rd_0_1)
 
-
-    #DPF version of 2nd Order
+    ## 2nd Order
     Amat = reshape(im_fdf_0_1, Nx*Ny, J*L)
     S12  = reshape(Amat' * Amat, J, L, J, L)
     Amat = reshape(im_rd_0_1, Nx*Ny, J*L)
     S20  = reshape(Amat' * Amat, J, L, J, L)
 
-    append!(out_coeff,S20)
-    append!(out_coeff,S12)
-
+    append!(out_coeff, S20)
+    append!(out_coeff, S12)
 
     return out_coeff
 end
 
 #test_img = rand(256,256)
 #temp1 = DHC(test_img,fink_filter_set)
-temp2 = speedy_DHC(test_img,fink_filter_set,filter_list)
+temp2 = speedy_DHC(test_img, filter_list)
 
 
-@time speedy_DHC(test_img,fink_filter_set,filter_list);
+@time speedy_DHC(test_img, filter_list);
 
 Profile.clear()
-@profile speedy_DHC(test_img,fink_filter_set,filter_list)
+@profile speedy_DHC(test_img, filter_list)
 
 Juno.profiler()
