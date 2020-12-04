@@ -450,7 +450,7 @@ function speedy_DHC_abs2(image::Array{Float64,2}, filter_list)
                     zval      = f_v[i] * im_fd_0[ind]
                     S1tot    += abs2(zval)
                     zarr[ind] = zval
-                    im_fdf_0_1[ind,j,l] = abs(zval)
+                    im_fdf_0_1[ind,j,l] = abs2(zval)
                 end
                 S1[j,l] = S1tot
                 im_rd_0_1[:,:,j,l] .= abs2.(P*zarr)
@@ -788,7 +788,7 @@ err_extract(angle_iso)
 
 ## Try S12 analysis on the 2pi coverage cases. No rotation. Then do j1/2
 
-function S20_iso(data,J,L,N)
+function S12_iso(data,J,L,N)
     S20 = reshape(data[2+J*L+J*L*J*L+1:2+J*L+J*L*J*L+J*L*J*L,:],J,L,J,L,N)
     iso_mat = zeros(J,J,N,L)
     for l=1:L
@@ -803,11 +803,11 @@ function S20_iso(data,J,L,N)
     return pow_mat
 end
 
-angle_iso = S20_iso(out0,8,16,360)
+angle_iso = S12_iso(out0,8,16,360)
 
-plot(angle_iso[3,4,:])
+plot(angle_iso[2,2,:])
 
- function err_extract(iso_out)
+function err_extract(iso_out,J,N)
      pdf_err = zeros(J,J)
      temp = zeros(N)
      for j2=1:J
@@ -816,5 +816,57 @@ plot(angle_iso[3,4,:])
              pdf_err[j1,j2] = maximum(temp)-minimum(temp)
           end
       end
+      pdf_err[isnan.(pdf_err)] .= 0
       return maximum(pdf_err[2:7,2:7])
  end
+
+out0 = h5read("./Data/j8l8w1p2.h5", "main/data")
+angle_iso = S12_iso(out0,8,8,360)
+val = err_extract(angle_iso,8,360)
+
+out0 = h5read("./Data/j8l8w2p2.h5", "main/data")
+angle_iso = S12_iso(out0,8,8,360)
+val = err_extract(angle_iso,8,360)
+
+out0 = h5read("./Data/j8l8w3p2.h5", "main/data")
+angle_iso = S12_iso(out0,8,8,360)
+val = err_extract(angle_iso,8,360)
+
+
+out0 = h5read("./Data/j8l16w1p2.h5", "main/data")
+angle_iso = S12_iso(out0,8,16,360)
+val = err_extract(angle_iso,8,360)
+
+out0 = h5read("./Data/j8l16w2p2.h5", "main/data")
+angle_iso = S12_iso(out0,8,16,360)
+val = err_extract(angle_iso,8,360)
+
+out0 = h5read("./Data/j8l16w3p2.h5", "main/data")
+angle_iso = S12_iso(out0,8,16,360)
+val = err_extract(angle_iso,8,360)
+
+
+out0 = h5read("./Data/abs2j8l8w1p2.h5", "main/data")
+angle_iso = S12_iso(out0,8,8,360)
+val = err_extract(angle_iso,8,360)
+
+out0 = h5read("./Data/abs2j8l8w2p2.h5", "main/data")
+angle_iso = S12_iso(out0,8,8,360)
+val = err_extract(angle_iso,8,360)
+
+out0 = h5read("./Data/j8l8w3p2.h5", "main/data")
+angle_iso = S12_iso(out0,8,8,360)
+val = err_extract(angle_iso,8,360)
+
+
+out0 = h5read("./Data/abs2j8l16w1p2.h5", "main/data")
+angle_iso = S12_iso(out0,8,16,360)
+val = err_extract(angle_iso,8,360)
+
+out0 = h5read("./Data/abs2j8l16w2p2.h5", "main/data")
+angle_iso = S12_iso(out0,8,16,360)
+val = err_extract(angle_iso,8,360)
+
+out0 = h5read("./Data/abs2j8l16w3p2.h5", "main/data")
+angle_iso = S12_iso(out0,8,16,360)
+val = err_extract(angle_iso,8,360)
