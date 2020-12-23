@@ -21,7 +21,7 @@ using DHC_Utils
 @time filter_list = fink_filter_list(fink_filter_set)
 
 # Generate phi from an L=16 filter bank
-donut = fink_filter_bank(8,16)
+donut = fink_filter_bank(8,8)
 phi   = sqrt.(reshape(sum(donut[:,:,8,:].^2,dims=[3,4]),256,256))
 phi_r = real(ifft(phi))
 # check that the real-space function sums to 1 as expected.

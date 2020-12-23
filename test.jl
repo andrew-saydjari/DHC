@@ -6,6 +6,7 @@ plotlyjs()
 theme(:juno)
 
 ##
+using IJulia
 display(1)
 
 print("hello doug")
@@ -20,6 +21,9 @@ end
 f(3)
 
 3+3
+
+using IJulia
+notebook()
 
 ## Simple testing suite
 
