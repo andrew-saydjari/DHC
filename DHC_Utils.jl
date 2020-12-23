@@ -1,5 +1,5 @@
 ## Preloads
-#module DHC_Utils
+module DHC_Utils
 
     using Statistics
     using FFTW
@@ -56,7 +56,7 @@
 
 
     ## Faster filter bank generation.  Only square filters allowed.
-    function fink_filter_bank(J::Integer, L::Integer; nx::Integer=256)
+    function fink_filter_bank(J::Integer, L::Integer; nx::Integer=256, wid::Integer=1)
 
         # -------- set parameters
         dθ   = π/8        # 8 angular bins hardwired
@@ -81,7 +81,7 @@
                 for y = 1:nx
                     sy = mod(y+dx, nx)-dx -1
                     θ_pix  = mod(atan(sy, sx)+π -θ_l, 2*π)
-                    θ_good = abs(θ_pix-π) <= dθ
+                    θ_good = abs(θ_pix-π) <= (dθ*wid)
 
                     # If this is a pixel we might use, calculate log2(r)
                     if θ_good
@@ -95,7 +95,7 @@
             angmask = findall(anggood)
         # -------- compute the wavelet in the Fourier domain
         #          the angular factor is the same for all j
-            F_angular = cos.((θ[angmask].-π).*4)
+            F_angular = cos.((θ[angmask].-π).*(4/wid))
 
         # -------- loop over j for the radial part
             for j = 0:J-1
@@ -214,4 +214,4 @@
         return out_coeff
     end
 
-#end # of module
+end # of module
