@@ -1,4 +1,3 @@
-
 using Plots; gr()
 using Measures
 using FFTW
@@ -6,10 +5,10 @@ push!(LOAD_PATH, pwd())
 using DHC_2DUtils
 
 
-function plot_filter_bank_QA(filt; fname="filter_bank_QA.png")
+function plot_filter_bank_QA(filt, info; fname="filter_bank_QA.png")
 
     # -------- define plot1 to append plot to a list
-    function plot1(ps, image; clim=nothing, bin=1, fsz=5)
+    function plot1(ps, image; clim=nothing, bin=1.0, fsz=5)
         # ps    - list of plots to append to
         # image - image to heatmap
         # clim  - tuple of color limits (min, max)
@@ -17,7 +16,7 @@ function plot_filter_bank_QA(filt; fname="filter_bank_QA.png")
         # fsz   - font size
         marg   = 0mm
         nx, ny = size(image)
-        nxb    = nx/(2*bin)
+        nxb    = nx/round(Integer, 2*bin)
 
         # -------- center on nx/2+1
         i0 = round(Integer, (nx/2+2)-nxb)
@@ -31,43 +30,42 @@ function plot_filter_bank_QA(filt; fname="filter_bank_QA.png")
     end
 
     # -------- initialize array of plots
-    ps = []
-
+    ps   = []
+    ind  = info["filter_index"]
+    jval = info["j_value"]
     # -------- loop over j
-    for j in 1:6
+    for j_ind in 1:6
         # first 3 filters in Fourier space
-        plot1(ps, fftshift(filt[:,:,(j-1)*8+1]), clim=(0,1),bin=2^(j-1))
-        plot1(ps, fftshift(filt[:,:,(j-1)*8+2]), clim=(0,1),bin=2^(j-1))
-        plot1(ps, fftshift(filt[:,:,(j-1)*8+3]), clim=(0,1),bin=2^(j-1))
+        j = jval[j_ind]
+        bfac = max(1,2.0^(j-1))
+        plot1(ps, fftshift(filt[:,:,ind[j_ind,1]]), clim=(0,1),bin=bfac)
+        plot1(ps, fftshift(filt[:,:,ind[j_ind,2]]), clim=(0,1),bin=bfac)
+        plot1(ps, fftshift(filt[:,:,ind[j_ind,3]]), clim=(0,1),bin=bfac)
         fac = max(1,2.0^(5-j))
         # real part of config space of 3rd filter
-        plot1(ps, fftshift(real(ifft(filt[:,:,(j-1)*8+3]))),bin=fac)
+        plot1(ps, fftshift(real(ifft(filt[:,:,ind[j_ind,3]]))),bin=fac)
 
         # sum all filters to form (partial) ring
-        ring = sum(filt[:,:,(j-1)*8+1:j*8].^2,dims=3)
-        plot1(ps, fftshift(ring[:,:,1]), clim=(0,1),bin=2^(j-1))
+        ring = dropdims(sum(filt[:,:,ind[j_ind,:]].^2, dims=3), dims=3)
+        plot1(ps, fftshift(ring[:,:,1]), clim=(0,1),bin=bfac)
     end
 
-    filtsum = (sum(filt[:,:,1:48].^2,dims=3))[:,:,1]
-    plot1(ps, fftshift(filtsum), clim=(-0.1,1))
-    dd = fftshift(filtsum)
-    dsym = dd+circshift(dd[end:-1:1,end:-1:1],(1,1))
-    plot1(ps, dsym, clim=(-0.1,1), bin=32)
-    phi = fftshift(filt[:,:,49])
+    wavepow = fftshift(dropdims(sum(filt[:,:,ind].^2, dims=(3,4)), dims=(3,4)))
+    plot1(ps, wavepow, clim=(-0.1,1))
+
+    if info["pc"]==1
+        wavepow += circshift(wavepow[end:-1:1,end:-1:1],(1,1))
+    end
+    plot1(ps, wavepow, clim=(-0.1,1), bin=32)
+    phi = fftshift(filt[:,:,info["phi_index"]])
     plot1(ps, phi.^2, clim=(-0.1,1), bin=32)
-    disc = dsym+(phi.^2)
+    disc = wavepow+(phi.^2)
     plot1(ps, disc, clim=(-0.1,1), bin=32)
     plot1(ps, disc, clim=(-0.1,1))
 
     myplot = plot(ps..., layout=(7,5), size = (700,1000))
     savefig(myplot, fname)
 end
-
-# -------- define a filter bank
-filt, info  = fink_filter_bank2(1, 8)
-filt2, info = fink_filter_bank2(1, 8, wd=2)
-plot_filter_bank_QA(filt, fname="newfilt.png")
-plot_filter_bank_QA(filt2, fname="newfilt2.png")
 
 
 function fink_filter_bank2(c, L; nx=256, wd=1, pc=1)
@@ -178,3 +176,42 @@ function fink_filter_bank2(c, L; nx=256, wd=1, pc=1)
 
     return filt, info
 end
+
+# -------- define a filter bank
+
+filt, info  = fink_filter_bank2(1, 8, pc=1, wd=1)
+plot_filter_bank_QA(filt, info, fname="filt-8-pc1-wd1.png")
+
+filt, info  = fink_filter_bank2(1, 8, pc=1, wd=2)
+plot_filter_bank_QA(filt, info, fname="filt-8-pc1-wd2.png")
+
+filt, info  = fink_filter_bank2(1, 8, pc=1, wd=3)
+plot_filter_bank_QA(filt, info, fname="filt-8-pc1-wd3.png")
+
+filt, info  = fink_filter_bank2(1, 8, pc=2, wd=1)
+plot_filter_bank_QA(filt, info, fname="filt-8-pc2-wd1.png")
+
+filt, info  = fink_filter_bank2(1, 16, pc=2, wd=1)
+plot_filter_bank_QA(filt, info, fname="filt-16-pc2-wd1.png")
+
+filt, info  = fink_filter_bank2(1, 16, pc=2, wd=2)
+plot_filter_bank_QA(filt, info, fname="filt-16-pc2-wd2.png")
+
+filt, info  = fink_filter_bank2(1, 16, pc=1, wd=1)
+plot_filter_bank_QA(filt, info, fname="filt-16-pc1-wd1.png")
+
+filt, info  = fink_filter_bank2(2, 8, pc=1, wd=1)
+plot_filter_bank_QA(filt, info, fname="filt2-8-pc1-wd1.png")
+
+filt, info  = fink_filter_bank2(2, 8, pc=2, wd=1)
+plot_filter_bank_QA(filt, info, fname="filt2-8-pc2-wd1.png")
+
+filt, info  = fink_filter_bank2(2, 16, pc=2, wd=1)
+plot_filter_bank_QA(filt, info, fname="filt2-16-pc2-wd1.png")
+
+filt, info  = fink_filter_bank2(2, 16, pc=2, wd=2)
+plot_filter_bank_QA(filt, info, fname="filt2-16-pc2-wd2.png")
+
+
+
+""
