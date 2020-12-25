@@ -68,7 +68,7 @@ function plot_filter_bank_QA(filt, info; fname="filter_bank_QA.png")
 end
 
 
-function fink_filter_bank2(c, L; nx=256, wd=1, pc=1)
+function fink_filter_bank2(c, L; nx=256, wd=1, pc=1, shift=false)
     #c  - sets the scale sampling rate (1 is dyadic, 2 is half dyadic)
     #L  - number of angular bins (usually 8*pc or 16*pc)
     #wd - width of the wavelets (default 1, wide 2)
@@ -78,6 +78,7 @@ function fink_filter_bank2(c, L; nx=256, wd=1, pc=1)
     # -------- set parameters
     dθ   = pc*π/L
     wdθ  = wd*dθ
+    θ_sh = shift ? dθ/2 : 0.0
     dx   = nx/2-1
     norm = 1.0/sqrt(wd)
 
@@ -97,7 +98,7 @@ function fink_filter_bank2(c, L; nx=256, wd=1, pc=1)
 
     # -------- loop over l
     for l = 0:L-1
-        θ_l        = dθ*l
+        θ_l        = dθ*l+θ_sh
         theta[l+1] = θ_l
 
     # -------- allocate anggood BitArray
@@ -211,6 +212,15 @@ plot_filter_bank_QA(filt, info, fname="filt2-16-pc2-wd1.png")
 
 filt, info  = fink_filter_bank2(2, 16, pc=2, wd=2)
 plot_filter_bank_QA(filt, info, fname="filt2-16-pc2-wd2.png")
+
+filt, info  = fink_filter_bank2(1, 8, pc=1, wd=1, shift=true)
+plot_filter_bank_QA(filt, info, fname="filt-8-pc1-wd1-shift.png")
+
+filt, info  = fink_filter_bank2(1, 16, pc=2, wd=1, shift=true)
+plot_filter_bank_QA(filt, info, fname="filt-16-pc2-wd1-shift.png")
+
+filt, info  = fink_filter_bank2(1, 16, pc=2, wd=2, shift=true)
+plot_filter_bank_QA(filt, info, fname="filt-16-pc2-wd2-shift.png")
 
 
 
