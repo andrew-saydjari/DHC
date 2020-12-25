@@ -25,3 +25,8 @@ Manifest.toml
 
 # Data that is large
 Data/*
+junk/
+*.png
+*.pdf
+*.svg
+
