@@ -8,6 +8,7 @@ module DHC_2DUtils
     export finklet
     export fink_filter_bank
     export fink_filter_list
+    export fink_filter_hash
     export DHC_compute
 
 
@@ -30,10 +31,10 @@ module DHC_2DUtils
         J = (im_scale-2)*c
 
         # -------- allocate output array of zeros
-        filt         = zeros(nx, nx, J*L+1)
-        filter_index = zeros(Int32, J, L)
-        theta        = zeros(Float64, L)
-        j_value      = zeros(Float64, J)
+        filt      = zeros(nx, nx, J*L+1)
+        psi_index = zeros(Int32, J, L)
+        theta     = zeros(Float64, L)
+        j_value   = zeros(Float64, J)
 
         # -------- allocate theta and logr arrays
         θ    = zeros(nx, nx)
@@ -83,7 +84,7 @@ module DHC_2DUtils
                 ind      = angmask[rmask]
                 f_ind    = (j_ind-1)*L+l+1
                 filt[ind, f_ind] = F_radial .* F_angular[rmask]
-                filter_index[j_ind,l+1] = f_ind
+                psi_index[j_ind,l+1] = f_ind
             end
         end
 
@@ -113,7 +114,7 @@ module DHC_2DUtils
         info["npix"]         = nx
         info["j_value"]      = j_value
         info["theta_value"]  = theta
-        info["filter_index"] = filter_index
+        info["psi_index"]    = psi_index
         info["phi_index"]    = phi_index
         info["pc"]           = pc
         info["wd"]           = wd
@@ -141,13 +142,28 @@ module DHC_2DUtils
         return [filtind, filtval]
     end
 
-    function DHC_compute(image::Array{Float64,2}, filter_list)
+
+    function fink_filter_hash(c, L; nx=256, wd=1, pc=1, shift=false)
+        # -------- compute the filter bank
+        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift)
+
+        # -------- list of non-zero pixels
+        flist = fink_filter_list(filt)
+
+        # -------- pack everything you need into the info structure
+        hash["filt_index"] = flist[1]
+        hash["filt_value"] = flist[2]
+        return hash
+    end
+
+
+    function DHC_compute(image::Array{Float64,2}, filter_hash)
         # Use 2 threads for FFT
         FFTW.set_num_threads(2)
 
         # array sizes
         (Nx, Ny)  = size(image)
-        (Nf, )    = size(filter_list[1])
+        (Nf, )    = size(filter_hash["filt_index"])
 
         # allocate coeff arrays
         out_coeff = []
@@ -171,9 +187,9 @@ module DHC_2DUtils
         ## 1st Order
         im_fd_0 = fft(norm_im)
 
-        # unpack filter_list
-        f_ind   = filter_list[1]  # (J, L) array of filters represented as index value pairs
-        f_val   = filter_list[2]
+        # unpack filter_hash
+        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val   = filter_hash["filt_value"]
 
         zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
 
