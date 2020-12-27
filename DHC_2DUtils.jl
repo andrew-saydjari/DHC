@@ -5,7 +5,6 @@ module DHC_2DUtils
     using LinearAlgebra
     using Statistics
 
-    export finklet
     export fink_filter_bank
     export fink_filter_list
     export fink_filter_hash
@@ -72,7 +71,7 @@ module DHC_2DUtils
 
         # -------- loop over j for the radial part
         #    for (j_ind, j) in enumerate(1/c:1/c:im_scale-2)
-            for j_ind = 1:c*(im_scale-2)
+            for j_ind = 1:J
                 j = j_ind/c
                 j_value[j_ind] = j  # store for later
                 jrad  = im_scale-j-1
@@ -82,7 +81,9 @@ module DHC_2DUtils
         # -------- radial part
                 F_radial = cos.(Δj[rmask] .* (c*π/2))
                 ind      = angmask[rmask]
-                f_ind    = (j_ind-1)*L+l+1
+#               Let's have these be (J,L) if you reshape...
+#                f_ind    = (j_ind-1)*L+l+1
+                f_ind    = j_ind + l*J
                 filt[ind, f_ind] = F_radial .* F_angular[rmask]
                 psi_index[j_ind,l+1] = f_ind
             end
@@ -171,6 +172,7 @@ module DHC_2DUtils
         S1  = zeros(Float64, Nf)
         S20 = zeros(Float64, Nf, Nf)
         S12 = zeros(Float64, Nf, Nf)
+        S2  = zeros(Float64, Nf, Nf)  # traditional 2nd order
 
         # allocate image arrays for internal use
         im_fdf_0_1 = zeros(Float64,           Nx, Ny, Nf)   # this must be zeroed!
@@ -227,7 +229,21 @@ module DHC_2DUtils
         S20  = Amat' * Amat
 
         append!(out_coeff, S20)
-        append!(out_coeff, S12)
+        #append!(out_coeff, S12)
+
+        ## Traditional second order
+        for f1 = 1:Nf
+            thisim = fft(im_rd_0_1[:,:,f1])  # Could try rfft here
+            # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
+            # Loop over f2 and do second-order convolution
+            for f2 = 1:Nf
+                f_i = f_ind[f2]  # CartesianIndex list for filter
+                f_v = f_val[f2]  # Values for f_i
+
+                S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i])) # sum im^2 same in real space
+            end
+        end
+        append!(out_coeff, S2)
 
         return out_coeff
     end
