@@ -81,8 +81,8 @@ module DHC_2DUtils
         # -------- radial part
                 F_radial = cos.(Δj[rmask] .* (c*π/2))
                 ind      = angmask[rmask]
-#               Let's have these be (J,L) if you reshape...
-#                f_ind    = (j_ind-1)*L+l+1
+        #      Let's have these be (J,L) if you reshape...
+        #        f_ind    = (j_ind-1)*L+l+1
                 f_ind    = j_ind + l*J
                 filt[ind, f_ind] = F_radial .* F_angular[rmask]
                 psi_index[j_ind,l+1] = f_ind
@@ -105,6 +105,9 @@ module DHC_2DUtils
         center_power[zind] .= 0.0  # set small numbers to zero
         phi_cen = zeros(nx, nx)
         phi_cen[i0:i1,i0:i1] = sqrt.(center_power)
+
+        # -------- before adding ϕ to filter bank, renormalize ψ if pc=1
+        if pc==1 filt .*= sqrt(2.0) end  # double power for half coverage
 
         # -------- add result to filter array
         phi_index  = J*L+1
@@ -187,7 +190,7 @@ module DHC_2DUtils
         append!(out_coeff,S0[:])
 
         ## 1st Order
-        im_fd_0 = fft(norm_im)
+        im_fd_0 = fft(norm_im)  # total power=1.0
 
         # unpack filter_hash
         f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
@@ -199,10 +202,10 @@ module DHC_2DUtils
         P   = plan_ifft(im_fd_0)   # P is an operator, P*im is ifft(im)
 
         ## Main 1st Order and Precompute 2nd Order
-        for l = 1:Nf
+        for f = 1:Nf
             S1tot = 0.0
-            f_i = f_ind[l]  # CartesianIndex list for filter
-            f_v = f_val[l]  # Values for f_i
+            f_i = f_ind[f]  # CartesianIndex list for filter
+            f_v = f_val[f]  # Values for f_i
             # for (ind, val) in zip(f_i, f_v)   # this is slower!
             if length(f_i) > 0
                 for i = 1:length(f_i)
@@ -210,10 +213,10 @@ module DHC_2DUtils
                     zval      = f_v[i] * im_fd_0[ind]
                     S1tot    += abs2(zval)
                     zarr[ind] = zval
-                    im_fdf_0_1[ind,l] = abs(zval)
+                    im_fdf_0_1[ind,f] = abs(zval)
                 end
-                S1[l] = S1tot
-                im_rd_0_1[:,:,l] .= abs2.(P*zarr)
+                S1[f] = S1tot/(Nx*Ny)  # image power
+                im_rd_0_1[:,:,f] .= abs2.(P*zarr)
                 zarr[f_i] .= 0
             end
         end
@@ -239,8 +242,8 @@ module DHC_2DUtils
             for f2 = 1:Nf
                 f_i = f_ind[f2]  # CartesianIndex list for filter
                 f_v = f_val[f2]  # Values for f_i
-
-                S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i])) # sum im^2 same in real space
+                # sum im^2 = sum(|fft|^2/npix)
+                S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)
             end
         end
         append!(out_coeff, S2)
