@@ -5,8 +5,8 @@ using Plots
 using BenchmarkTools
 using Profile
 using LinearAlgebra
-using StaticArrays
-using HybridArrays
+#using StaticArrays
+#using HybridArrays
 
 # put the cwd on the path so Julia can find the module
 push!(LOAD_PATH, pwd())
@@ -15,21 +15,21 @@ using DHC_2DUtils
 ##
 
 # create filter bank
-@time fink_filter_set  = fink_filter_bank(8,8)
-@time fink_filter_set2  = fink_filter_bank(8,8,wid=2)
+@time filter_hash = fink_filter_hash(1,8)
 
-# condense this to a filter list of (index, value) pairs.
-@time filter_list = fink_filter_list(fink_filter_set)
-@time filter_list2 = fink_filter_list(fink_filter_set2)
 
-# Generate phi from an L=16 filter bank
-donut = fink_filter_bank(8,16)
-phi   = sqrt.(reshape(sum(donut[:,:,8,:].^2,dims=[3,4]),256,256))
-phi_r = real(ifft(phi))
-# check that the real-space function sums to 1 as expected.
-print(sum(phi_r))
+# instantiate image of wavelet, centered
+function wavelet_image(h, ind)
+    npix   = h["npix"]
+    pixind = h["filt_index"][ind]
+    pixval = h["filt_value"][ind]
+    ψ̃ = zeros(npix,npix)
+    ψ̃[pixind] = pixval
+    ψ = ifft(ψ̃)
+    return fftshift(ψ)
+end
 
-# really we should never use j=7 finklets, only use phi.
+print(sum(wavelet_image(filter_hash,49)))
 
 test_img = rand(256,256)
 
@@ -39,38 +39,6 @@ temp2 = speedy_DHC(test_img, filter_list)
 @time speedy_DHC(test_img, filter_list)
 @benchmark speedy_DHC(test_img, filter_list)
 # mean time:        194.513 ms (8.08% GC)
-
-for l=1:8 filter_list[1][1,l] = [] end  # j=0 is useless and expensive!
-for l=1:8 filter_list[2][1,l] = [] end
-@benchmark speedy_DHC(test_img, filter_list)
-# mean time:        156.590 ms (8.67% GC)
-
-for l=1:8 filter_list[1][8,l] = [] end  # and so is j=7
-for l=1:8 filter_list[2][8,l] = [] end
-@benchmark speedy_DHC(test_img, filter_list)
-# mean time:        148.648 ms (8.75% GC)
-
-
-Profile.clear()
-@profile speedy_DHC(test_img, filter_list)
-Juno.profiler()
-
-
-
-
-
-
-function had!(A,B)
-    m,n = size(A)
-    @assert (m,n) == size(B)
-    for j in 1:n
-       for i in 1:m
-         @inbounds A[i,j] *= B[i,j]
-       end
-    end
-    return A
-end
-
 
 function DHC(image::Array{Float64,2}, filter_set::Array{Float64,4}; norm_on = 1, coeff_12_on =1, coeff_20_on = 1)
     FFTW.set_num_threads(2)
@@ -513,7 +481,6 @@ function doug_DHC(image::Array{Float64,2}, filter_list)
     append!(out_coeff, S12)
 
     ## Traditional second order
-
     for l = 1:L
         for j = 1:J
             thisim = fft(im_rd_0_1[:,:,j,l])  # Could try rfft here
@@ -547,6 +514,10 @@ Juno.profiler()
 out = doug_DHC(test_rod, filter_list2)
 S2 = reshape(out[8259:12354],8,8,8,8)
 
+#---------------
+
+
+
 
 
 
@@ -579,57 +550,71 @@ function rod(xcen, ycen, length, pa, fwhm)
             rodimage[i,j] = exp(-(dperp^2+dpara^2)/(2*sig^2))
         end
     end
+    rodimage ./= sqrt(sum(rodimage.^2))
     return rodimage
 end
 
 @time test_rod = rod(10,10,30,45,4)
 
 
-function rod_test(filter_list)
+function rod_test(filter_hash)
 
+    Nf      = length(filter_hash["filt_value"])
+    Nj      = length(filter_hash["j_value"])
+    Nl      = length(filter_hash["theta_value"])
+    Npix    = filter_hash["npix"]
+    jlind   = filter_hash["psi_index"]
     angmax  = 180
     angstep = 2
     nang    = angmax ÷ angstep+1
-    energy  = zeros(Float64, nang)
-    Siso    = zeros(8,8,8,nang)
-    Sall    = zeros(8,8,8,8,nang)
-    Sisoodd    = zeros(8,8,8,nang)
-    Sisoeven   = zeros(8,8,8,nang)
+    energy     = zeros(nang)
+    Siso       = zeros(Nj, Nj, Nl, nang)
+    Sall       = zeros(Nj, Nj, Nl, Nl, nang)
+    Sisoodd    = zeros(Nj, Nj, Nl, nang)
+    Sisoeven   = zeros(Nj, Nj, Nl, nang)
+    S2all      = zeros(Nf, Nf, nang)
+    Ef         = zeros(Nf, nang)  # energy in each filter
     for i = 1:nang
         ang = i*angstep
         rod_image = rod(10,10,30,ang,4)
         # t = speedy_DHC(rod_image, filter_list)
-        t = doug_DHC(rod_image, filter_list)
-        S20 = reshape(t[66+1:66+4096],64,64)
-        S2  = reshape(t[8259:12354],8,8,8,8)
-        energy[i] = sum(diag(S20))
+        t   = DHC_compute(rod_image, filter_hash)
+        S20_big = reshape(t[2+Nf+1:2+Nf+Nf*Nf], Nf, Nf)
+        #S20 = S20_big[1:Nj*Nl, 1:Nj*Nl]
+        off2 = 2+Nf+Nf*Nf
+        S2 = reshape(t[off2+1:off2+Nf*Nf], Nf, Nf)
+        S2all[:,:,i] = S2
+        energy[i] = sum(diag(S20_big))
+        Ef[:,i]   = diag(S20_big)
+        # if filter_hash["pc"]==1 Ef[1:Nj*Nl,i] .*= 2 end
         # Verify sum of diag(S20) = sum(S1)   (= energy)
-        println(i,"   ",energy[i],"   ",sum(t[3:66])/65536)
+        println(i,"   ",energy[i],"   ",sum(t[3:2+Nf]))
 
 
         # what about j1, j2, Delta L
-        S = reshape(S20,8,8,8,8)  #  (j1, l1, j2, l2), symmetric in j and l
+        #S = reshape(S20,Nj,Nl,Nj,Nl)  #  (j1, l1, j2, l2), symmetric in j and l
+        S = S2[jlind,jlind]  # amazing this works...
         println(sum(S))
-        for j1 = 1:8
-            for j2 = 1:8
-                for l1 = 1:8
-                    for l2 = 1:8
-                        DeltaL = mod(l1-l2,8)
+        for j1 = 1:Nj
+            for j2 = 1:Nj
+                for l1 = 1:Nl
+                    for l2 = 1:Nl
+                        DeltaL = mod(l1-l2, Nl)
                         Siso[j1,j2,DeltaL+1,i] += S[j1,l1,j2,l2]
                         # Sall[j1,j2,l1,l2,i] = S[j1,l1,j2,l2]
-                        Sall[j1,j2,l1,l2,i] = S2[j1,l1,j2,l2]
+                        Sall[j1,j2,l1,l2,i] = S[j1,l1,j2,l2]
                         #println(Siso[j1,j2,DeltaL+1,i])
                     end
                 end
-                for l1 = 1:2:7
-                    for l2 = 1:2:7
-                        DeltaL = mod(l1-l2,8)
+                for l1 = 1:2:Nl
+                    for l2 = 1:2:Nl
+                        DeltaL = mod(l1-l2, Nl)
                         Sisoodd[j1,j2,DeltaL+1,i] += S[j1,l1,j2,l2]
                     end
                 end
-                for l1 = 2:2:8
-                    for l2 = 2:2:8
-                        DeltaL = mod(l1-l2,8)
+                for l1 = 2:2:Nl
+                    for l2 = 2:2:Nl
+                        DeltaL = mod(l1-l2, Nl)
                         Sisoeven[j1,j2,DeltaL+1,i] += S[j1,l1,j2,l2]
                     end
                 end
@@ -639,8 +624,50 @@ function rod_test(filter_list)
 
     end
     println(std(Siso))
-    return (Siso, Sisoodd, Sisoeven, Sall)
+    return (Siso, Ef, Sall, S2all)
 end
+
+
+function plot_energy(Siso, S2, Ef, h)
+
+    # -------- angle array for plots
+    nang = size(Siso)[end]
+    angstep = 180/(nang-1)
+    ang = collect(0:angstep:180)
+
+    # -------- compute total energy
+    Etot = sum(Ef,dims=1)[1,:]
+    p = plot(ang, Etot, xguide="Angle [deg]", yguide="Total energy", label="S1 energy")
+
+    # -------- compute total energy from S2
+    Etot = sum(S2,dims=(1,2))[1,1,:]
+    plot!(ang, Etot, label="S2 energy")
+    display(p)
+
+    # -------- energy in the ϕ component
+    Eϕ = sum(S2[:,end,:],dims=1)[1,:]
+    p=plot(ang, Eϕ, xguide="Angle [deg]", yguide="ϕ energy")
+    display(p)
+
+    jlind = h["psi_index"]
+    S2_5d = S2[jlind, jlind,:]
+    pow   = sum(S2_5d, dims=(2,4))[:,1,:,1,:]
+    p=plot(reshape(pow[:,:,:],36,nang)',yaxis=(:log),
+           ylims=(1e-6,1e-1), xguide="Rod angle",yguide="Ang averged energy")
+    display(p)
+
+    return
+    val = Siso[j1,j2,1,:]
+    p = plot(ang, val/mean(val))
+
+    for Δl = 2:8
+        val = Siso[j1,j2,Δl,:]
+        plot!(p, ang, val/mean(val))
+    end
+    display(p)
+    return
+end
+
 
 function plot8(Siso, j1, j2)
 
@@ -648,10 +675,10 @@ function plot8(Siso, j1, j2)
     angstep = 180/(nang-1)
     ang = collect(0:angstep:180)
     val = Siso[j1,j2,1,:]
-    p = plot(ang, val/mean(val))
+    p = plot(ang, val, xguide="Angle", label="Δl=0")
     for Δl = 2:8
         val = Siso[j1,j2,Δl,:]
-        plot!(p, ang, val/mean(val))
+        plot!(p, ang, val, label="Δl=$(Δl-1)")
     end
     display(p)
 
@@ -659,13 +686,11 @@ function plot8(Siso, j1, j2)
     return
 end
 
-
-Siso = rod_test(filter_list)
-Siso2 = rod_test(filter_list2)
-(Siso2, Sisoodd, Sisoeven, Sall) = rod_test(filter_list2)
-
+filter_hash = fink_filter_hash(1,8,wd=2)
+(Siso, Ef, Sall, S2) = rod_test(filter_hash)
+plot_energy(Siso,S2,Ef,filter_hash)
 
 heatmap(Siso[:,:,1,14])
 plot(Siso[4,4,1,:]/Siso[4,4,1,1])
 
-plot8(Siso,3,4)
+plot8(Siso,3,3)

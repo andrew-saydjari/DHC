@@ -78,15 +78,14 @@ function plot_filter_bank_QA(filt, info; fname="filter_bank_QA.png")
     plot1(ps, fftshift(real(ifft(phi))), label="ϕ")
     plot1(ps, disc, clim=(-0.1,1), bin=32, label="all")
 
-    println("call myplot")
     myplot = plot(ps..., layout=(7,5), size=(1400,2000))
-    println("call savefig")
     savefig(myplot, fname)
 end
 
 # -------- define a filter bank
 
 filt, info  = fink_filter_bank(1, 8, pc=1, wd=1)
+hash = fink_filter_hash(1, 8, pc=1, wd=1)
 plot_filter_bank_QA(filt, info, fname="filt-8-pc1-wd1.png")
 
 filt, info  = fink_filter_bank(1, 8, pc=1, wd=2)

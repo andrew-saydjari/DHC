@@ -17,10 +17,15 @@ test_x, test_y   = MNIST.testdata()
 # To view, heatmap(train_x[:,:,6]',yaxis=(:flip),aspect_ratio=1)
 
 # transpose and flip, pad to 32, rebin to 64
-function mnist_pad(im)
+function mnist_pad(im; θ=0.0)
     impad = zeros(Float64,32,32)
     impad[30:-1:3,3:30] = im'
     imbig = imresize(impad,(64,64))
+    if θ != 0.0
+        print("Rotating")
+        imrot = imrotate(imbig, θ, axes(imbig), Constant())
+        return imrot
+    end
     return imbig
 end
 
@@ -181,11 +186,11 @@ end
 mlist, clist = get_all_covar(train_x, train_y, S2)
 mnist_2class_plot(train_y, S2, mlist, clist, [3,4])
 
-S2iso = reshape(make_iso(filter_hash, S2), length(Siso)÷Nd, Nd)
+S2iso = reshape(make_iso(filter_hash, S2), length(S2iso)÷Nd, Nd)
 mlist, clist = get_all_covar(train_x, train_y, S2iso)
 mnist_2class_plot(train_y, S2iso, mlist, clist, [3,4])
 
-S20iso = reshape(make_iso(filter_hash, S20), length(Siso)÷Nd, Nd)
+S20iso = reshape(make_iso(filter_hash, S20), length(S20iso)÷Nd, Nd)
 mlist, clist = get_all_covar(train_x, train_y, S20iso)
 mnist_2class_plot(train_y, S20iso, mlist, clist, [3,4])
 
@@ -194,6 +199,10 @@ mlist, clist = get_all_covar(train_x, train_y, Siso)
 mnist_2class_plot(train_y, Siso, mlist, clist, [3,4])
 
 Siso = log.([S20iso;S2iso])
+mlist, clist = get_all_covar(train_x, train_y, Siso)
+mnist_2class_plot(train_y, Siso, mlist, clist, [3,4])
+
+Siso = [S20iso; log.(S20iso)]
 mlist, clist = get_all_covar(train_x, train_y, Siso)
 mnist_2class_plot(train_y, Siso, mlist, clist, [3,4])
 
