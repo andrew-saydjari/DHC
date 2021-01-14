@@ -22,8 +22,8 @@ function mnist_pad(im; θ=0.0)
     impad[30:-1:3,3:30] = im'
     imbig = imresize(impad,(64,64))
     if θ != 0.0
-        print("Rotating")
-        imrot = imrotate(imbig, θ, axes(imbig), Constant())
+        imrot = imrotate(imbig, θ, axes(imbig))
+        imrot[findall(imrot .!= imrot)] .= 0.0
         return imrot
     end
     return imbig
@@ -31,19 +31,21 @@ end
 
 
 # call DHC WST transform
-function mnist_DHC(x, y)
+# θ in radians
+function mnist_DHC(x, y; θ=0.0)
     # filter bank
     filter_hash = fink_filter_hash(1,8,nx=64,wd=2)
 
     # get transform size}
     Nimage = size(x)[end]
-    image  = mnist_pad(x[:,:,1])
+    println("theta", θ)
+    image  = mnist_pad(x[:,:,1], θ=θ)
     test   = DHC_compute(image, filter_hash)
     Ncoeff = length(test)
     # allocate output arrays
     WST    = zeros(Ncoeff, Nimage)
     for i=1:Nimage
-        image    = mnist_pad(x[:,:,i])
+        image    = mnist_pad(x[:,:,i], θ=θ)
         WST[:,i] = DHC_compute(image, filter_hash)
     end
     return WST
@@ -59,6 +61,27 @@ nfilt = 33
 S1  = wst4[1:2+nfilt,:]
 S20 = wst4[3+nfilt:2+nfilt+nfilt^2,:]
 S2  = wst4[3+nfilt+nfilt^2:end,:]
+
+nuse = 100   # this takes 8.5 mins for 20000
+@time wstrot1 = mnist_DHC(train_x[:,:,1:nuse],train_y[1:nuse], θ=0.0)
+
+nuse = 100   # this takes 8.5 mins for 20000
+@time wstrot2 = mnist_DHC(train_x[:,:,1:nuse],train_y[1:nuse], θ=1.9)
+
+function tryit(train_x, train_y)
+    nuse = 100   # this takes 8.5 mins for 20000
+    wstrot1 = mnist_DHC(train_x[:,:,1:nuse],train_y[1:nuse], θ=0.0)
+    S20 = wstrot1[3+nfilt:2+nfilt+nfilt^2,:]
+    len20 = length(make_iso(filter_hash, S20))  # yuck
+    S20iso1 = reshape(make_iso(filter_hash, S20), len20÷nuse, nuse)
+
+    wstrot2 = mnist_DHC(train_x[:,:,1:nuse],train_y[1:nuse], θ=1.9)
+    S20 = wstrot2[3+nfilt:2+nfilt+nfilt^2,:]
+    S20iso2 = reshape(make_iso(filter_hash, S20), len20÷nuse, nuse)
+    heatmap([S20iso1 S20iso2 S20iso2-S20iso1], clim=(-0.1,0.1))
+    outim = [S20iso1 S20iso2 S20iso2-S20iso1]
+    return outim
+end
 
 
 # Compute the mean and covariance of a set of vectors, x
@@ -164,7 +187,7 @@ function make_iso(filter_hash,wst)
 
     jlind   = filter_hash["psi_index"]
 
-    S       = reshape(S2, Nf, Nf, Nd)[jlind,jlind,:]
+    S       = reshape(wst, Nf, Nf, Nd)[jlind,jlind,:]
     Siso    = zeros(Nj, Nj, Nl, Nd)
 
     for j1 = 1:Nj
