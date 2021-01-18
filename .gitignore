@@ -23,10 +23,13 @@ docs/site/
 # environment.
 Manifest.toml
 
+#PythonNotebookCheckpoints
+*.ipynb_checkpoints
+*.DS_Store
+
 # Data that is large
 Data/*
 junk/
 *.png
 *.pdf
 *.svg
-

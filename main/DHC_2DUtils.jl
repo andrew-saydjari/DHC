@@ -226,12 +226,12 @@ module DHC_2DUtils
         im_rd_0_1 .= sqrt.(im_rd_0_1)
 
         ## 2nd Order
-        Amat = reshape(im_fdf_0_1, Nx*Ny, Nf)
-        S12  = Amat' * Amat
-        Amat = reshape(im_rd_0_1, Nx*Ny, Nf)
-        S20  = Amat' * Amat
+        #Amat = reshape(im_fdf_0_1, Nx*Ny, Nf)
+        #S12  = Amat' * Amat
+        #Amat = reshape(im_rd_0_1, Nx*Ny, Nf)
+        #S20  = Amat' * Amat
 
-        append!(out_coeff, S20)
+        #append!(out_coeff, S20)
         #append!(out_coeff, S12)
 
         ## Traditional second order
