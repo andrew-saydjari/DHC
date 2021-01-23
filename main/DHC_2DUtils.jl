@@ -161,7 +161,7 @@ module DHC_2DUtils
     end
 
 
-    function DHC_compute(image::Array{Float64,2}, filter_hash)
+    function DHC_compute(image::Array{Float64,2}, filter_hash, filter_hash2)
         # Use 2 threads for FFT
         FFTW.set_num_threads(2)
 
@@ -195,6 +195,9 @@ module DHC_2DUtils
         # unpack filter_hash
         f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
         f_val   = filter_hash["filt_value"]
+
+        f_ind2   = filter_hash2["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val2   = filter_hash2["filt_value"]
 
         zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
 
@@ -240,8 +243,8 @@ module DHC_2DUtils
             # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
             # Loop over f2 and do second-order convolution
             for f2 = 1:Nf
-                f_i = f_ind[f2]  # CartesianIndex list for filter
-                f_v = f_val[f2]  # Values for f_i
+                f_i = f_ind2[f2]  # CartesianIndex list for filter
+                f_v = f_val2[f2]  # Values for f_i
                 # sum im^2 = sum(|fft|^2/npix)
                 S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)
             end

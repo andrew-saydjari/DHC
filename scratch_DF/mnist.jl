@@ -10,7 +10,6 @@ using DHC_2DUtils
 using MLDatasets
 using Images
 
-
 # read the MNIST training data, x=image, y=class
 train_x, train_y = MNIST.traindata()
 test_x, test_y   = MNIST.testdata()
