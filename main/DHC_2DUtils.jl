@@ -11,12 +11,13 @@ module DHC_2DUtils
     export DHC_compute
 
 
-    function fink_filter_bank(c, L; nx=256, wd=1, pc=1, shift=false)
+    function fink_filter_bank(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false)
         #c     - sets the scale sampling rate (1 is dyadic, 2 is half dyadic)
         #L     - number of angular bins (usually 8*pc or 16*pc)
         #wd    - width of the wavelets (default 1, wd=2 for a double covering)
         #pc    - plane coverage (default 1, full 2pi 2)
         #shift - shift in θ by 1/2 of the θ spacing
+        #Omega - true= append Omega filter (all power beyond Nyquist) so the sum of filters is 1.0
 
         # -------- set parameters
         dθ   = pc*π/L
@@ -30,7 +31,7 @@ module DHC_2DUtils
         J = (im_scale-2)*c
 
         # -------- allocate output array of zeros
-        filt      = zeros(nx, nx, J*L+1)
+        filt      = zeros(nx, nx, J*L+(Omega ? 2 : 1))
         psi_index = zeros(Int32, J, L)
         theta     = zeros(Float64, L)
         j_value   = zeros(Float64, J)
@@ -122,6 +123,17 @@ module DHC_2DUtils
         info["phi_index"]    = phi_index
         info["pc"]           = pc
         info["wd"]           = wd
+
+        if Omega     # append a filter containing the rest (outside Nyquist)
+            filter_power += filt[:,:,phi_index].^2
+            edge_power    = 1.0 .- filter_power
+            zind          = findall(edge_power .< 1E-15)
+            edge_power[zind]     .= 0.0  # set small numbers to zero
+            Omega_index           = J*L+2
+            info["Omega_index"]   = Omega_index
+            filt[:,:,Omega_index] = sqrt.(edge_power)
+        end
+
 
         return filt, info
     end
