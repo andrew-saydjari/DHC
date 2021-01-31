@@ -159,9 +159,9 @@ module DHC_2DUtils
     end
 
 
-    function fink_filter_hash(c, L; nx=256, wd=1, pc=1, shift=false)
+    function fink_filter_hash(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false)
         # -------- compute the filter bank
-        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift)
+        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega)
 
         # -------- list of non-zero pixels
         flist = fink_filter_list(filt)
