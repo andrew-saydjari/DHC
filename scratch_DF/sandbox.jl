@@ -5,6 +5,7 @@ using Profile
 using FFTW
 using Statistics
 using Optim
+using Images, FileIO
 
 #using Profile
 using LinearAlgebra
@@ -13,7 +14,7 @@ using LinearAlgebra
 push!(LOAD_PATH, pwd()*"/main")
 using DHC_2DUtils
 
-@time filt, info  = fink_filter_bank(1, 8, pc=1, wd=1)
+
 @time fhash = fink_filter_hash(1, 8, nx=64, pc=1, wd=1)
 
 function realspace_filter(Nx, f_i, f_v)
@@ -90,7 +91,7 @@ end
 
 
 
-function wst_S2_deriv(image::Array{Float64,2}, filter_hash::Dict)
+function wst_S20_deriv(image::Array{Float64,2}, filter_hash::Dict)
     function conv(a,b)
         ifft(fft(a) .* fft(b))
     end
@@ -166,7 +167,7 @@ function derivtest2(Nx)
     im0 = copy(im)
     im1[2,3] += eps/2
     im0[2,3] -= eps/2
-    dS20dp = wst_S2_deriv(im, fhash)
+    dS20dp = wst_S20_deriv(im, fhash)
 
     der0=DHC(im0,fhash,doS2=false,doS20=true)
     der1=DHC(im1,fhash,doS2=false,doS20=true)
@@ -211,10 +212,10 @@ Nx = 64
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 im = zeros(Float64, Nx, Nx)
 im[6,6]=1.0
-@benchmark blarg = wst_S2_deriv(im, fhash)
+@benchmark blarg = wst_S20_deriv(im, fhash)
 
 Profile.clear()
-@profile blarg = wst_S2_deriv(im, fhash)
+@profile blarg = wst_S20_deriv(im, fhash)
 Juno.profiler()
 
 
@@ -529,12 +530,19 @@ foo = wst_synth(init, fixmask)
 # 128x128        est 28,000  (8 hrs)
 
 
+function readdust()
+
+    RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
+    img = reinterpret(UInt8,rawview(channelview(RGBA_img)))
+
+    return img[1,:,:]
+end
 
 
 
 
 
-function wst_synthS20(im_init, fixmask)
+function wst_synthS20(im_init, fixmask, S_targ, S20sig)
     # fixmask -  0=float in fit   1=fixed
 
     function wst_synth_chisq(vec_in)
@@ -544,10 +552,11 @@ function wst_synthS20(im_init, fixmask)
 
         S20arr  = DHC(thisim, fhash, doS2=false, doS20=true)
         i0 = 3+Nf
-        diff  = (S20arr - S_targ)[i0:end]
+        diff  = ((S20arr - S_targ)./S20sig)[i0:end]
 
         # should have some kind of weight here
         chisq = diff'*diff
+        println(chisq)
         return chisq
 
     end
@@ -556,10 +565,11 @@ function wst_synthS20(im_init, fixmask)
 
         thisim = copy(im_init)
         thisim[indfloat] = vec_in
-        dS20dp = wst_S2_deriv(thisim, fhash)
+        dS20dp = wst_S20_deriv(thisim, fhash)
         S20arr = DHC(thisim, fhash, doS2=false, doS20=true)
         i0 = 3+Nf
-        diff   = (S20arr - S_targ)[i0:end]
+        # put both factors of S20sig in this array to weight
+        diff   = ((S20arr - S_targ)./(S20sig.^2))[i0:end]
 
         # dSdp matrix * S1-S_targ is dchisq
         dchisq_im = (reshape(dS20dp, Nx*Nx, Nf*Nf) * diff).*2
@@ -602,16 +612,52 @@ function wst_synthS20(im_init, fixmask)
     return im_synth
 end
 
-Nx    = 16
-fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-im    = rand(Nx,Nx)
-fixmask = im .> 0.5
+
+function S20_weights(im, fhash, Nsam=10)
+
+    (Nx, Ny)  = size(im)
+    if Nx != Ny error("Input image must be square") end
+    (Nf, )    = size(fhash["filt_index"])
+
+    # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+
+    S20   = DHC(im, fhash, doS2=false, doS20=true)
+    Ns    = length(S20)
+    S20arr = zeros(Float64, Ns, Nsam)
+    for j=1:Nsam
+        noise = rand(Nx,Nx)
+        S20arr[:,j] = DHC(im+noise, fhash, doS2=false, doS20=true)
+    end
+
+    wt = zeros(Float64, Ns)
+    for i=1:Ns
+        wt[i] = std(S20arr[i,:])
+    end
+
+    return wt
+end
+
+
+
+# read dust map
+dust = Float64.(readdust())
+dust = dust[1:256,1:256]
+
+Nx    = 64
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+im    = imresize(dust,(Nx,Nx))
+fixmask = rand(Nx,Nx) .< 0.1
+
 S_targ = DHC(im, fhash, doS2=false, doS20=true)
-
+S_targ[end] = 0
 init = copy(im)
-init[findall(fixmask .==0)] .= 0
+floatind = findall(fixmask .==0)
+init[floatind] .+= rand(length(floatind)).*5 .-25
 
-foo = wst_synthS20(init, fixmask)
+S20sig = S20_weights(im, fhash, 100)
+foo = wst_synthS20(init, fixmask, S_targ, S20sig)
+S_foo = DHC(foo, fhash, doS2=false, doS20=true)
+
 
 # using dchisq function with S20
 # size   t(BFGS) t(LBFGS) [sec]
