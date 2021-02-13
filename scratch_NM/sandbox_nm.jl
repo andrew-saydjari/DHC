@@ -515,6 +515,85 @@ end
 end
 
 
+
+
+function derivtestS1S2(Nx)
+    eps = 1e-4
+    fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+    im = rand(Float64, Nx, Nx).*0.1
+    im[6,6]=1.0
+    im1 = copy(im)
+    im0 = copy(im)
+    im1[2,3] += eps/2
+    im0[2,3] -= eps/2
+    dS1dp_existing = wst_S1_deriv(im, fhash)
+    dS1dp, dS2dp = wst_S1S2_deriv(im, fhash)
+
+    der0=DHC(im0,fhash,doS2=true,doS20=false)
+    der1=DHC(im1,fhash,doS2=true,doS20=false)
+    dSlim = (der1-der0) ./ eps
+    Nf = length(fhash["filt_index"])
+    lasts1ind = 2+Nf
+
+    dS1lim23 = dSlim[3:lasts1ind]
+    dS2lim23 = dSlim[lasts1ind+1:end]
+    dS1dp_23 = dS1dp[2, 3, :]
+    dS2dp_23 = dS2dp[2, 3, :, :]
+    #=
+    println("Checking dS1dp using existing deriv")
+    Nf = length(fhash["filt_index"])
+    lasts1ind = 2+Nf
+    diff = dS1dp_existing[2, 3, :]-dSlim[3:lasts1ind]
+    println(dSlim[3:lasts1ind])
+    println("and")
+    println(dS1dp_existing[2, 3, :])
+    println("stdev: ",std(diff))
+    println("--------------------------")=#
+    println("Checking dS1dp using dS1S2")
+    derdiff = dS1dp_23 - dS1lim23
+    println(dS1lim23)
+    println("and")
+    println(dS1dp_23)
+    txt= @sprintf("Range of S1 der0, der1: Max= %.3E, %.3E Min=%.3E, %.3E ",maximum(der0[3:lasts1ind]),maximum(der1[3:lasts1ind]),minimum(der0[3:lasts1ind]),minimum(der1[3:lasts1ind]))
+    print(txt)
+    txt = @sprintf("Checking dS1dp using S1S2 deriv, mean(abs(diff/dS1lim)): %.3E", mean(abs.(derdiff./dS1lim23)))
+    print(txt)
+    println("stdev: ",std(derdiff))
+    txt= @sprintf("Range of dS1lim: Max= %.3E Min= %.3E",maximum(abs.(dS1lim23)),minimum(abs.(dS1lim23)))
+    print(txt)
+    println("--------------------------")
+    println("Checking dS2dp using S1S2 deriv")
+    Nf = length(fhash["filt_index"])
+    println("Shape check",size(dS2dp_23),size(dS2lim23))
+    derdiff = reshape(dS2dp_23, Nf*Nf) - dS2lim23 #Column major issue here?
+    println("Difference",derdiff)
+    txt = @sprintf("Range of S2 der0, der1: Max= %.3E, %.3E Min=%.3E, %.3E \n",maximum(der0[lasts1ind+1:end]),maximum(der1[lasts1ind+1:end]),minimum(der0[lasts1ind+1:end]),minimum(der1[lasts1ind+1:end]))
+    print(txt)
+    txt = @sprintf("Range of dS2lim: Max=%.3E  Min=%.3E \n",maximum(abs.(dS2lim23)),minimum(abs.(dS2lim23)))
+    print(txt)
+    txt = @sprintf("Difference between dS2dp and dSlim Mean: %.3E stdev: %.3E mean(abs(derdiff/dS2lim)): %.3E \n",mean(derdiff),std(derdiff), mean(abs.(derdiff./dS2lim23)))
+    print(txt)
+    println("Examining only those S2 coeffs which are greater than eps=1e-3 for der0")
+    eps_mask = findall(der0[lasts1ind+1:end] .> 1E-3)
+    der0_s2good = der0[lasts1ind+1:end][eps_mask]
+    der1_s2good = der1[lasts1ind+1:end][eps_mask]
+    dSlim_s2good = dS2lim23[eps_mask]
+    derdiff_good = derdiff[eps_mask]
+    print(derdiff_good)
+    txt = @sprintf("\nRange of S2 der0, der1: Max= %.3E, %.3E Min=%.3E, %.3E \n",maximum(der0_s2good),maximum(der1_s2good),minimum(der0_s2good),minimum(der1_s2good))
+    print(txt)
+    txt = @sprintf("Range of dS2lim: Max=%.3E  Min=%.3E \n",maximum(abs.(dSlim_s2good)),minimum(abs.(dSlim_s2good)))
+    print(txt)
+    txt = @sprintf("Mean: %.3E stdev: %.3E mean(abs(derdiff/dS2lim)): %.3E \n",mean(derdiff_good),std(derdiff_good), mean(abs.(derdiff_good ./dSlim_s2good)))
+    print(txt)
+
+    #plot(dS[3:end])
+    #plot!(blarg[2,3,:])
+    #plot(diff)
+    return
+end
+
+#=OLD
 function derivtestS1S2(Nx)
     eps = 1e-4
     fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
@@ -563,7 +642,6 @@ function derivtestS1S2(Nx)
     println("Range of S2 der0, der1: Max",)
     print("Range of dS2lim: Max= ",maximum(abs.(dSlim[lasts1ind+1:end]))," Min= ",minimum(abs.(dSlim[lasts1ind+1:end])))
     println("Mean: ",mean(diff)," stdev: ",std(diff)," mean(abs(diff/dS2lim)): ", mean(abs.(diff./dSlim[lasts1ind+1:end])))
-    println("EXAMINING ONLY THE DERIVATIVES FOR ")
 
 
     #plot(dS[3:end])
@@ -571,7 +649,7 @@ function derivtestS1S2(Nx)
     #plot(diff)
     return
 end
-
+=#
 function derivtestS20(Nx)
     eps = 1e-4
     fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
@@ -705,7 +783,7 @@ im = rand(Nx,Nx)
 
 
 
-
+derivtestS1S2(16)
 
 function wst_synth(im_init, fixmask)
     # fixmask -  0=float in fit   1=fixed
