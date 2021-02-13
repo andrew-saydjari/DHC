@@ -344,7 +344,8 @@ not reinitializing the arr[f_i] somewhere: worstcase try removing all these step
 using the wrong f_i1/2
 
 =#
-function wst_S1S2_deriv(image::Array{Float64,2}, filter_hash::Dict) #Needs to be checked
+function wst_S1S2_deriv(image::Array{Float64,2}, filter_hash::Dict)
+    #Works as is: some superfluous convolution and FFT opns. Working on fixing this.
     # Use 2 threads for FFT
     FFTW.set_num_threads(2)
 
@@ -682,7 +683,7 @@ function derivtestS20(Nx)
     return
 end
 
-derivtestS1S2(16)
+derivtestS1S2(128)
 
 
 
@@ -783,7 +784,7 @@ im = rand(Nx,Nx)
 
 
 
-derivtestS1S2(16)
+derivtestS1S2(128)
 
 function wst_synth(im_init, fixmask)
     # fixmask -  0=float in fit   1=fixed
@@ -1022,7 +1023,8 @@ S_foo = DHC(foo, fhash, doS2=false, doS20=true)
 
 
 
-#DOING dS1S2 in MAIN TO EXAMINE VARS
+#DOING dS1S2 and derivtest code in MAIN TO EXAMINE VARS in workspace
+#=
 dust = Float64.(readdust())
 Nx=16
 dust = dust[1:Nx,1:Nx]
@@ -1040,7 +1042,9 @@ dS1dp, dS2dp = wst_S1S2_deriv(im, fhash)
 der0=DHC(im0,fhash,doS2=true,doS20=false)
 der1=DHC(im1,fhash,doS2=true,doS20=false)
 dSlim = (der1-der0) ./ eps
-#=
+
+
+
 println("Checking dS1dp using existing deriv")
 Nf = length(fhash["filt_index"])
 lasts1ind = 2+Nf
@@ -1048,7 +1052,7 @@ derdiff = dS1dp_existing[2, 3, :]-dSlim[3:lasts1ind]
 println(dSlim[3:lasts1ind])
 println("and")
 println(dS1dp_existing[2, 3, :])
-println("stdev: ",std(derdiff)) =#
+println("stdev: ",std(derdiff))
 println("--------------------------")
 Nf = length(fhash["filt_index"])
 lasts1ind = 2+Nf
@@ -1091,3 +1095,4 @@ txt = @sprintf("Range of dS2lim: Max=%.3E  Min=%.3E \n",maximum(abs.(dSlim_s2goo
 print(txt)
 txt = @sprintf("Mean: %.3E stdev: %.3E mean(abs(derdiff/dS2lim)): %.3E \n",mean(derdiff_good),std(derdiff_good), mean(abs.(derdiff_good ./dSlim_s2good)))
 print(txt)
+=#
