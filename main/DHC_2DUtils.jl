@@ -173,6 +173,44 @@ module DHC_2DUtils
     end
 
 
+    function wst_S1_deriv(image::Array{Float64,2}, filter_hash::Dict, nthread::Int=1)
+
+        # Use nthread threads for FFT -- but for Nx<512 nthread=1 is fastest.  Overhead?
+        FFTW.set_num_threads(nthread)
+
+        # array sizes
+        (Nx, Ny)  = size(image)
+        (Nf, )    = size(filter_hash["filt_index"])
+
+        # allocate output array
+        dS1dα  = zeros(Float64, Nx, Nx, Nf)
+
+        ## 1st Order
+        im_fd = fft(image)
+
+        # unpack filter_hash
+        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val   = filter_hash["filt_value"]
+        zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
+
+        # make a FFTW "plan" for an array of the given size and type
+        P = plan_ifft(im_fd)  # P is an operator, P*im is ifft(im)
+
+        # Loop over filters
+        for f = 1:Nf
+            f_i = f_ind[f]  # CartesianIndex list for filter
+            f_v = f_val[f]  # Values for f_i
+
+            zarr[f_i] = (f_v.*f_v) .* im_fd[f_i]
+            dS1dα[:,:,f] = 2 .* real.(P*(zarr))
+
+            zarr[f_i] .= 0   # reset zarr for next loop
+        end
+        return dS1dα
+
+    end
+
+
     function DHC_compute(image::Array{Float64,2}, filter_hash, filter_hash2)
         # Use 2 threads for FFT
         FFTW.set_num_threads(2)
