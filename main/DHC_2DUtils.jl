@@ -8,6 +8,8 @@ module DHC_2DUtils
     export fink_filter_bank
     export fink_filter_list
     export fink_filter_hash
+    export wst_S1_deriv
+    export wst_S20_deriv
     export DHC_compute
 
 
