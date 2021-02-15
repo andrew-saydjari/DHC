@@ -338,12 +338,7 @@ function wst_S20_deriv(image::Array{Float64,2}, filter_hash::Dict) #make this fa
 
 end
 
-#=Possible bugs:
-.* or .ops
-not reinitializing the arr[f_i] somewhere: worstcase try removing all these steps and redoing
-using the wrong f_i1/2
 
-=#
 function wst_S1S2_deriv(image::Array{Float64,2}, filter_hash::Dict)
     #Works as is: some superfluous convolution and FFT opns. Working on fixing this.
     # Use 2 threads for FFT
@@ -390,7 +385,7 @@ function wst_S1S2_deriv(image::Array{Float64,2}, filter_hash::Dict)
         f_i1 = f_ind[f1]  # CartesianIndex list for filter1
         f_v1 = f_val[f1]  # Values for f_i1
 
-        zarr1[f_i1] = f_v1 .* im_fd_0[f_i1] #Why do we need .* here? Presum so it doesn't matmul
+        zarr1[f_i1] = f_v1 .* im_fd_0[f_i1] #F[z]
         zarr1_rd = P*zarr1
         fz_fψ1[f_i1] = f_v1 .* zarr1[f_i1]
         fz_fψ1_rd = P*fz_fψ1
@@ -431,6 +426,103 @@ function wst_S1S2_deriv(image::Array{Float64,2}, filter_hash::Dict)
 end
 
 
+function wst_S1S2_derivfast(image::Array{Float64,2}, filter_hash::Dict)
+    #Works now.
+    #Possible Bug: You assumed zero freq in wrong place and N-k is the wrong transformation.
+    # Use 2 threads for FFT
+    FFTW.set_num_threads(2)
+
+    # array sizes
+    (Nx, Ny)  = size(image)
+    (Nf, )    = size(filter_hash["filt_index"])
+
+    # allocate output array
+    dS1dp  = zeros(Float64, Nx, Nx, Nf)
+    dS2dp  = zeros(Float64, Nx, Nx, Nf, Nf)
+
+    # allocate image arrays for internal use
+    im_rdc_0_1 = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+    im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+
+    # Not sure what to do here -- for gradients I don't think we want these
+    ## 0th Order
+    #S0[1]   = mean(image)
+    #norm_im = image.-S0[1]
+    #S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
+    #norm_im ./= sqrt(Nx*Ny*S0[2])
+
+    ## 1st Order
+    im_fd_0 = fft(image)  # total power=1.0
+
+    # unpack filter_hash
+    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+    f_val   = filter_hash["filt_value"]
+
+    f_ind_rev = [[CartesianIndex(mod1(Nx+2 - ci[1],Nx), mod1(Nx+2 - ci[2],Nx)) for ci in f_Nf] for f_Nf in f_ind]
+
+    #CartesianIndex(17,17) .- f_ind
+    # tmp arrays for all tmp[f_i] = arr[f_i] .* f_v opns
+    zarr1 = zeros(ComplexF64, Nx, Nx)
+    fz_fψ1 = zeros(ComplexF64, Nx, Nx)
+    fterm_a = zeros(ComplexF64, Nx, Nx)
+    fterm_ct1 = zeros(ComplexF64, Nx, Nx)
+    fterm_ct2 = zeros(ComplexF64, Nx, Nx)
+    #rterm_bt2 = zeros(ComplexF64, Nx, Nx)
+    # make a FFTW "plan" for an array of the given size and type
+    P = plan_ifft(im_fd_0)  # P is an operator, P*im is ifft(im)
+
+    # Loop over filters
+    for f1 = 1:Nf
+        f_i1 = f_ind[f1]  # CartesianIndex list for filter1
+        f_v1 = f_val[f1]  # Values for f_i1
+        f_i1rev = f_ind_rev[f1]
+
+        zarr1[f_i1] = f_v1 .* im_fd_0[f_i1] #F[z]
+        zarr1_rd = P*zarr1 #for frzi
+        fz_fψ1[f_i1] = f_v1 .* zarr1[f_i1]
+        fz_fψ1_rd = P*fz_fψ1
+        dS1dp[:,:,f1] = 2 .* real.(fz_fψ1_rd) #real.(conv(I_λ, ψ_λ))
+        #CHECK; that this equals derivS1fast code
+
+        #dS2 loop prep
+        #ψ_λ1  = realspace_filter(Nx, f_i1, f_v1) #Slow
+        #fcψ_λ1 = fft(conj.(ψ_λ1)) #Slow
+        I_λ1 = sqrt.(abs2.(zarr1_rd))
+        fI_λ1 = fft(I_λ1)
+        rterm_bt1 = zarr1_rd./I_λ1 #Z_λ1/I_λ1_bar.
+        rterm_bt2 = conj.(zarr1_rd)./I_λ1
+        for f2 = 1:Nf
+            f_i2 = f_ind[f2]  # CartesianIndex list for filter2
+            f_v2 = f_val[f2]  # Values for f_i2
+
+            fterm_a[f_i2] = fI_λ1[f_i2] .* (f_v2).^2 #fterm_a = F[I_λ1].F[ψ_λ]^2
+            rterm_a = P*fterm_a                #Finv[fterm_a]
+            fterm_bt1 = fft(rterm_a .* rterm_bt1) #F[Finv[fterm_a].*Z_λ1/I_λ1_bar] for T1
+            fterm_bt2 = fft(rterm_a .* rterm_bt2) #F[Finv[fterm_a].*Z_λ1_bar/I_λ1_bar] for T2
+            fterm_ct1[f_i1] = fterm_bt1[f_i1] .* f_v1    #fterm_b*F[ψ_λ]
+            #fterm_ct2 = fterm_bt2 .* fcψ_λ1             #Slow
+            #println(size(fterm_ct2[f_i1rev]),size(fterm_bt2[f_i1rev]),size(f_v1),size(conj.(f_v1)))
+            fterm_ct2[f_i1rev] = fterm_bt2[f_i1rev] .* f_v1 #f_v1 is real
+            #fterm_ct2slow = fterm_bt2 .* fcψ_λ1
+            dS2dp[:, :, f1, f2] = real.(P*(fterm_ct1 + fterm_ct2))
+
+            #Reset f2 specific tmp arrays to 0
+            fterm_a[f_i2] .= 0
+            fterm_ct1[f_i1] .=0
+            fterm_ct2[f_i1rev] .=0
+
+        end
+        # reset all reused variables to 0
+        zarr1[f_i1] .= 0
+        fz_fψ1[f_i1] .= 0
+
+
+    end
+    return dS1dp, dS2dp
+end
+
+
+
 function realconv_test(Nx, ar1, ar2)
     soln = zeros(Float64, 8)
     for x=1:8:
@@ -462,14 +554,14 @@ function realconv_test(Nx, ar1, ar2)
     println(blarg[2,3,:])
     println("stdev: ",std(diff))
 
-    #Checking that the derivative is 0 for all pixels?? need to check against autodiff?
+    #=#Delete: blarg shouldnt be 0 for all other pixels since the coefficient isnt constant wrt other pixels!!
     Nf = length(fhash["filt_index"])
     mask = trues((Nx,Nx, Nf))
     println("Nf",Nf,"Check",(size(mask)==size(blarg)))
     mask[2, 3, :] .= false
     println("Mean deriv wrt to other pixels (should be 0 for all)",mean(blarg[mask]), "Maximum",maximum(blarg[mask]))
     #For Nx=128, Mean is actually 0.002 Seems concerning since eps is 1e-4!? the max is 0.10
-    #For Nx=8, Mean is 0.01, max is 1.0 -- some kind of normalization issue?
+    #For Nx=8, Mean is 0.01, max is 1.0 -- some kind of normalization issue?=#
     return
 end
 
@@ -501,6 +593,7 @@ end
     println("and")
     println(blargfast[2,3,:])
     println("stdev: ",std(diff))
+    #=#Delete: blarg shouldnt be 0 for all other pixels since the coefficient isnt constant wrt other pixels!!
     #Check: that the derivative is 0 for all pixels?? THink about this... need to check against autodiff?
     Nf = length(fhash["filt_index"])
     mask = trues((Nx,Nx, Nf))
@@ -511,14 +604,14 @@ end
     #For Nx=8, Mean is 0.01, max is 0.90 -- some kind of normalization issue?
     #plot(dS[3:end])
     #plot!(blarg[2,3,:])
-    #plot(diff)
+    #plot(diff)=#
     return
 end
 
 
 
 
-function derivtestS1S2(Nx)
+function derivtestS1S2(Nx; mode="slow")
     eps = 1e-4
     fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
     im = rand(Float64, Nx, Nx).*0.1
@@ -528,7 +621,11 @@ function derivtestS1S2(Nx)
     im1[2,3] += eps/2
     im0[2,3] -= eps/2
     dS1dp_existing = wst_S1_deriv(im, fhash)
-    dS1dp, dS2dp = wst_S1S2_deriv(im, fhash)
+    if mode=="slow"
+        dS1dp, dS2dp = wst_S1S2_deriv(im, fhash)
+    else
+        dS1dp, dS2dp = wst_S1S2_derivfast(im, fhash)
+    end
 
     der0=DHC(im0,fhash,doS2=true,doS20=false)
     der1=DHC(im1,fhash,doS2=true,doS20=false)
@@ -552,9 +649,9 @@ function derivtestS1S2(Nx)
     println("--------------------------")=#
     println("Checking dS1dp using dS1S2")
     derdiff = dS1dp_23 - dS1lim23
-    println(dS1lim23)
-    println("and")
-    println(dS1dp_23)
+    #println(dS1lim23)
+    #println("and")
+    #println(dS1dp_23)
     txt= @sprintf("Range of S1 der0, der1: Max= %.3E, %.3E Min=%.3E, %.3E ",maximum(der0[3:lasts1ind]),maximum(der1[3:lasts1ind]),minimum(der0[3:lasts1ind]),minimum(der1[3:lasts1ind]))
     print(txt)
     txt = @sprintf("Checking dS1dp using S1S2 deriv, mean(abs(diff/dS1lim)): %.3E", mean(abs.(derdiff./dS1lim23)))
@@ -683,16 +780,19 @@ function derivtestS20(Nx)
     return
 end
 
-derivtestS1S2(128)
 
 
+derivtestS1S2(16, mode="fast")
 
-Nx=512
+Nx=16
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-im = zeros(Float64, Nx, Nx)
-im[6,6]=1.0
-@benchmark blarg = wst_S1_deriv(im, fhash)
-@benchmark blarg = wst_S1_deriv_fast(im, fhash)
+img = zeros(Float64, Nx, Nx)
+img[6,6]=1.0
+@benchmark ds1ds2slow = wst_S1S2_deriv(img, fhash)
+@benchmark ds1s2 = wst_S1S2_derivfast(img, fhash)
+@benchmark blarg = wst_S1_deriv(img, fhash)
+@benchmark blarg = wst_S1_deriv_fast(img, fhash)
+@benchmark
 # S1 deriv mean time, NM Feb10??
 # 32
 # 64    3|6|23 ms
