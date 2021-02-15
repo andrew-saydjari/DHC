@@ -29,134 +29,72 @@ end
 
 
 
-function wst_S1_deriv(image::Array{Float64,2}, filter_hash::Dict)
-    function conv(a,b)
-        ifft(fft(a) .* fft(b))
-    end
 
-    # Use 2 threads for FFT
-    FFTW.set_num_threads(2)
+function wst_S20_deriv(image::Array{Float64,2}, filter_hash::Dict, nthread::Int=1)
+
+    # Use nthread threads for FFT -- but for Nx<512 nthread=1 is fastest.  Overhead?
+    FFTW.set_num_threads(nthread)
 
     # array sizes
     (Nx, Ny)  = size(image)
     (Nf, )    = size(filter_hash["filt_index"])
 
     # allocate output array
-    dSdp  = zeros(Float64, Nx, Nx, Nf)
+    dS20dα  = zeros(Float64, Nx, Nx, Nf, Nf)
 
     # allocate image arrays for internal use
-    #im_rdc_0_1 = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
-
-    # Not sure what to do here -- for gradients I don't think we want these
-    ## 0th Order
-    #S0[1]   = mean(image)
-    #norm_im = image.-S0[1]
-    #S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
-    #norm_im ./= sqrt(Nx*Ny*S0[2])
-
-    ## 1st Order
-    im_fd_0 = fft(image)  # total power=1.0
+    im_rdc = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+    im_rd  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+    im_fd  = fft(image)
 
     # unpack filter_hash
     f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
     f_val   = filter_hash["filt_value"]
-
     zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
 
-    # make a FFTW "plan" for an array of the given size and type
-    P = plan_ifft(im_fd_0)  # P is an operator, P*im is ifft(im)
+    # make a FFTW "plan" a complex array, both forward and inverse transform
+    P_fft  = plan_fft(im_fd)   # P_fft is an operator,  P_fft*im is fft(im)
+    P_ifft = plan_ifft(im_fd)  # P_ifft is an operator, P_ifft*im is ifft(im)
 
     # Loop over filters
     for f = 1:Nf
         f_i = f_ind[f]  # CartesianIndex list for filter
         f_v = f_val[f]  # Values for f_i
 
-        zarr[f_i] = f_v .* im_fd_0[f_i]
-        I_λ = P*zarr  # complex valued ifft of zarr
-        #im_rdc_0_1[:,:,f] = I_lambda
+        zarr[f_i] = f_v .* im_fd[f_i]
+        Z_λ = P_ifft*zarr  # complex valued ifft of zarr
         zarr[f_i] .= 0   # reset zarr for next loop
-
-        #xfac = 2 .* real(I_λ)
-        #yfac = 2 .* imag(I_λ)
-        # it is clearly stupid to transform back and forth, but we will need these steps for the S20 part
-        ψ_λ  = realspace_filter(Nx, f_i, f_v)
-        # convolution requires flipping wavelet direction, equivalent to flipping sign of imaginary part.
-        # dSdp[:,:,f] = real.(conv(xfac,real(ψ_λ))) - real.(conv(yfac,imag(ψ_λ)))
-        dSdp[:,:,f] = 2 .* real.(conv(I_λ, ψ_λ))
-
+        im_rdc[:,:,f] = Z_λ
+        im_rd[:,:,f]  = abs.(Z_λ)
     end
-    return dSdp
-
-end
-
-
-
-function wst_S20_deriv(image::Array{Float64,2}, filter_hash::Dict)
-    function conv(a,b)
-        ifft(fft(a) .* fft(b))
-    end
-
-    # Use 2 threads for FFT
-    FFTW.set_num_threads(2)
-
-    # array sizes
-    (Nx, Ny)  = size(image)
-    (Nf, )    = size(filter_hash["filt_index"])
-
-    # allocate output array
-    dS20dp  = zeros(Float64, Nx, Nx, Nf, Nf)
-
-    # allocate image arrays for internal use
-    im_rdc_0_1 = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
-    im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
-
-    # Not sure what to do here -- for gradients I don't think we want these
-    ## 0th Order
-    #S0[1]   = mean(image)
-    #norm_im = image.-S0[1]
-    #S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
-    #norm_im ./= sqrt(Nx*Ny*S0[2])
-
-    ## 1st Order
-    im_fd_0 = fft(image)  # total power=1.0
-
-    # unpack filter_hash
-    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
-    f_val   = filter_hash["filt_value"]
 
     zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
-
-    # make a FFTW "plan" for an array of the given size and type
-    P = plan_ifft(im_fd_0)  # P is an operator, P*im is ifft(im)
-
-    # Loop over filters
-    for f = 1:Nf
-        f_i = f_ind[f]  # CartesianIndex list for filter
-        f_v = f_val[f]  # Values for f_i
-
-        zarr[f_i] = f_v .* im_fd_0[f_i]
-        I_λ = P*zarr  # complex valued ifft of zarr
-        zarr[f_i] .= 0   # reset zarr for next loop
-        im_rdc_0_1[:,:,f] = I_λ
-        im_rd_0_1[:,:,f]  = abs.(I_λ)
-    end
-
     for f2 = 1:Nf
-        ψ_λ  = realspace_filter(Nx, f_ind[f2], f_val[f2])
-        uvec = im_rdc_0_1[:,:,f2] ./ im_rd_0_1[:,:,f2]
+        f_i = f_ind[f2]  # CartesianIndex list for filter
+        f_v = f_val[f2]  # Values for f_i
+        uvec = im_rdc[:,:,f2] ./ im_rd[:,:,f2]
         for f1 = 1:Nf
-            cfac = im_rd_0_1[:,:,f1].*uvec
-            I1dI2 = real.(conv(cfac,ψ_λ))
-            dS20dp[:,:,f1,f2] += I1dI2
-            dS20dp[:,:,f2,f1] += I1dI2
+            temp = P_fft*(im_rd[:,:,f1].*uvec)
+            zarr[f_i] = f_v .* temp[f_i]
+
+            Z1dZ2 = real.(P_ifft*zarr)
+#          It is possible to do this with rifft, but it is not much faster...
+#            Z1dZ2 = myrealifft(zarr)
+            dS20dα[:,:,f1,f2] += Z1dZ2
+            dS20dα[:,:,f2,f1] += Z1dZ2
+            zarr[f_i] .= 0   # reset zarr for next loop
         end
     end
-
-    return dS20dp
+    return dS20dα
 
 end
 
-
+function myrealifft(fbar)
+    (Nx, Ny)  = size(fbar)
+    fbars = circshift(fbar[end:-1:1,end:-1:1],(1,1))
+    myarg = fbar[1:Ny÷2+1,:]+conj(fbars[1:Ny÷2+1,:])
+    irfft(myarg,Ny).* 0.5
+end
 
 function derivtest2(Nx)
     eps = 1e-4
@@ -198,17 +136,19 @@ Nx=128
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 im = zeros(Float64, Nx, Nx)
 im[6,6]=1.0
-@benchmark blarg = wst_S1_deriv(im, fhash)
+@benchmark blarg = wst_S1_deriv_old(im, fhash)
 
 
-# S1 deriv time, Jan 30
-# 32    17 ms
-# 64    34 ms
-# 128   115 ms
-# 256   520 ms
-# 512   2500 ms
+# S1 deriv time, Jan 30 version (old) compared to Feb 14 version from NM
+# Nx    old      Feb 14
+#   32     17 ms   0.5 ms
+#   64     34 ms   3.5 ms
+#  128    115 ms    20 ms
+#  256    520 ms    92 ms
+#  512   2500 ms   720 ms   540 ms with 2 threads
+# 1024   9500 ms  3300 ms  2500 ms with 2
 
-Nx = 64
+Nx = 256
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 im = zeros(Float64, Nx, Nx)
 im[6,6]=1.0
@@ -219,13 +159,14 @@ Profile.clear()
 Juno.profiler()
 
 
-# S2 deriv time, Jan 30
-# 8     28 ms
-# 16    112
-# 32    320
-# 64    1000
-# 128   5 sec
-# 256   ---
+# S20 deriv time, Jan 30
+# Nx     Jan 30  Feb 14
+#   8     28 ms   1 ms
+#  16    112      7
+#  32    320     50
+#  64   1000    400
+# 128   5 sec     3.3 sec
+# 256   ---      17.2 sec
 # 512   ---
 
 
