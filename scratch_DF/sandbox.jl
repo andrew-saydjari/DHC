@@ -158,6 +158,133 @@ function myrealifft(fbar)
 end
 
 
+
+function wst_S1S2_derivfast(image::Array{Float64,2}, filter_hash::Dict)
+    #Works now.
+    #Possible Bug: You assumed zero freq in wrong place and N-k is the wrong transformation.
+    # Use 2 threads for FFT
+    FFTW.set_num_threads(2)
+
+    # array sizes
+    (Nx, Ny)  = size(image)
+    (Nf, )    = size(filter_hash["filt_index"])
+
+    # allocate output array
+    dS1dp  = zeros(Float64, Nx, Nx, Nf)
+    dS2dp  = zeros(Float64, Nx, Nx, Nf, Nf)
+
+    # allocate image arrays for internal use
+    im_rdc_0_1 = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+    im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+
+    ## 1st Order
+    im_fd_0 = fft(image)  # total power=1.0
+
+    # unpack filter_hash
+    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+    f_val   = filter_hash["filt_value"]
+
+    f_ind_rev = [[CartesianIndex(mod1(Nx+2 - ci[1],Nx), mod1(Nx+2 - ci[2],Nx)) for ci in f_Nf] for f_Nf in f_ind]
+
+    # tmp arrays for all tmp[f_i] = arr[f_i] .* f_v opns
+    zarr1     = zeros(ComplexF64, Nx, Nx)
+    fz_fψ1    = zeros(ComplexF64, Nx, Nx)
+    fterm_a   = zeros(ComplexF64, Nx, Nx)
+    fterm_ct1 = zeros(ComplexF64, Nx, Nx)
+    fterm_ct2 = zeros(ComplexF64, Nx, Nx)
+    #rterm_bt2 = zeros(ComplexF64, Nx, Nx)
+    # make a FFTW "plan" for an array of the given size and type
+    P = plan_ifft(im_fd_0)  # P is an operator, P*im is ifft(im)
+
+    # Loop over filters
+    for f1 = 1:Nf
+        f_i1 = f_ind[f1]  # CartesianIndex list for filter1
+        f_v1 = f_val[f1]  # Values for f_i1
+        f_i1rev = f_ind_rev[f1]
+
+        zarr1[f_i1] = f_v1 .* im_fd_0[f_i1] #F[z]
+        zarr1_rd = P*zarr1 #for frzi
+        fz_fψ1[f_i1] = f_v1 .* zarr1[f_i1]
+        fz_fψ1_rd = P*fz_fψ1
+        dS1dp[:,:,f1] = 2 .* real.(fz_fψ1_rd) #real.(conv(I_λ, ψ_λ))
+        #CHECK; that this equals derivS1fast code
+
+        #dS2 loop prep
+        #ψ_λ1  = realspace_filter(Nx, f_i1, f_v1) #Slow
+        #fcψ_λ1 = fft(conj.(ψ_λ1)) #Slow
+        I_λ1 = sqrt.(abs2.(zarr1_rd))
+        fI_λ1 = fft(I_λ1)
+        rterm_bt1 = zarr1_rd./I_λ1 #Z_λ1/I_λ1_bar.
+        rterm_bt2 = conj.(zarr1_rd)./I_λ1
+        for f2 = 1:Nf
+            f_i2 = f_ind[f2]  # CartesianIndex list for filter2
+            f_v2 = f_val[f2]  # Values for f_i2
+
+            fterm_a[f_i2] = fI_λ1[f_i2] .* (f_v2).^2 #fterm_a = F[I_λ1].F[ψ_λ]^2
+            rterm_a = P*fterm_a                #Finv[fterm_a]
+
+            fterm_bt1 = fft(rterm_a .* rterm_bt1) #F[Finv[fterm_a].*Z_λ1/I_λ1_bar] for T1
+            fterm_bt2 = fft(rterm_a .* rterm_bt2) #F[Finv[fterm_a].*Z_λ1_bar/I_λ1_bar] for T2
+            fterm_ct1[f_i1] = fterm_bt1[f_i1] .* f_v1    #fterm_b*F[ψ_λ]
+            #fterm_ct2 = fterm_bt2 .* fcψ_λ1             #Slow
+            #println(size(fterm_ct2[f_i1rev]),size(fterm_bt2[f_i1rev]),size(f_v1),size(conj.(f_v1)))
+            fterm_ct2[f_i1rev] = fterm_bt2[f_i1rev] .* f_v1 #f_v1 is real
+            #fterm_ct2slow = fterm_bt2 .* fcψ_λ1
+            dS2dp[:, :, f1, f2] = real.(P*(fterm_ct1 + fterm_ct2))
+            #println("Term2",fterm_ct2)
+
+            #Reset f2 specific tmp arrays to 0
+            fterm_a[f_i2] .= 0
+            fterm_ct1[f_i1] .=0
+            fterm_ct2[f_i1rev] .=0
+
+        end
+        # reset all reused variables to 0
+        zarr1[f_i1] .= 0
+        fz_fψ1[f_i1] .= 0
+
+
+    end
+    return dS1dp, dS2dp
+end
+
+
+
+
+function derivtestS1S2(Nx)
+    eps = 1e-4
+    fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+    im = rand(Float64, Nx, Nx).*0.1
+    im[6,6]=1.0
+    im1 = copy(im)
+    im0 = copy(im)
+    im1[2,3] += eps/2
+    im0[2,3] -= eps/2
+    dS1dp, dS2dp = wst_S1S2_derivfast(im, fhash)
+    println(size(dS2dp))
+    der0=DHC(im0,fhash,doS2=true)
+    der1=DHC(im1,fhash,doS2=true)
+    dS = (der1-der0) ./ eps
+
+    Nf = length(fhash["filt_index"])
+    i0 = 3+Nf
+    blarg = dS2dp[2,3,:,:]
+    diff = dS[i0:end]-reshape(blarg,Nf*Nf)
+    println(dS[i0:end])
+    println("and")
+    println(blarg)
+    println("stdev: ",std(diff))
+    println()
+    println(diff)
+
+    return
+end
+
+derivtestS1S2(8)
+
+
+println(1)
+
 function derivtest2(Nx)
     eps = 1e-4
     fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
@@ -184,9 +311,6 @@ function derivtest2(Nx)
     println()
     println(diff)
 
-    #plot(dS[3:end])
-    #plot!(blarg[2,3,:])
-    #plot(diff)
     return
 end
 
@@ -198,7 +322,7 @@ Nx=128
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 im = zeros(Float64, Nx, Nx)
 im[6,6]=1.0
-@benchmark blarg = wst_S1_deriv_old(im, fhash)
+@benchmark blarg = wst_S1_deriv(im, fhash)
 
 
 # S1 deriv time, Jan 30 version (old) compared to Feb 14 version from NM
@@ -210,7 +334,24 @@ im[6,6]=1.0
 #  512   2500 ms   720 ms   540 ms with 2 threads
 # 1024   9500 ms  3300 ms  2500 ms with 2
 
-Nx = 256
+Nx = 128
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+im = zeros(Float64, Nx, Nx)
+im[6,6]=1.0
+@benchmark blarg,blafb2 = wst_S1S2_derivfast(im, fhash)
+
+# S20 vs S2 deriv time, Feb 15
+# Nx     S20
+#   8      1 ms    27 ms
+#  16      7      104
+#  32     50      300
+#  64    400 ms   1.1 sec
+# 128    3.3 sec  5.0
+# 256   17.2 sec
+# 512   ---
+
+
+Nx = 32
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 im = zeros(Float64, Nx, Nx)
 im[6,6]=1.0
@@ -450,7 +591,8 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig)
         i0 = 3+Nf
         # put both factors of S20sig in this array to weight
         diff   = ((S20arr - S_targ)./(S20sig.^2))[i0:end]
-
+        #println("size of diff", size(diff))
+        #println("size of dS20dp", size(reshape(dS20dp, Nx*Nx, Nf*Nf)))
         # dSdp matrix * S1-S_targ is dchisq
         dchisq_im = (reshape(dS20dp, Nx*Nx, Nf*Nf) * diff).*2
         dchisq = reshape(dchisq_im, Nx, Nx)[indfloat]
@@ -482,7 +624,9 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig)
     println("Clever: ",clever[1])
 
     # call optimizer
-    res = optimize(wst_synth_chisq, wst_synth_dchisq, vec_init, BFGS())
+    #res = optimize(wst_synth_chisq, wst_synth_dchisq, copy(vec_init), BFGS())
+    res = optimize(wst_synth_chisq, wst_synth_dchisq, copy(vec_init),
+        ConjugateGradient(), Optim.Options(iterations=2000))
 
     # copy results into pixels of output image
     im_synth = copy(im_init)
@@ -523,24 +667,40 @@ end
 dust = Float64.(readdust())
 dust = dust[1:256,1:256]
 
+Nx    = 128
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+im    = imresize(dust,(Nx,Nx))
+fixmask = rand(Nx,Nx) .< 0.1
+
+S_targ = DHC(im, fhash, doS2=false, doS20=true)
+#S_targ[end] = 0
+init = copy(im)
+floatind = findall(fixmask .==0)
+init[floatind] .+= rand(length(floatind)).*50 .-25
+
+S20sig = S20_weights(im, fhash, 100)
+foo = wst_synthS20(init, fixmask, S_targ, S20sig)
+S_foo = DHC(foo, fhash, doS2=false, doS20=true)
+
+init64 = imresize(foo,(64,64))
+
 Nx    = 64
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 im    = imresize(dust,(Nx,Nx))
 fixmask = rand(Nx,Nx) .< 0.1
 
 S_targ = DHC(im, fhash, doS2=false, doS20=true)
-S_targ[end] = 0
-init = copy(im)
-floatind = findall(fixmask .==0)
-init[floatind] .+= rand(length(floatind)).*5 .-25
+#S_targ[end] = 0
 
 S20sig = S20_weights(im, fhash, 100)
-foo = wst_synthS20(init, fixmask, S_targ, S20sig)
+foo = wst_synthS20(init64, fixmask, S_targ, S20sig)
 S_foo = DHC(foo, fhash, doS2=false, doS20=true)
+
 
 
 # using dchisq function with S20
 # size   t(BFGS) t(LBFGS) [sec]
-# 8x8      33
-# 16x16    -
-# 32x32
+# 8x8      30
+# 16x16    90
+# 32x32   189                           74
+# 64x64  1637                          531
