@@ -291,3 +291,28 @@ plot_filter_bank_QA(filt, info, fname="/Users/saydjari/Dropbox/GradSchool_AKS/Do
 hash = fink_filter_hash_AKS(1, 8, pc=1, wd=1)
 
 DHC_compute(rand(256,256),hash,hash)
+
+filt, info  = fink_filter_bank_AKS(1, 16, pc=1, wd=2)
+info
+
+plot_filter_bank_QA(filt, info, fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/filt-16-pc1-wd2-aks.png")
+
+filt, info  = fink_filter_bank_AKS(1, 32, pc=1, wd=2)
+info
+
+plot_filter_bank_QA(filt, info, fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/filt-32-pc1-wd2-aks.png")
+
+filt, info  = fink_filter_bank_AKS(1, 64, pc=1, wd=2)
+info
+
+plot_filter_bank_QA(filt, info, fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/filt-64-pc1-wd2-aks.png")
+
+filt, info  = fink_filter_bank_AKS(2, 64, pc=1, wd=2)
+info
+
+plot_filter_bank_QA(filt, info, fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/filt-2-64-pc1-wd2-aks.png")
+
+filt, info  = fink_filter_bank_AKS(2, 8, pc=1, wd=2)
+info
+
+plot_filter_bank_QA(filt, info, fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/filt-2-8-pc1-wd2-aks.png")
