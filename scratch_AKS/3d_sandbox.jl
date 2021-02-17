@@ -153,7 +153,7 @@ function fink_filter_bank(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, sa
     return filt, info
 end
 
-function fink_filter_bank_3dizer(hash, c; nz=256)
+function fink_filter_bank_3dizer(hash, cz; nz=256)
     # -------- set parameters
     nx = convert(Int64,hash["npix"])
     n2d = size(hash["filt_value"])[1]
@@ -161,7 +161,7 @@ function fink_filter_bank_3dizer(hash, c; nz=256)
 
     im_scale = convert(Int8,log2(nz))
     # -------- number of bins in radial direction (size scales)
-    K = (im_scale-2)*c
+    K = (im_scale-2)*cz
 
     # -------- allocate output array of zeros
     #filt      = zeros(Float64, nx, nx, nz, K*n2d)
@@ -182,15 +182,15 @@ function fink_filter_bank_3dizer(hash, c; nz=256)
     end
 
     for k_ind = 1:K
-        k = k_ind/c
+        k = k_ind/cz
         k_value[k_ind] = k  # store for later
         krad  = im_scale-k-1
         Δk    = abs.(logr.-krad)
-        kmask = (Δk .<= 1/c)
+        kmask = (Δk .<= 1/cz)
         k_count = count(kmask)
 
         # -------- radial part
-        F_z[:,:,kmask].= reshape(cos.(Δk[kmask] .* (c*π/2)),1,1,k_count)
+        F_z[:,:,kmask].= reshape(cos.(Δk[kmask] .* (cz*π/2)),1,1,k_count)
 
         for index = 1:n2d
             p_ind = hash["filt_index"][index]
@@ -204,7 +204,25 @@ function fink_filter_bank_3dizer(hash, c; nz=256)
             #psi_index[j_ind,l+1] = f_ind
         end
     end
-    return [filtind,filtval]
+
+    # -------- metadata dictionary
+    info=Dict()
+    info["2d_npix"]         = hash["npix"]
+    info["2d_j_value"]      = hash["npix"]
+    info["2d_theta_value"]  = hash["theta_value"]
+    info["2d_psi_index"]    = hash["psi_index"]
+    info["2d_phi_index"]    = hash["phi_index"]
+    info["2d_pc"]           = hash["pc"]
+    info["2d_wd"]           = hash["wd"]
+    info["2d_fs_center_r"]  = hash["fs_center_r"]
+
+    info["nz"]              = nz
+    info["cz"]              = cz
+    info["k_value"]         = k_value
+    info["filt_index"]      = filtind
+    info["filt_value"]      = filtval
+
+    return info
 end
 
 hash = fink_filter_hash(1, 4, nx=128, pc=1, wd=1)
