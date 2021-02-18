@@ -105,7 +105,9 @@ module DHC_2DUtils
                     rmask = (Δj .<= 1/c)
 
             # -------- radial part
-                    F_radial = cos.(Δj[rmask] .* (c*π/2))
+                    F_radial = cos.(Δj[rmask] .* (c*π/2))                filt = zeros(nx,nx,nz)
+                                    ind = lup[j_ind,l_ind,k_ind]
+                                    filt[index[ind]] = value[ind]
                     ind      = angmask[rmask]
             #      Let's have these be (J,L) if you reshape...
             #        f_ind    = (j_ind-1)*L+l+1

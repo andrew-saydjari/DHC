@@ -926,6 +926,7 @@ function fink_filter_bank_3dizer(hash, cz; nz=256)
     logr      = zeros(Float64,nz)
     filt_temp = zeros(Float64,nx,nx,nz)
     F_z       = zeros(Float64,nx,nx,nz)
+    #F_p       = zeros(Float64,nx,nx,nz)
 
     filtind = fill(CartesianIndex{3}[], K*n2d)
     filtval = fill(Float64[], K*n2d)
@@ -943,17 +944,22 @@ function fink_filter_bank_3dizer(hash, cz; nz=256)
         Δk    = abs.(logr.-krad)
         kmask = (Δk .<= 1/cz)
         k_count = count(kmask)
+        k_vals = findall(kmask)
 
         # -------- radial part
-        @views F_z[:,:,kmask].= reshape(cos.(Δk[kmask] .* (cz*π/2)),1,1,k_count)
-
+        #I have somehow dropped a factor of sqrt(2) which has been reinserted as a 0.5... fix my brain
+        @views F_z[:,:,kmask].= reshape(1/sqrt(2).*cos.(Δk[kmask] .* (cz*π/2)),1,1,k_count)
         @inbounds for index = 1:n2d
             p_ind = hash["filt_index"][index]
             p_filt = hash["filt_value"][index]
+            #F_p[p_ind,:] .= p_filt
             f_ind    = k_ind + (index-1)*K
             @views filt_tmp = p_filt.*F_z[p_ind,kmask]
+            #temp_ind = findall((F_p .> 1E-13) .& (F_z .> 1E-13))
+            #@views filt_tmp = F_p[temp_ind].*F_z[temp_ind]
             ind = findall(filt_tmp .> 1E-13)
-            @views filtind[f_ind] = map(x->CartesianIndex(p_ind[x[1]][1],p_ind[x[1]][2],x[2]),ind)
+            @views filtind[f_ind] = map(x->CartesianIndex(p_ind[x[1]][1],p_ind[x[1]][2],k_vals[x[2]]),ind)
+            #filtind[f_ind] = temp_ind[ind]
             @views filtval[f_ind] = filt_tmp[ind]
             @views J_L_K[f_ind,:] = [hash["J_L"][index,1],hash["J_L"][index,2],k_ind-1]
             psi_index[hash["J_L"][index,1]+1,hash["J_L"][index,2]+1,k_ind] = f_ind
@@ -974,7 +980,6 @@ function fink_filter_bank_3dizer(hash, cz; nz=256)
     info["2d_filt_index"]   = hash["filt_index"]
     info["2d_filt_value"]   = hash["filt_value"]
 
-
     info["nz"]              = nz
     info["cz"]              = cz
     info["J_L_K"]           = psi_index
@@ -988,16 +993,18 @@ end
 
 filt_3d = fink_filter_bank_3dizer(filter_hash, 1, nz=256)
 
+@time filt_3d = fink_filter_bank_3dizer(filter_hash, 1, nz=256)
+
 @benchmark filt_3d = fink_filter_bank_3dizer(filter_hash, 1, nz=256)
 
 using Plots; gr()
 using Measures
 theme(:dark)
 
-function plot_filter_bank_QA(hash; fname="filter_bank_QA.png")
+function plot_filter_bank_QAxy(hash; fname="filter_bank_QA.png")
 
     # -------- define plot1 to append plot to a list
-    function plot1(ps, image; clim=nothing, bin=1.0, fsz=12, label=nothing)
+    function plot1(ps, image; clim=nothing, bin=1.0, fsz=12, label=nothing,color=:white)
         # ps    - list of plots to append to
         # image - image to heatmap
         # clim  - tuple of color limits (min, max)
@@ -1017,7 +1024,7 @@ function plot_filter_bank_QA(hash; fname="filter_bank_QA.png")
             legend=false,xtickfontsize=fsz,ytickfontsize=fsz,#tick_direction=:out,
             rightmargin=marg,leftmargin=marg,topmargin=marg,bottommargin=marg))
         if label != nothing
-            annotate!(lims'*[.96,.04],lims'*[.09,.91],text(label,:left,:white,16))
+            annotate!(lims'*[.96,.04],lims'*[.09,.91],text(label,:left,color,16))
         end
         return
     end
@@ -1085,17 +1092,174 @@ function plot_filter_bank_QA(hash; fname="filter_bank_QA.png")
     end
 
     filt = zeros(nx,nx,nz)
-    for indx in lup[1:J,:,:]
+    for indx in lup[1:J,:,2]
         filt[index[indx]] .+= value[indx].^2
     end
 
     wavepow = fftshift(dropdims(sum(filt, dims=3), dims=3))
-    plot1(ps, wavepow, clim=(-0.1,1), label=string("j=1:",J," ℓ=0:",L-1," K=1:",K))
+    plot1(ps, wavepow, clim=(-0.1,1), label=string("j=1:",J," ℓ=0:",L-1," K=1:",K),color=:black)
 
     if hash["2d_pc"]==1
         wavepow += circshift(wavepow[end:-1:1,end:-1:1],(1,1))
     end
-    plot1(ps, wavepow, clim=(-0.1,1), bin=32, label="missing power")
+    plot1(ps, wavepow, #clim=(0,K),
+        bin=32, label="missing power",color=:black)
+
+    phi_z = zeros(nx,nx,nz)
+    for indx in lup[J+1,1,2]
+        phi_z[index[indx]] .+= value[indx].^2
+    end
+
+    phi_rs = zeros(nx,nx,nz)
+    for indx in lup[J+1,1,2]
+        phi_rs[index[indx]] .+= value[indx]
+    end
+    phi_rst = fftshift(real(ifft(phi_rs)))[:,:,krs]
+
+    k = kval[K]
+    krs = convert(Int64,(max(1,2.0^(7-k))+nz/2))
+    kfs = convert(Int64,(max(1,2.0^(7-k))+1))
+
+    phi_shift = fftshift(dropdims(sum(phi_z, dims=3), dims=3))
+    plot1(ps, phi_shift, #clim=(0,K),
+        bin=32, label="ϕ")
+    disc = wavepow.+phi_shift
+    plot1(ps, phi_rst, label=string("ϕ k=",convert(Int64,k)))
+    plot1(ps, disc, #clim=(0,K),
+        bin=32, label="all", color=:black)
+
+    myplot = plot(ps..., layout=(19,5), size=(3000,8000))
+    savefig(myplot, fname)
+    return phi_z
+end
+
+temp1 = plot_filter_bank_QAxy(filt_3d, fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/images/filt-3d.png")
+
+function plot_filter_bank_QAxz(hash; fname="filter_bank_QA.png")
+
+    # -------- define plot1 to append plot to a list
+    function plot1(ps, image; clim=nothing, binx=1.0, biny=1.0, fsz=12, label=nothing,color=:white)
+        # ps    - list of plots to append to
+        # image - image to heatmap
+        # clim  - tuple of color limits (min, max)
+        # bin   - bin down by this factor, centered on nx/2+1
+        # fsz   - font size
+        marg   = -1mm
+        nx, ny = size(image)
+        nxb    = nx/round(Integer, 2*binx)
+        nyb    = ny/round(Integer, 2*biny)
+
+        # -------- center on nx/2+1
+        xi0 = max(1,round(Integer, (nx/2+2)-nxb-1))
+        xi1 = min(nx,round(Integer, (nx/2)+nxb+1))
+        xlims = [xi0,xi1]
+
+        yi0 = max(1,round(Integer, (ny/2+2)-nyb-1))
+        yi1 = min(ny,round(Integer, (ny/2)+nyb+1))
+        ylims = [yi0,yi1]
+
+        subim = image[xi0:xi1,yi0:yi1]
+        push!(ps, heatmap(image,aspect_ratio=biny/binx,clim=clim,
+            xlims=xlims, ylims=ylims, size=(400,400),
+            legend=false,xtickfontsize=fsz,ytickfontsize=fsz,#tick_direction=:out,
+            rightmargin=marg,leftmargin=marg,topmargin=marg,bottommargin=marg))
+        if label != nothing
+            annotate!(xlims'*[.96,.04],ylims'*[.09,.91],text(label,:left,color,16))
+        end
+        return
+    end
+
+    # -------- initialize array of plots
+    ps   = []
+    jval = hash["2d_j_value"]
+    kval = hash["k_value"]
+    J    = length(hash["2d_j_value"])
+    L    = length(hash["2d_theta_value"])
+    K    = length(hash["k_value"])
+    nx   = hash["2d_npix"]
+    nz   = hash["nz"]
+    lup  = hash["psi_index"]
+    index= hash["filt_index"]
+    value= hash["filt_value"]
+    # plot the first 3 and last 3 j values
+    jplt = [1:3;J-2:J]
+    lplt = [1,2,L]
+    kplt = [1,2,K]
+
+    # -------- loop over k
+    for k_ind in kplt
+        # -------- loop over j
+        k = kval[k_ind]
+        krs = convert(Int64,(max(1,2.0^(7-k))+nz/2))
+        kfs = convert(Int64,(max(1,2.0^(7-k))+1))
+        kfac = max(1,2.0^(k-1))
+        for j_ind in jplt
+            # first 3 filters in Fourier space
+            j = jval[j_ind]
+            jrs = convert(Int64,(max(1,2.0^(7-j))+nx/2))
+            jfs = convert(Int64,(max(1,2.0^(7-j))+1))
+
+            bfac = max(1,2.0^(j-1))
+            # -------- loop over l
+            for l_ind in lplt
+                label=string("j=",j_ind," ℓ=",l_ind-1," k=",k_ind)
+                filt = zeros(nx,nx,nz)
+                ind = lup[j_ind,l_ind,k_ind]
+                filt[index[ind]] = value[ind]
+                #temp = dropdims(sum(filt,dims=2),dims=2)
+                #temp = filt[:,nx÷2,:]
+                plot1(ps, fftshift(filt)[nx÷2,:,:], #clim=(0,1),
+                      binx=kfac, biny=bfac, label=label)
+            end
+            j_fac = max(1,2.0^(5-j))
+            k_fac = max(1,2.0^(5-k))
+            # real part of config space of 1st filter
+            l_ind = 1
+
+            filt = zeros(nx,nx,nz)
+            ind = lup[j_ind,l_ind,k_ind]
+            filt[index[ind]] = value[ind]
+            rs = fftshift(real(ifft(filt)))
+            rs_slice = rs[nx÷2,:,:]
+            plot1(ps, rs_slice,
+                  binx=k_fac, biny=j_fac, label=string("j=",j_ind," ℓ=",l_ind-1," k=",k_ind))
+
+            filt = zeros(nx,nx,nz)
+            ind = lup[j_ind,l_ind,k_ind]
+            filt[index[ind]] = value[ind]
+            rs = fftshift(real(ifft(filt)))
+            rs_slice = rs[:,nx÷2,:]
+            plot1(ps, rs_slice,
+                binx=k_fac, biny=j_fac, label=string("j=",j_ind," ℓ=",l_ind-1," k=",k_ind))
+
+            # sum all filters to form (partial) ring
+            ring = zeros(nx,nx)
+            filt = zeros(nx,nx,nz)
+            for indx in lup[j_ind,:,k_ind]
+                filt[index[indx]] .+= value[indx].^2
+            end
+            ring = filt
+            plot1(ps, fftshift(ring)[nx÷2,:,:], #clim=(0,1),
+                  binx=kfac, biny=bfac, label=string("j=",j_ind," ℓ=",0,":",L-1," k=",k_ind))
+        end
+    end
+
+    filt = zeros(nx,nx,nz)
+    for indx in lup[1:J,:,:]
+        filt[index[indx]] .+= value[indx].^2
+    end
+
+    wavepow = fftshift(filt)
+    plot1(ps, wavepow[:,nx÷2,:], #clim=(-0.1,1),
+    label=string("j=1:",J," ℓ=0:",L-1," K=1:",K))
+
+    wavepow2 = wavepow[:,nx÷2,:]
+    if hash["2d_pc"]==1
+        wavepow2 += reverse(wavepow[:,nx÷2,:], dims = 2)
+        wavepow2 += circshift(wavepow2[end:-1:1,end:-1:1],(1,1))
+    end
+    plot1(ps, wavepow2, #clim=(0,K),
+        binx=16, label="missing power",color=:black)
 
     phi_z = zeros(nx,nx,nz)
     for indx in lup[J+1,1,:]
@@ -1106,17 +1270,46 @@ function plot_filter_bank_QA(hash; fname="filter_bank_QA.png")
     for indx in lup[J+1,1,:]
         phi_rs[index[indx]] .+= value[indx]
     end
-    phi_rs .= fftshift(real(ifft(phi_rs)))
+    phi_rst = fftshift(real(ifft(phi_rs)))[:,:,krs]
 
+    k = kval[K]
+    krs = convert(Int64,(max(1,2.0^(7-k))+nz/2))
+    kfs = convert(Int64,(max(1,2.0^(7-k))+1))
 
-    phi_shift = fftshift(dropdims(sum(phi_z, dims=3), dims=3))
-    plot1(ps, phi_shift, clim=(-0.1,1), bin=32, label="ϕ")
-    disc = wavepow.+phi_shift
-    plot1(ps, phi_rs[:,:,krs], string("j=",j_ind," ℓ=",0,":",L-1," k=",k_ind))
-    plot1(ps, disc, clim=(-0.1,1), bin=32, label="all")
+    phi_shift = fftshift(dropdims(sum(phi_z, dims=1), dims=1))
+    plot1(ps, phi_shift, #clim=(0,K),
+        binx=32, label="ϕ")
+    disc = wavepow[:,nx÷2,:].+phi_shift
+    plot1(ps, phi_rst, label=string("ϕ k=",convert(Int64,k)))
+    plot1(ps, disc, #clim=(0,K),
+        binx=32, label="all", color=:black)
 
-    myplot = plot(ps..., layout=(19,5), size=(2000,8000))
+    plot1(ps, disc, #clim=(0,K),
+        binx=32, label="all", color=:black)
+
+    myplot = plot(ps..., layout=(19,6), size=(3000,8000))
     savefig(myplot, fname)
+
+    filt = zeros(nx,nx,nz)
+    ind = lup[1,1,1]
+    filt[index[ind]] = value[ind]
+
+    return wavepow
 end
 
-plot_filter_bank_QA(filt_3d, fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/images/filt-3d.png")
+temp1 = plot_filter_bank_QAxz(filt_3d, fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/images/filt-3dxz.png")
+
+nx = convert(Int64,filt_3d["2d_npix"])
+nz = 256
+lup  = filt_3d["psi_index"]
+index= filt_3d["filt_index"]
+value= filt_3d["filt_value"]
+
+filt = zeros(nx,nx,nz)
+ind = lup[1,1,1]
+filt[index[ind]] = value[ind]
+plot(dropdims(sum(filt[1,].^2,dims=(1,2)),dims=(1,2)),xlims=(0,128))
+
+filt = zeros(nx,nx,nz)
+filt[filt_3d[1]] = filt_3d[2]
+plot(dropdims(sum(filt.^2,dims=(1,2)),dims=(1,2)),xlims=(0,128))
