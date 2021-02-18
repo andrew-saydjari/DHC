@@ -37,6 +37,7 @@ module DHC_2DUtils
         # -------- allocate output array of zeros
         filt      = zeros(nx, nx, J*L+(Omega ? 2 : 1))
         psi_index = zeros(Int32, J, L)
+        psi_ind_in= zeros(Int32, J*L+(Omega ? 2 : 1), 2)
         theta     = zeros(Float64, L)
         j_value   = zeros(Float64, J)
 
@@ -111,6 +112,7 @@ module DHC_2DUtils
                     f_ind    = j_ind + l*J
                     filt[ind, f_ind] = F_radial .* F_angular[rmask]
                     psi_index[j_ind,l+1] = f_ind
+                    psi_ind_in[f_ind,:] = [j_ind-1,l]
                 end
             end
         end
@@ -138,6 +140,7 @@ module DHC_2DUtils
         # -------- add result to filter array
         phi_index  = J*L+1
         filt[:,:,phi_index] .= fftshift(phi_cen)
+        psi_ind_in[phi_index,:] = [J,0]
 
         # -------- metadata dictionary
         info=Dict()
@@ -146,6 +149,7 @@ module DHC_2DUtils
         info["theta_value"]  = theta
         info["psi_index"]    = psi_index
         info["phi_index"]    = phi_index
+        info["J_L"]          = psi_ind_in
         info["pc"]           = pc
         info["wd"]           = wd_j
         info["fs_center_r"]  = j_rad_exp
