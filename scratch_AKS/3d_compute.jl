@@ -112,7 +112,7 @@ function DHC_compute_3d(image::Array{Float64,3}, filter_hash)
 
     # allocate image arrays for internal use
     im_fdf_0_1 = zeros(Float64,           Nx, Ny, Nz, Nf)   # this must be zeroed!
-    im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nz, Nf)
+    im_rd_0_1  = Array{Float64, 4}(undef, Nx, Ny, Nz, Nf)
 
     ## 0th Order
     S0[1]   = mean(image)
@@ -186,3 +186,23 @@ function DHC_compute_3d(image::Array{Float64,3}, filter_hash)
 
     return out_coeff
 end
+
+filter_hash = fink_filter_hash(1, 8, nx=64, pc=1, wd=2)
+filt_3d = fink_filter_bank_3dizer(filter_hash, 1, nz=64)
+
+test_img = rand(64,64,64)
+DHC_compute_3d(test_img,filt_3d)
+
+@time DHC_compute_3d(test_img,filt_3d)
+
+@benchmark DHC_compute_3d(test_img,filt_3d)
+
+filter_hash = fink_filter_hash(1, 16, nx=64, pc=2, wd=2)
+filt_3d = fink_filter_bank_3dizer(filter_hash, 1, nz=64)
+
+test_img = rand(64,64,64)
+DHC_compute_3d(test_img,filt_3d)
+
+@benchmark DHC_compute_3d(test_img,filt_3d)
+
+fink_filter_hash(1, 8, nx=64, pc=1, wd=1)
