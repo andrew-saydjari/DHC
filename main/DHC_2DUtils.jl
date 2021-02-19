@@ -191,6 +191,90 @@ module DHC_2DUtils
     end
 
 
+    function S2_iso_matrix(fhash)
+        # fhash is the filter hash output by fink_filter_hash
+        # The output matrix converts an S2 coeff vector to S2iso by
+        #   summing over l1,l2 and fixed Δl.
+        # Matrix is stored in sparse CSC format using SparseArrays.
+        # DPF 2021-Feb-18
+
+        # Does hash contain Omega filter?
+        Omega   = haskey(fhash, "Omega_index")
+        if Omega Ω_ind = fhash["Omega_index"] end
+
+        # unpack fhash
+        Nl      = length(fhash["theta_value"])
+        Nj      = length(fhash["j_value"])
+        Nf      = length(fhash["filt_value"])
+        ψ_ind   = fhash["psi_index"]
+        ϕ_ind   = fhash["phi_index"]
+
+        # number of iso coefficients
+        Niso    = Omega ? Nj*Nj*Nl+4*Nj+4 : Nj*Nj*Nl+2*Nj+1
+        Mat     = zeros(Int32, Niso, Nf*Nf)
+
+        # first J*J*L elements of iso
+        for j1 = 1:Nj
+            for j2 = 1:Nj
+                for l1 = 1:Nl
+                    for l2 = 1:Nl
+                        DeltaL = mod(l1-l2, Nl)
+                        λ1     = ψ_ind[j1,l1]
+                        λ2     = ψ_ind[j2,l2]
+
+                        Iiso   = j1+Nj*((j2-1)+Nj*DeltaL)
+                        Icoeff = λ1+Nf*(λ2-1)
+                        Mat[Iiso, Icoeff] = 1
+                    end
+                end
+            end
+        end
+
+        # Next J elements are λϕ, then J elements ϕλ
+        for j = 1:Nj
+            for l = 1:Nl
+                λ      = ψ_ind[j,l]
+                Iiso   = Nj*Nj*Nl+j
+                Icoeff = λ+Nf*(ϕ_ind-1)  # λϕ
+                Mat[Iiso, Icoeff] = 1
+
+                Iiso   = Nj*Nj*Nl+Nj+j
+                Icoeff = ϕ_ind+Nf*(λ-1)  # ϕλ
+                Mat[Iiso, Icoeff] = 1
+            end
+        end
+
+        # Next 1 element is ϕϕ
+        I0     = Nj*Nj*Nl+Nj+Nj+1
+        Icoeff = ϕ_ind+Nf*(ϕ_ind-1)
+        Mat[I0, Icoeff] = 1
+
+        # If the Omega filter exists, add more terms
+        if Omega
+            # Next J elements are λΩ, then J elements Ωλ
+            for j = 1:Nj
+                for l = 1:Nl
+                    λ      = ψ_ind[j,l]
+                    Iiso   = I0+j
+                    Icoeff = λ+Nf*(Ω_ind-1)  # λΩ
+                    Mat[Iiso, Icoeff] = 1
+
+                    Iiso   = I0+Nj+j
+                    Icoeff = Ω_ind+Nf*(λ-1)  # Ωλ
+                    Mat[Iiso, Icoeff] = 1
+                end
+            end
+            # Next 3 elements are ϕΩ, Ωϕ, ΩΩ
+            Iiso   = I0+Nj+Nj
+            Mat[Iiso+1, ϕ_ind+Nf*(Ω_ind-1)] = 1
+            Mat[Iiso+2, Ω_ind+Nf*(ϕ_ind-1)] = 1
+            Mat[Iiso+3, Ω_ind+Nf*(Ω_ind-1)] = 1
+        end
+
+        return sparse(Mat)
+    end
+
+
     function fink_filter_hash(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false)
         # -------- compute the filter bank
         filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega)
@@ -201,6 +285,11 @@ module DHC_2DUtils
         # -------- pack everything you need into the info structure
         hash["filt_index"] = flist[1]
         hash["filt_value"] = flist[2]
+
+        # -------- compute matrix that projects iso coeffs, add to hash
+        S2_iso_mat = S2_iso_matrix(hash)
+        hash["S2_iso_mat"] = S2_iso_mat
+
         return hash
     end
 
