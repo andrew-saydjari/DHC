@@ -3,6 +3,7 @@ module DHC_2DUtils
 
     using FFTW
     using LinearAlgebra
+    using SparseArrays
     using Statistics
     using Test
 
@@ -191,6 +192,45 @@ module DHC_2DUtils
     end
 
 
+    function S1_iso_matrix(fhash)
+        # fhash is the filter hash output by fink_filter_hash
+        # The output matrix converts an S1 coeff vector to S1iso by
+        #   summing over l
+        # Matrix is stored in sparse CSC format using SparseArrays.
+        # DPF 2021-Feb-18
+
+        # Does hash contain Omega filter?
+        Omega   = haskey(fhash, "Omega_index")
+        if Omega Ω_ind = fhash["Omega_index"] end
+
+        # unpack fhash
+        Nl      = length(fhash["theta_value"])
+        Nj      = length(fhash["j_value"])
+        Nf      = length(fhash["filt_value"])
+        ψ_ind   = fhash["psi_index"]
+        ϕ_ind   = fhash["phi_index"]
+
+        # number of iso coefficients
+        Niso    = Omega ? Nj+2 : Nj+1
+        Mat     = zeros(Int32, Niso, Nf)
+
+        # first J elements of iso
+        for j = 1:Nj
+            for l = 1:Nl
+                λ = ψ_ind[j,l]
+                Mat[j, λ] = 1
+            end
+        end
+
+        # Next elements are ϕ, Ω
+        I0     = Nj+1
+        Mat[I0, ϕ_ind] = 1
+        if Omega Mat[I0+1, Ω_ind] = 1 end
+
+        return sparse(Mat)
+    end
+
+
     function S2_iso_matrix(fhash)
         # fhash is the filter hash output by fink_filter_hash
         # The output matrix converts an S2 coeff vector to S2iso by
@@ -287,6 +327,8 @@ module DHC_2DUtils
         hash["filt_value"] = flist[2]
 
         # -------- compute matrix that projects iso coeffs, add to hash
+        S1_iso_mat = S1_iso_matrix(hash)
+        hash["S1_iso_mat"] = S1_iso_mat
         S2_iso_mat = S2_iso_matrix(hash)
         hash["S2_iso_mat"] = S2_iso_mat
 
