@@ -175,7 +175,7 @@ module Deriv_Utils
             f_i = f_ind[f]  # CartesianIndex list for filter
             f_v = f_val[f]  # Values for f_i
 
-            zarr[f_i] = f_v .* im_fd_0[f_i] 
+            zarr[f_i] = f_v .* im_fd_0[f_i]
             #Old: I_λ = P*zarr  # complex valued ifft of zarr, Should have been z_lambda in the latex conv
             #im_rdc_0_1[:,:,f] = I_lambda
 
@@ -206,8 +206,8 @@ module Deriv_Utils
         (Nf, )    = size(filter_hash["filt_index"])
 
         # allocate output array
-        dS1dp  = zeros(Float64, Nx, Nx, Nf)
-        dS2dp  = zeros(Float64, Nx, Nx, Nf, Nf)
+        dS1dp  = zeros(Float64, Nf, Nx, Nx) #Mod zeros(Float64, Nx, Nx, Nf)
+        dS2dp  = zeros(Float64, Nf*Nf, Nx, Nx) #Mod
 
         # allocate image arrays for internal use
         im_rdc_0_1 = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
@@ -250,7 +250,7 @@ module Deriv_Utils
             zarr1_rd = P*zarr1 #for frzi
             fz_fψ1[f_i1] = f_v1 .* zarr1[f_i1]
             fz_fψ1_rd = P*fz_fψ1
-            dS1dp[:,:,f1] = 2 .* real.(fz_fψ1_rd) #real.(conv(I_λ, ψ_λ))
+            dS1dp[f1, :,:] = 2 .* real.(fz_fψ1_rd) #real.(conv(I_λ, ψ_λ)) #Mod
             #CHECK; that this equals derivS1fast code
 
             #dS2 loop prep
@@ -273,7 +273,7 @@ module Deriv_Utils
                 #println(size(fterm_ct2[f_i1rev]),size(fterm_bt2[f_i1rev]),size(f_v1),size(conj.(f_v1)))
                 fterm_ct2[f_i1rev] = fterm_bt2[f_i1rev] .* f_v1 #f_v1 is real
                 #fterm_ct2slow = fterm_bt2 .* fcψ_λ1
-                dS2dp[:, :, f1, f2] = real.(P*(fterm_ct1 + fterm_ct2))
+                dS2dp[(Nf*(f1-1))+f2, :, :] = real.(P*(fterm_ct1 + fterm_ct2)) #Mod
 
                 #Reset f2 specific tmp arrays to 0
                 fterm_a[f_i2] .= 0
@@ -287,7 +287,7 @@ module Deriv_Utils
 
 
         end
-        return dS1dp, dS2dp
+        return vcat(dS1dp, dS2dp) #Mod
     end
 
     function wst_S20_deriv(image::Array{Float64,2}, filter_hash::Dict) #make this faster
