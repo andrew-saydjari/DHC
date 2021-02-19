@@ -5,7 +5,7 @@ using BenchmarkTools
 using LinearAlgebra
 
 # put the cwd on the path so Julia can find the module
-push!(LOAD_PATH, pwd())
+push!(LOAD_PATH, "/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/main")
 using DHC_2DUtils
 using MLDatasets
 using Images
@@ -28,7 +28,7 @@ function mnist_pad(im; θ=0.0)
     return imbig
 end
 
-
+filter_hash = fink_filter_hash(1,8,nx=64,wd=2)
 # call DHC WST transform
 # θ in radians
 function mnist_DHC(x, y; θ=0.0)
@@ -39,13 +39,13 @@ function mnist_DHC(x, y; θ=0.0)
     Nimage = size(x)[end]
     println("theta", θ)
     image  = mnist_pad(x[:,:,1], θ=θ)
-    test   = DHC_compute(image, filter_hash)
+    test   = DHC_compute(image, filter_hash,filter_hash)
     Ncoeff = length(test)
     # allocate output arrays
     WST    = zeros(Ncoeff, Nimage)
     for i=1:Nimage
         image    = mnist_pad(x[:,:,i], θ=θ)
-        WST[:,i] = DHC_compute(image, filter_hash)
+        WST[:,i] = DHC_compute(image, filter_hash,filter_hash)
     end
     return WST
 end
@@ -100,6 +100,7 @@ function get_covar(x; cut=0.0)
     x̄     = mean(xx,dims=2)[:,1]
     xsub  = xx.-x̄
     cov   = (xsub * xsub') ./ Nx
+    println(Nx)
     return x̄, cov
 end
 
@@ -172,9 +173,9 @@ function mnist_2class_plot(y, wst, mlist, clist, classes)
 
     ind1 = findall(y[1:Nd] .== class1)
     ind2 = findall(y[1:Nd] .== class2)
-    scatter(χ2_1[ind1],χ2_2[ind1],lims=(0,1000),msize=2,label=class1)
+    scatter(χ2_1[ind1],χ2_2[ind1],msize=2,label=class1)
     scatter!(χ2_1[ind2],χ2_2[ind2],msize=2,label=class2)
-    plot!([0,1000],[0,1000],label=nothing)
+    #plot!([0,1000],[0,1000],label=nothing)
 end
 
 
@@ -203,12 +204,12 @@ function make_iso(filter_hash,wst)
     return Siso
 end
 
+S2iso = make_iso(filter_hash,S20)
 
+mlist, clist = get_all_covar(train_x, train_y, S20)
+mnist_2class_plot(train_y, S20, mlist, clist, [3,4])
 
-mlist, clist = get_all_covar(train_x, train_y, S2)
-mnist_2class_plot(train_y, S2, mlist, clist, [3,4])
-
-S2iso = reshape(make_iso(filter_hash, S2), length(S2iso)÷Nd, Nd)
+#S2iso = reshape(make_iso(filter_hash, S20), length(S2iso)÷Nd, Nd)
 mlist, clist = get_all_covar(train_x, train_y, S2iso)
 mnist_2class_plot(train_y, S2iso, mlist, clist, [3,4])
 
@@ -231,19 +232,19 @@ mnist_2class_plot(train_y, Siso, mlist, clist, [3,4])
 
 
 
-Nd = 20000
+Nd = 40000
 class1 = 4
 nk = 600
 ind1 = findall(train_y[1:Nd] .== class1)
-mn1,cov1 = get_covar(wst[200+1:200+nk,ind1]+1e-5 .*randn(nk,length(ind1)),cut=1000)
-c1 = get_chi2(wst[200+1:200+nk,:], mn1, cov1)
+mn1,cov1 = get_covar(wst4[200+1:200+nk,ind1]+1e-5 .*randn(nk,length(ind1)),cut=1000)
+c1 = get_chi2(wst4[200+1:200+nk,:], mn1, cov1)
 histogram((c1[ind1]./nk))
 println("Median: ",median(c1[ind1]), "   Mean: ",mean(c1[ind1]))
 
 ind2 = findall((train_y[1:Nd] .== class1) .& (c1 .< 1.5*nk))
 println("Keeping ",100*length(ind2)/length(ind1), " %")
-mn2,cov2 = get_covar(wst[200+1:200+nk,ind2]+1e-5 .*randn(nk,length(ind2)))
-c2 = get_chi2(wst[200+1:200+nk,:], mn2, cov2)
+mn2,cov2 = get_covar(wst4[200+1:200+nk,ind2]+1e-5 .*randn(nk,length(ind2)))
+c2 = get_chi2(wst4[200+1:200+nk,:], mn2, cov2)
 histogram((c2[ind2]./nk))
 println("Median: ",median(c2[ind2]), "   Mean: ",mean(c2[ind2]))
 
