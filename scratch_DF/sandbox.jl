@@ -9,6 +9,7 @@ using Images, FileIO
 
 #using Profile
 using LinearAlgebra
+using SparseArrays
 
 # put the cwd on the path so Julia can find the module
 push!(LOAD_PATH, pwd()*"/main")
@@ -19,13 +20,15 @@ using DHC_2DUtils
 
 
 function DHC(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
-    doS2::Bool=true, doS12::Bool=false, doS20::Bool=false)
+    doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false)
     # image        - input for WST
     # filter_hash  - filter hash from fink_filter_hash
     # filter_hash2 - filters for second order.  Default to same as first order.
     # doS2         - compute S2 coeffs
     # doS12        - compute S2 coeffs
     # doS20        - compute S2 coeffs
+    # norm         - scale to mean zero, unit variance
+    # iso          - sum over angles to obtain isotropic coeffs
 
     # Use 2 threads for FFT
     FFTW.set_num_threads(2)
@@ -34,7 +37,7 @@ function DHC(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filt
     (Nx, Ny)  = size(image)
     if Nx != Ny error("Input image must be square") end
     (Nf, )    = size(filter_hash["filt_index"])
-    if Nf == 0 error("filter hash corrupted") end
+    if Nf == 0  error("filter hash corrupted") end
 
     # allocate coeff arrays
     out_coeff = []
@@ -54,9 +57,11 @@ function DHC(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filt
     S0[1]   = mean(image)
     norm_im = image.-S0[1]
     S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
-    # norm_im ./= sqrt(Nx*Ny*S0[2])
-    # println("norm off")
-    norm_im = copy(image)
+    if norm
+        norm_im ./= sqrt(Nx*Ny*S0[2])
+    else
+        norm_im = copy(image)
+    end
 
     append!(out_coeff,S0[:])
 
@@ -93,12 +98,14 @@ function DHC(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filt
             zarr[f_i] .= 0
         end
     end
-    append!(out_coeff, S1[:])
+
+    append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
+
 
     # we stored the abs()^2, so take sqrt (this is faster to do all at once)
     if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
 
-
+    Mat2 = filter_hash["S2_iso_mat"]
     if doS2
         f_ind2   = filter_hash2["filt_index"]  # (J, L) array of filters represented as index value pairs
         f_val2   = filter_hash2["filt_value"]
@@ -115,25 +122,22 @@ function DHC(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filt
                 S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)
             end
         end
-        append!(out_coeff, S2)
+        append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
     end
-
 
     # Fourier domain 2nd order
     if doS12
         Amat = reshape(im_fdf_0_1, Nx*Nx, Nf)
         S12  = Amat' * Amat
-        append!(out_coeff, S12)
+        append!(out_coeff, iso ? Mat2*S12[:] : S12[:])
     end
-
 
     # Real domain 2nd order
     if doS20
         Amat = reshape(im_rd_0_1, Nx*Nx, Nf)
         S20  = Amat' * Amat
-        append!(out_coeff, S20)
+        append!(out_coeff, iso ? Mat2*S20[:] : S20[:])
     end
-
 
     return out_coeff
 end
@@ -148,6 +152,25 @@ function realspace_filter(Nx, f_i, f_v)
     filt = ifft(zarr)  # real space, complex
     return filt
 end
+
+
+
+Nx = 256
+bar = rand(2500,100)
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+#M = S2_iso_matrix(fhash, sparse=false)
+#Ms = sparse(M)
+Ms = fhash["S2_iso_mat"]
+M = Array(Ms)
+@benchmark M*bar
+@benchmark Ms*bar
+
+# M*bar test
+# Nx         full   sparse
+# 128       0.8 ms     4 μs
+# 128x100   45  ms   500 μs
+# 256       1.9 ms     7 μs
+# 256x100   90  ms   800 μs
 
 
 function myrealifft(fbar)
@@ -563,7 +586,7 @@ end
 
 
 
-function wst_synthS20(im_init, fixmask, S_targ, S20sig)
+function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
     # fixmask -  0=float in fit   1=fixed
 
     function wst_synth_chisq(vec_in)
@@ -571,9 +594,13 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig)
         thisim = copy(im_init)
         thisim[indfloat] = vec_in
 
-        S20arr  = DHC(thisim, fhash, doS2=false, doS20=true)
-        i0 = 3+Nf
-        diff  = ((S20arr - S_targ)./S20sig)[i0:end]
+        M20 = fhash["S2_iso_mat"]
+
+        S20 = DHC(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso)
+        i0 = 3+(iso ? N1iso : Nf)
+        diff  = ((S20[i0:end] - S_targ)./S20sig)
+
+
 
         # should have some kind of weight here
         chisq = diff'*diff
@@ -586,15 +613,23 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig)
 
         thisim = copy(im_init)
         thisim[indfloat] = vec_in
-        dS20dp = wst_S20_deriv(thisim, fhash)
-        S20arr = DHC(thisim, fhash, doS2=false, doS20=true)
-        i0 = 3+Nf
+
+        dS20dp = reshape(wst_S20_deriv(thisim, fhash), Nx*Nx, Nf*Nf)
+        if iso
+            M20 = fhash["S2_iso_mat"]
+            dS20dp = dS20dp * M20'
+        end
+        i0 = 3+(iso ? N1iso : Nf)
+
+        S20arr = (DHC(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
+
         # put both factors of S20sig in this array to weight
-        diff   = ((S20arr - S_targ)./(S20sig.^2))[i0:end]
+        diff   = (S20arr - S_targ)./(S20sig.^2)
         #println("size of diff", size(diff))
         #println("size of dS20dp", size(reshape(dS20dp, Nx*Nx, Nf*Nf)))
         # dSdp matrix * S1-S_targ is dchisq
-        dchisq_im = (reshape(dS20dp, Nx*Nx, Nf*Nf) * diff).*2
+        #dchisq_im = (reshape(dS20dp, Nx*Nx, Nf*Nf) * diff).*2
+        dchisq_im = (dS20dp * diff).*2
         dchisq = reshape(dchisq_im, Nx, Nx)[indfloat]
 
         storage .= dchisq
@@ -602,7 +637,7 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig)
 
     (Nx, Ny)  = size(im_init)
     if Nx != Ny error("Input image must be square") end
-    (Nf, )    = size(fhash["filt_index"])
+    (N1iso, Nf)    = size(fhash["S1_iso_mat"])
 
 
     # index list of pixels to float in fit
@@ -626,7 +661,7 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig)
     # call optimizer
     #res = optimize(wst_synth_chisq, wst_synth_dchisq, copy(vec_init), BFGS())
     res = optimize(wst_synth_chisq, wst_synth_dchisq, copy(vec_init),
-        ConjugateGradient(), Optim.Options(iterations=2000))
+        ConjugateGradient(), Optim.Options(iterations=1000))
 
     # copy results into pixels of output image
     im_synth = copy(im_init)
@@ -637,20 +672,20 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig)
 end
 
 
-function S20_weights(im, fhash, Nsam=10)
+function S20_weights(im, fhash, Nsam=10; iso=iso)
 
     (Nx, Ny)  = size(im)
     if Nx != Ny error("Input image must be square") end
-    (Nf, )    = size(fhash["filt_index"])
+    (N1iso, Nf)    = size(fhash["S1_iso_mat"])
 
     # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 
-    S20   = DHC(im, fhash, doS2=false, doS20=true)
+    S20   = DHC(im, fhash, doS2=false, doS20=true, norm=false, iso=iso)
     Ns    = length(S20)
     S20arr = zeros(Float64, Ns, Nsam)
     for j=1:Nsam
         noise = rand(Nx,Nx)
-        S20arr[:,j] = DHC(im+noise, fhash, doS2=false, doS20=true)
+        S20arr[:,j] = DHC(im+noise, fhash, doS2=false, doS20=true, norm=false, iso=iso)
     end
 
     wt = zeros(Float64, Ns)
@@ -667,34 +702,27 @@ end
 dust = Float64.(readdust())
 dust = dust[1:256,1:256]
 
-Nx    = 128
+Nx     = 64
+doiso  = true
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(N1iso, Nf)    = size(fhash["S1_iso_mat"])
+i0 = 3+(doiso ? N1iso : Nf)
 im    = imresize(dust,(Nx,Nx))
 fixmask = rand(Nx,Nx) .< 0.1
 
-S_targ = DHC(im, fhash, doS2=false, doS20=true)
-#S_targ[end] = 0
+
+S_targ = DHC(im, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
+S_targ = S_targ[i0:end]
+
 init = copy(im)
 floatind = findall(fixmask .==0)
 init[floatind] .+= rand(length(floatind)).*50 .-25
 
-S20sig = S20_weights(im, fhash, 100)
-foo = wst_synthS20(init, fixmask, S_targ, S20sig)
-S_foo = DHC(foo, fhash, doS2=false, doS20=true)
+S20sig = S20_weights(im, fhash, 100, iso=doiso)
+S20sig = S20sig[i0:end]
+foo = wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
+S_foo = DHC(foo, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
 
-init64 = imresize(foo,(64,64))
-
-Nx    = 64
-fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
-im    = imresize(dust,(Nx,Nx))
-fixmask = rand(Nx,Nx) .< 0.1
-
-S_targ = DHC(im, fhash, doS2=false, doS20=true)
-#S_targ[end] = 0
-
-S20sig = S20_weights(im, fhash, 100)
-foo = wst_synthS20(init64, fixmask, S_targ, S20sig)
-S_foo = DHC(foo, fhash, doS2=false, doS20=true)
 
 
 
@@ -703,4 +731,5 @@ S_foo = DHC(foo, fhash, doS2=false, doS20=true)
 # 8x8      30
 # 16x16    90
 # 32x32   189                           74
-# 64x64  1637                          531
+# 64x64  1637                          531      642 iso
+# 128x128                              2 hrs
