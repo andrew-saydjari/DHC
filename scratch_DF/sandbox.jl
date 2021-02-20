@@ -163,8 +163,8 @@ function derivtestS1S2(Nx)
     im0[2,3] -= eps/2
     dS1dp, dS2dp = wst_S1S2_derivfast(im, fhash)
     println(size(dS2dp))
-    der0=DHC(im0,fhash,doS2=true)
-    der1=DHC(im1,fhash,doS2=true)
+    der0=DHC_compute(im0,fhash,doS2=true)
+    der1=DHC_compute(im1,fhash,doS2=true)
     dS = (der1-der0) ./ eps
 
     Nf = length(fhash["filt_index"])
@@ -197,8 +197,8 @@ function derivtest2(Nx)
     im0[2,3] -= eps/2
     dS20dp = wst_S20_deriv(im, fhash)
 
-    der0=DHC(im0,fhash,doS2=false,doS20=true)
-    der1=DHC(im1,fhash,doS2=false,doS20=true)
+    der0=DHC_compute(im0,fhash,doS2=false,doS20=true)
+    der1=DHC_compute(im1,fhash,doS2=false,doS20=true)
     dS = (der1-der0) ./ eps
 
     Nf = length(fhash["filt_index"])
@@ -291,8 +291,8 @@ function derivtest(Nx)
     im0[2,3] -= eps/2
     blarg = wst_S1_deriv(im, fhash)
 
-    der0=DHC(im0,fhash,doS2=false)
-    der1=DHC(im1,fhash,doS2=false)
+    der0=DHC_compute(im0,fhash,doS2=false)
+    der1=DHC_compute(im1,fhash,doS2=false)
     dS = (der1-der0) ./ eps
 
 
@@ -315,34 +315,34 @@ derivtest(128)
 Nx=32
 im = rand(Nx,Nx)
 @time fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-@benchmark Sarr = DHC(im, fhash, doS2=false)  # 0.36 ms
-@benchmark Sarr = DHC(im, fhash, doS2=true)   # 6.4 ms
-@benchmark Sarr = DHC(im, fhash, doS2=false, doS12=true)  # 0.7 ms
-@benchmark Sarr = DHC(im, fhash, doS2=false, doS20=true)  # 2.1 ms
+@benchmark Sarr = DHC_compute(im, fhash, doS2=false)  # 0.36 ms
+@benchmark Sarr = DHC_compute(im, fhash, doS2=true)   # 6.4 ms
+@benchmark Sarr = DHC_compute(im, fhash, doS2=false, doS12=true)  # 0.7 ms
+@benchmark Sarr = DHC_compute(im, fhash, doS2=false, doS20=true)  # 2.1 ms
 
 
 Nx=64
 im = rand(Nx,Nx)
 @time fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-@benchmark Sarr = DHC(im, fhash, doS2=false)  # 1.3 ms
-@benchmark Sarr = DHC(im, fhash, doS2=true)   # 19 ms
-@benchmark Sarr = DHC(im, fhash, doS2=false, doS12=true)  # 2.8 ms
-@benchmark Sarr = DHC(im, fhash, doS2=false, doS20=true)  # 6.6 ms
+@benchmark Sarr = DHC_compute(im, fhash, doS2=false)  # 1.3 ms
+@benchmark Sarr = DHC_compute(im, fhash, doS2=true)   # 19 ms
+@benchmark Sarr = DHC_compute(im, fhash, doS2=false, doS12=true)  # 2.8 ms
+@benchmark Sarr = DHC_compute(im, fhash, doS2=false, doS20=true)  # 6.6 ms
 
 
 Nx=256
 im = rand(Nx,Nx)
 @time fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-@benchmark Sarr = DHC(im, fhash, doS2=false)  # 25 ms
-@benchmark Sarr = DHC(im, fhash, doS2=true)   # 375 ms
-@benchmark Sarr = DHC(im, fhash, doS2=false, doS12=true)  # 55 ms
-@benchmark Sarr = DHC(im, fhash, doS2=false, doS20=true)  # 130 ms
+@benchmark Sarr = DHC_compute(im, fhash, doS2=false)  # 25 ms
+@benchmark Sarr = DHC_compute(im, fhash, doS2=true)   # 375 ms
+@benchmark Sarr = DHC_compute(im, fhash, doS2=false, doS12=true)  # 55 ms
+@benchmark Sarr = DHC_compute(im, fhash, doS2=false, doS20=true)  # 130 ms
 
 
 Nx = 64
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 im = rand(Nx,Nx)
-S_targ = DHC(im, fhash, doS2=false)
+S_targ = DHC_compute(im, fhash, doS2=false)
 
 im = rand(Nx,Nx)
 
@@ -360,7 +360,7 @@ function wst_synth(im_init, fixmask)
         thisim = copy(im_init)
         thisim[indfloat] = vec_in
 
-        Sarr  = DHC(thisim, fhash, doS2=false)
+        Sarr  = DHC_compute(thisim, fhash, doS2=false)
         diff  = (Sarr .- S_targ)[3:end]
 
         # should have some kind of weight here
@@ -374,7 +374,7 @@ function wst_synth(im_init, fixmask)
         thisim = copy(im_init)
         thisim[indfloat] = vec_in
         dSdp   = wst_S1_deriv(thisim, fhash)
-        S1arr  = DHC(thisim, fhash, doS2=false)
+        S1arr  = DHC_compute(thisim, fhash, doS2=false)
         diff  = (S1arr - S_targ)[3:end]
 
         # dSdp matrix * S1-S_targ is dchisq
@@ -422,7 +422,7 @@ Nx    = 128
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 im    = rand(Nx,Nx)
 fixmask = im .> 0.5
-S_targ = DHC(im, fhash, doS2=false)
+S_targ = DHC_compute(im, fhash, doS2=false)
 
 init = copy(im)
 init[findall(fixmask .==0)] .= 0
@@ -474,7 +474,7 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
 
         M20 = fhash["S2_iso_mat"]
 
-        S20 = DHC(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso)
+        S20 = DHC_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso)
         i0 = 3+(iso ? N1iso : Nf)
         diff  = ((S20[i0:end] - S_targ)./S20sig)
 
@@ -499,7 +499,7 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
         end
         i0 = 3+(iso ? N1iso : Nf)
 
-        S20arr = (DHC(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
+        S20arr = (DHC_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
 
         # put both factors of S20sig in this array to weight
         diff   = (S20arr - S_targ)./(S20sig.^2)
@@ -558,12 +558,12 @@ function S20_weights(im, fhash, Nsam=10; iso=iso)
 
     # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 
-    S20   = DHC(im, fhash, doS2=false, doS20=true, norm=false, iso=iso)
+    S20   = DHC_compute(im, fhash, doS2=false, doS20=true, norm=false, iso=iso)
     Ns    = length(S20)
     S20arr = zeros(Float64, Ns, Nsam)
     for j=1:Nsam
         noise = rand(Nx,Nx)
-        S20arr[:,j] = DHC(im+noise, fhash, doS2=false, doS20=true, norm=false, iso=iso)
+        S20arr[:,j] = DHC_compute(im+noise, fhash, doS2=false, doS20=true, norm=false, iso=iso)
     end
 
     wt = zeros(Float64, Ns)
@@ -589,7 +589,7 @@ im    = imresize(dust,(Nx,Nx))
 fixmask = rand(Nx,Nx) .< 0.1
 
 
-S_targ = DHC(im, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
+S_targ = DHC_compute(im, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
 S_targ = S_targ[i0:end]
 
 init = copy(im)
@@ -599,13 +599,13 @@ init[floatind] .+= rand(length(floatind)).*50 .-25
 S20sig = S20_weights(im, fhash, 100, iso=doiso)
 S20sig = S20sig[i0:end]
 foo = wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
-S_foo = DHC(foo, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
+S_foo = DHC_compute(foo, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
 
 plot_synth_QA(im, init, foo, fhash)
 
 
 
-function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test.png")
+function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test2.png")
 
     # -------- define plot1 to append plot to a list
     function plot1(ps, image; clim=nothing, bin=1.0, fsz=16, label=nothing)
