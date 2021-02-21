@@ -1,14 +1,14 @@
-using Statistics
 using Plots
+
+using Statistics
 using BenchmarkTools
 using Profile
 using FFTW
-using Statistics
+
 using Optim
 using Measures
 using Images, FileIO
 
-#using Profile
 using LinearAlgebra
 using SparseArrays
 
@@ -219,7 +219,7 @@ derivtest2(8)
 
 
 
-Nx=128
+Nx=1024
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 im = zeros(Float64, Nx, Nx)
 im[6,6]=1.0
@@ -227,17 +227,17 @@ im[6,6]=1.0
 
 
 # S1 deriv time, Jan 30 version (old) compared to Feb 14 version from NM
-# Nx    old      Feb 14
-#   32     17 ms   0.5 ms
-#   64     34 ms   3.5 ms
-#  128    115 ms    20 ms
-#  256    520 ms    92 ms
-#  512   2500 ms   720 ms   540 ms with 2 threads
-# 1024   9500 ms  3300 ms  2500 ms with 2
+# Nx    old      Feb 14                            Holyfink01
+#   32     17 ms   0.5 ms                        FFTW nth
+#   64     34 ms   3.5 ms                        ~10% effect
+#  128    115 ms    20 ms                            9 ms         
+#  256    520 ms    92 ms                           60 ms
+#  512   2500 ms   720 ms   540 ms with 2 threads  370 ms
+# 1024   9500 ms  3300 ms  2500 ms with 2         2100 ms
 
-Nx = 128
+Nx = 32
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-im = zeros(Float64, Nx, Nx)
+im = zeros(Float64, Nx, Nx);
 im[6,6]=1.0
 @benchmark blarg,blafb2 = wst_S1S2_derivfast(im, fhash)
 
@@ -252,11 +252,82 @@ im[6,6]=1.0
 # 512   ---
 
 
-Nx = 32
+
+
+
+
+
+    function wst_S20_deriv_mine(image::Array{Float64,2}, filter_hash::Dict, nthread::Int=1)
+
+        # Use nthread threads for FFT -- but for Nx<512 nthread=1 is fastest.  Overhead?
+        FFTW.set_num_threads(nthread)
+
+        # array sizes
+        (Nx, Ny)  = size(image)
+        (Nf, )    = size(filter_hash["filt_index"])
+
+        # allocate output array
+        dS20dα  = zeros(Float64, Nx, Nx, Nf, Nf)
+
+        # allocate image arrays for internal use
+        im_rdc = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+        im_rd  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+        im_fd  = fft(image)
+
+        # unpack filter_hash
+        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val   = filter_hash["filt_value"]
+        zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
+
+        # make a FFTW "plan" a complex array, both forward and inverse transform
+        P_fft  = plan_fft(im_fd)   # P_fft is an operator,  P_fft*im is fft(im)
+        P_ifft = plan_ifft(im_fd)  # P_ifft is an operator, P_ifft*im is ifft(im)
+
+        # Loop over filters
+        for f = 1:Nf
+            f_i = f_ind[f]  # CartesianIndex list for filter
+            f_v = f_val[f]  # Values for f_i
+
+            zarr[f_i] = f_v .* im_fd[f_i]
+            Z_λ = P_ifft*zarr  # complex valued ifft of zarr
+            zarr[f_i] .= 0   # reset zarr for next loop
+            im_rdc[:,:,f] = Z_λ
+            im_rd[:,:,f]  = abs.(Z_λ)
+        end
+
+        zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
+        for f2 = 1:Nf
+            f_i = f_ind[f2]  # CartesianIndex list for filter
+            f_v = f_val[f2]  # Values for f_i
+            uvec = im_rdc[:,:,f2] ./ im_rd[:,:,f2]
+            @threads for f1 = 1:Nf
+                temp = P_fft*(im_rd[:,:,f1].*uvec)
+                zarr[f_i] = f_v .* temp[f_i]
+
+                Z1dZ2 = real.(P_ifft*zarr)
+                #  It is possible to do this with rifft, but it is not much faster...
+                #   Z1dZ2 = myrealifft(zarr)
+                dS20dα[:,:,f1,f2] += Z1dZ2
+                dS20dα[:,:,f2,f1] += Z1dZ2
+                zarr[f_i] .= 0   # reset zarr for next loop
+            end
+        end
+        return dS20dα
+    end
+
+
+
+
+
+
+
+
+
+Nx = 256
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-im = zeros(Float64, Nx, Nx)
+im = zeros(Float64, Nx, Nx);
 im[6,6]=1.0
-@benchmark blarg = wst_S20_deriv(im, fhash)
+@benchmark blarg = wst_S20_deriv_mine(im, fhash)
 
 Profile.clear()
 @profile blarg = wst_S20_deriv(im, fhash)
@@ -264,13 +335,13 @@ Juno.profiler()
 
 
 # S20 deriv time, Jan 30
-# Nx     Jan 30  Feb 14
-#   8     28 ms   1 ms
+# Nx     Jan 30  Feb 14  Feb 20
+#   8     28 ms   1 ms     HF01     4 th
 #  16    112      7
-#  32    320     50
-#  64   1000    400
-# 128   5 sec     3.3 sec
-# 256   ---      17.2 sec
+#  32    320     50          25
+#  64   1000    400         160
+# 128   5 sec     3.3 sec   1.2   0.6 sec
+# 256   ---      17.2 sec   8.5   4.5 sec
 # 512   ---
 
 
