@@ -37,3 +37,6 @@ junk/
 *.pdf
 *.svg
 *.h5
+*.fits
+.nfs00*
+

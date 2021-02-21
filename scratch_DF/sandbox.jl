@@ -332,24 +332,24 @@ end
 
 
 
-Nx = 128
+Nx = 256
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-im = zeros(Float64, Nx, Nx)
+im = zeros(Float64, Nx, Nx);
 im[6,6]=1.0
-@benchmark bmine = wst_S20_deriv_mine(im, fhash,2)
-bmine = wst_S20_deriv_mine(im, fhash,2)
-blarg = wst_S20_deriv(im, fhash)
+@benchmark bmine = wst_S20_deriv_mine(im, fhash,4)
+bmine = wst_S20_deriv_mine(im, fhash,4)
+blarg = wst_S20_deriv(im, fhash,4)
 
 std(bmine - blarg)
 
 # S20 deriv time, Jan 30
 # Nx     Jan 30  Feb 14  Feb 20
-#   8     28 ms   1 ms     HF01     4 th
+#   8     28 ms   1 ms     HF01     4 th   my4
 #  16    112      7
 #  32    320     50          25
-#  64   1000    400         160
-# 128   5 sec     3.3 sec   1.2   0.6 sec
-# 256   ---      17.2 sec   8.5   4.5 sec
+#  64   1000    400         160           150
+# 128   5 sec     3.3 sec   1.2   0.6 sec 1.0
+# 256   ---      17.2 sec   8.5   4.5 sec 7.0
 # 512   ---
 
 
@@ -533,7 +533,8 @@ foo = wst_synth(init, fixmask)
 
 function readdust()
 
-    RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
+    #RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
+    RGBA_img = load("/n/home08/dfink/DHC/scratch_DF/t115_clean_small.png")
     img = reinterpret(UInt8,rawview(channelview(RGBA_img)))
 
     return img[1,:,:]
@@ -571,7 +572,7 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
         thisim = copy(im_init)
         thisim[indfloat] = vec_in
 
-        dS20dp = reshape(wst_S20_deriv(thisim, fhash), Nx*Nx, Nf*Nf)
+        dS20dp = reshape(wst_S20_deriv(thisim, fhash, 4), Nx*Nx, Nf*Nf)
         if iso
             M20 = fhash["S2_iso_mat"]
             dS20dp = dS20dp * M20'
@@ -659,7 +660,7 @@ end
 dust = Float64.(readdust())
 dust = dust[1:256,1:256]
 
-Nx     = 64
+Nx     = 256
 doiso  = true
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
@@ -681,6 +682,16 @@ foo = wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
 S_foo = DHC_compute(foo, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
 
 plot_synth_QA(im, init, foo, fhash)
+
+
+function writestuff(im, init, im_out, fhash)
+    f = FITS("newfile.fits", "w")
+    write(f, im)
+    write(f, init)
+    write(f, im_out)
+    close(f)
+end
+
 
 
 
@@ -736,7 +747,7 @@ plot_synth_QA(im, init, foo, fhash)
 # using dchisq function with S20
 # size   t(BFGS) t(LBFGS) [sec]
 # 8x8      30
-# 16x16    90
-# 32x32   189                           74
+# 16x16    90                                           iso on HF01
+# 32x32   189                           74                  32
 # 64x64  1637                          531      642 iso
 # 128x128                              2 hrs
