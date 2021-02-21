@@ -144,7 +144,7 @@ module DHC_2DUtils
         psi_ind_in[phi_index,:] = [J,0]
 
         # -------- metadata dictionary
-        info=Dict()
+        info=Dict{String,Any}()
         info["npix"]         = nx
         info["j_value"]      = j_value
         info["theta_value"]  = theta
