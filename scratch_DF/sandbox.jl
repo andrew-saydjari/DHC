@@ -230,7 +230,7 @@ im[6,6]=1.0
 # Nx    old      Feb 14                            Holyfink01
 #   32     17 ms   0.5 ms                        FFTW nth
 #   64     34 ms   3.5 ms                        ~10% effect
-#  128    115 ms    20 ms                            9 ms         
+#  128    115 ms    20 ms                            9 ms
 #  256    520 ms    92 ms                           60 ms
 #  512   2500 ms   720 ms   540 ms with 2 threads  370 ms
 # 1024   9500 ms  3300 ms  2500 ms with 2         2100 ms
@@ -257,64 +257,72 @@ im[6,6]=1.0
 
 
 
-    function wst_S20_deriv_mine(image::Array{Float64,2}, filter_hash::Dict, nthread::Int=1)
+function wst_S20_deriv_mine(image::Array{Float64,2}, filter_hash::Dict, nthread::Int=1)
 
-        # Use nthread threads for FFT -- but for Nx<512 nthread=1 is fastest.  Overhead?
-        FFTW.set_num_threads(nthread)
+    # Use nthread threads for FFT -- but for Nx<512 nthread=1 is fastest.  Overhead?
+    #FFTW.set_num_threads(1)
 
-        # array sizes
-        (Nx, Ny)  = size(image)
-        (Nf, )    = size(filter_hash["filt_index"])
+    # array sizes
+    (Nx, Ny)  = size(image)
+    (Nf, )    = size(filter_hash["filt_index"])
 
-        # allocate output array
-        dS20dα  = zeros(Float64, Nx, Nx, Nf, Nf)
+    # allocate output array
+    dS20dα  = zeros(Float64, Nx, Nx, Nf, Nf)
 
-        # allocate image arrays for internal use
-        im_rdc = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
-        im_rd  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
-        im_fd  = fft(image)
+    # allocate image arrays for internal use
+    im_rdc = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+    im_rd  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+    im_fd  = fft(image)
 
-        # unpack filter_hash
-        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
-        f_val   = filter_hash["filt_value"]
-        zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
+    # unpack filter_hash
+    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+    f_val   = filter_hash["filt_value"]
+    zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
 
-        # make a FFTW "plan" a complex array, both forward and inverse transform
-        P_fft  = plan_fft(im_fd)   # P_fft is an operator,  P_fft*im is fft(im)
-        P_ifft = plan_ifft(im_fd)  # P_ifft is an operator, P_ifft*im is ifft(im)
+    # make a FFTW "plan" a complex array, both forward and inverse transform
+    P_fft  = plan_fft(im_fd)   # P_fft is an operator,  P_fft*im is fft(im)
+    P_ifft = plan_ifft(im_fd)  # P_ifft is an operator, P_ifft*im is ifft(im)
 
-        # Loop over filters
-        for f = 1:Nf
-            f_i = f_ind[f]  # CartesianIndex list for filter
-            f_v = f_val[f]  # Values for f_i
+    # Loop over filters
+    for f = 1:Nf
+        f_i = f_ind[f]  # CartesianIndex list for filter
+        f_v = f_val[f]  # Values for f_i
 
-            zarr[f_i] = f_v .* im_fd[f_i]
-            Z_λ = P_ifft*zarr  # complex valued ifft of zarr
-            zarr[f_i] .= 0   # reset zarr for next loop
-            im_rdc[:,:,f] = Z_λ
-            im_rd[:,:,f]  = abs.(Z_λ)
-        end
-
-        zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
-        for f2 = 1:Nf
-            f_i = f_ind[f2]  # CartesianIndex list for filter
-            f_v = f_val[f2]  # Values for f_i
-            uvec = im_rdc[:,:,f2] ./ im_rd[:,:,f2]
-            @threads for f1 = 1:Nf
-                temp = P_fft*(im_rd[:,:,f1].*uvec)
-                zarr[f_i] = f_v .* temp[f_i]
-
-                Z1dZ2 = real.(P_ifft*zarr)
-                #  It is possible to do this with rifft, but it is not much faster...
-                #   Z1dZ2 = myrealifft(zarr)
-                dS20dα[:,:,f1,f2] += Z1dZ2
-                dS20dα[:,:,f2,f1] += Z1dZ2
-                zarr[f_i] .= 0   # reset zarr for next loop
-            end
-        end
-        return dS20dα
+        zarr[f_i] = f_v .* im_fd[f_i]
+        Z_λ = P_ifft*zarr  # complex valued ifft of zarr
+        zarr[f_i] .= 0   # reset zarr for next loop
+        im_rdc[:,:,f] = Z_λ
+        im_rd[:,:,f]  = abs.(Z_λ)
     end
 
+    df1  = zeros(Float64, Nx, Nx, Nf)
+    println("nthread",nthread)
+    zarr = []
+    for ii=1:nthread
+        append!(zarr,[zeros(ComplexF64, Nx, Nx)])
+    end
+    println("Size1",size(zarr[threadid()]))
+    println("Size1",size(zarr))
+    #zarr = zeros(ComplexF64, Nx, Nx, nthread)  # temporary array to fill with zvals
+    for f2 = 1:Nf
+        f_i = f_ind[f2]  # CartesianIndex list for filter
+        f_v = f_val[f2]  # Values for f_i
+        uvec = im_rdc[:,:,f2] ./ im_rd[:,:,f2]
+        @threads for f1 = 1:Nf
+            #println(threadid())
+            #println("ln ",f1,"  ",f2,"  ",threadid(),"  ",length(f_i))
+            zarr[threadid()][f_i] .= f_v .* (P_fft*(im_rd[:,:,f1].*uvec))[f_i]
+            df1[:,:,f1] = real.(P_ifft*zarr[threadid()])
+            zarr[threadid()][f_i] .= 0   # reset zarr for next loop
+        end
+        for f1 = 1:Nf
+            dS20dα[:,:,f1,f2] += df1[:,:,f1]
+            dS20dα[:,:,f2,f1] += df1[:,:,f1]
+        end
+
+    end
+    return dS20dα
+end
 
 
 
@@ -323,16 +331,16 @@ im[6,6]=1.0
 
 
 
-Nx = 256
+
+Nx = 128
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-im = zeros(Float64, Nx, Nx);
+im = zeros(Float64, Nx, Nx)
 im[6,6]=1.0
-@benchmark blarg = wst_S20_deriv_mine(im, fhash)
+@benchmark bmine = wst_S20_deriv_mine(im, fhash,2)
+bmine = wst_S20_deriv_mine(im, fhash,2)
+blarg = wst_S20_deriv(im, fhash)
 
-Profile.clear()
-@profile blarg = wst_S20_deriv(im, fhash)
-Juno.profiler()
-
+std(bmine - blarg)
 
 # S20 deriv time, Jan 30
 # Nx     Jan 30  Feb 14  Feb 20
