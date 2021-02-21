@@ -211,3 +211,25 @@ fink_filter_hash(1, 8, nx=64, pc=1, wd=1)
 A = rand(32,32)
 B = rand(32,32)
 transpose(B)*A
+
+
+filter_hash = fink_filter_hash(1, 16, nx=64, pc=2, wd=2)
+@benchmark filt_3d = fink_filter_bank_3dizer(filter_hash, 1, nz=64)
+test_img = rand(64,64,64)
+@benchmark DHC_compute_3d(test_img,filt_3d)
+
+filter_hash = fink_filter_hash(1, 16, nx=128, pc=2, wd=2)
+@benchmark filt_3d = fink_filter_bank_3dizer(filter_hash, 1, nz=128)
+test_img = rand(128,128,128)
+@benchmark DHC_compute_3d(test_img,filt_3d)
+
+filter_hash = fink_filter_hash(1, 16, nx=64, pc=2, wd=2)
+@benchmark filt_3d = fink_filter_bank_3dizer(filter_hash, 1, nz=256)
+test_img = rand(64,64,256)
+@benchmark DHC_compute_3d(test_img,filt_3d)
+
+filter_hash = fink_filter_hash(1, 16, nx=64, pc=2, wd=2)
+@benchmark filt_3d = fink_filter_bank_3dizer(filter_hash, 1, nz=512)
+test_img = rand(64,64,512)
+@benchmark DHC_compute_3d(test_img,filt_3d)
+DHC_compute_3d(test_img,filt_3d)
