@@ -733,7 +733,7 @@ module DHC_2DUtils
         return info
     end
 
-    function DHC_compute_3d(image::Array{Float64,3}, filter_hash, FFTthreads=2)
+    function DHC_compute_3d(image::Array{Float64,3}, filter_hash; FFTthreads=2)
         # Use 2 threads for FFT
         FFTW.set_num_threads(FFTthreads)
 
