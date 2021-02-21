@@ -695,7 +695,7 @@ end
 
 
 
-function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test2.png")
+function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test256.png")
 
     # -------- define plot1 to append plot to a list
     function plot1(ps, image; clim=nothing, bin=1.0, fsz=16, label=nothing)
@@ -743,6 +743,71 @@ end
 plot_synth_QA(im, init, foo, fhash)
 
 
+
+function sfft(Nx,Nind)
+    zarr = zeros(ComplexF64, Nx, Nx)
+    out  = zeros(ComplexF64, Nx, Nx, Nind)
+    for i = 1:Nind
+        zarr[1,i] = 1.0
+        out[:,:,i] = ifft(zarr)
+    end
+    return out
+end
+
+function stest(fhash, f2, uvec)
+    f_ind   = fhash["filt_index"]  # (J, L) array of filters represented as index value pairs
+    f_val   = fhash["filt_value"]
+    Nx = ?
+    Nf = ?
+    #for f2 = 1:Nf
+        f_i = f_ind[f2]  # CartesianIndex list for filter
+        f_v = f_val[f2]  # Values for f_i
+        #uvec = im_rdc[:,:,f2] ./ im_rd[:,:,f2]
+
+
+        # pre-compute some exp(ikx)
+        expikx = zeros(ComplexF64, Nx, Nx, Nf)
+        for i=1:Nf expikx[:,:,i] = ifft()
+
+
+        A = reshape(im_rd, Nx*Nx, Nf) .* uvec
+        for f1 = 1:Nf
+            temp = P_fft*(im_rd[:,:,f1].*uvec)
+            zarr[f_i] = f_v .* temp[f_i]
+
+            Z1dZ2 = real.(P_ifft*zarr)
+            #  It is possible to do this with rifft, but it is not much faster...
+            #   Z1dZ2 = myrealifft(zarr)
+            dS20dα[:,:,f1,f2] += Z1dZ2
+            dS20dα[:,:,f2,f1] += Z1dZ2
+            zarr[f_i] .= 0   # reset zarr for next loop
+        end
+    end
+
+    return
+end
+
+
+function Fourierbasis2D(Nx, f_i)
+    Nf = length(f_i)
+
+    [[2,3]'*[ci[1],ci[2]] for ci in f_i]
+    return
+end
+
+function f5(xs, ys, kx, ky)
+    lx, ly = length(xs), length(ys)
+    res = Array{ComplexF64, 2}(undef,lx*ly, 2)
+    ind = 1
+    ikx = Complex(0,kx)
+    iky = Complex(0,ky)
+    for y in ys, x in xs
+        res[ind, 1] = exp(ikx*x + iky*y)
+        #res[ind, 2] = y
+        ind += 1
+    end
+    return res
+end
 
 # using dchisq function with S20
 # size   t(BFGS) t(LBFGS) [sec]
