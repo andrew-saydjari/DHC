@@ -433,7 +433,7 @@ module DHC_2DUtils
 
 
     function DHC_compute(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
-        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false)
+        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false, FFTthreads=2)
         # image        - input for WST
         # filter_hash  - filter hash from fink_filter_hash
         # filter_hash2 - filters for second order.  Default to same as first order.
@@ -444,7 +444,7 @@ module DHC_2DUtils
         # iso          - sum over angles to obtain isotropic coeffs
 
         # Use 2 threads for FFT
-        FFTW.set_num_threads(2)
+        FFTW.set_num_threads(FFTthreads)
 
         # array sizes
         (Nx, Ny)  = size(image)
@@ -733,9 +733,9 @@ module DHC_2DUtils
         return info
     end
 
-    function DHC_compute_3d(image::Array{Float64,3}, filter_hash)
+    function DHC_compute_3d(image::Array{Float64,3}, filter_hash, FFTthreads=2)
         # Use 2 threads for FFT
-        FFTW.set_num_threads(2)
+        FFTW.set_num_threads(FFTthreads)
 
         # array sizes
         (Nx, Ny, Nz)  = size(image)
