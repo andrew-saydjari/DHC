@@ -206,3 +206,8 @@ DHC_compute_3d(test_img,filt_3d)
 @benchmark DHC_compute_3d(test_img,filt_3d)
 
 fink_filter_hash(1, 8, nx=64, pc=1, wd=1)
+
+
+A = rand(32,32)
+B = rand(32,32)
+transpose(B)*A
