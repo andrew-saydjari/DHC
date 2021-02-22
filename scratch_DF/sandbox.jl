@@ -11,6 +11,7 @@ using Images, FileIO
 
 using LinearAlgebra
 using SparseArrays
+using Base.Threads
 
 # put the cwd on the path so Julia can find the module
 push!(LOAD_PATH, pwd()*"/main")
@@ -530,8 +531,8 @@ foo = wst_synth(init, fixmask)
 # 64x64          1645
 # 128x128        est 28,000  (8 hrs)
 
-
-function readdust()
+ 
+ function readdust()
 
     #RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
     RGBA_img = load("/n/home08/dfink/DHC/scratch_DF/t115_clean_small.png")
@@ -572,7 +573,7 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
         thisim = copy(im_init)
         thisim[indfloat] = vec_in
 
-        dS20dp = reshape(wst_S20_deriv(thisim, fhash, 4), Nx*Nx, Nf*Nf)
+        dS20dp = reshape(wst_S20_deriv(thisim, fhash, 8), Nx*Nx, Nf*Nf)
         if iso
             M20 = fhash["S2_iso_mat"]
             dS20dp = dS20dp * M20'
@@ -657,8 +658,10 @@ end
 
 
 # read dust map
-dust = Float64.(readdust())
-dust = dust[1:256,1:256]
+dustbig = Float64.(readdust())
+
+# Try it with log dust!!
+dust = log.(dustbig[1:256,1:256])
 
 Nx     = 256
 doiso  = true
@@ -674,7 +677,8 @@ S_targ = S_targ[i0:end]
 
 init = copy(im)
 floatind = findall(fixmask .==0)
-init[floatind] .+= rand(length(floatind)).*50 .-25
+#init[floatind] .+= rand(length(floatind)).*50 .-25
+init[floatind] .+= rand(length(floatind)).*0.80 .-0.4
 
 S20sig = S20_weights(im, fhash, 100, iso=doiso)
 S20sig = S20sig[i0:end]
@@ -695,7 +699,7 @@ end
 
 
 
-function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test2.png")
+function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test3.png")
 
     # -------- define plot1 to append plot to a list
     function plot1(ps, image; clim=nothing, bin=1.0, fsz=16, label=nothing)
