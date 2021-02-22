@@ -113,7 +113,7 @@ module Deriv_Utils
                     S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)
                 end
             end
-            append!(out_coeff, S2)
+            append!(out_coeff, S2) #Does this force S2 to flatten st f1 varies faster than f2?
         end
 
 
@@ -207,7 +207,7 @@ module Deriv_Utils
 
         # allocate output array
         dS1dp  = zeros(Float64, Nf, Nx, Nx) #Mod zeros(Float64, Nx, Nx, Nf)
-        dS2dp  = zeros(Float64, Nf*Nf, Nx, Nx) #Mod
+        dS2dp  = zeros(Float64, Nf, Nf, Nx, Nx) #Mod
 
         # allocate image arrays for internal use
         im_rdc_0_1 = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
@@ -273,7 +273,7 @@ module Deriv_Utils
                 #println(size(fterm_ct2[f_i1rev]),size(fterm_bt2[f_i1rev]),size(f_v1),size(conj.(f_v1)))
                 fterm_ct2[f_i1rev] = fterm_bt2[f_i1rev] .* f_v1 #f_v1 is real
                 #fterm_ct2slow = fterm_bt2 .* fcψ_λ1
-                dS2dp[(Nf*(f1-1))+f2, :, :] = real.(P*(fterm_ct1 + fterm_ct2)) #Mod
+                dS2dp[f1, f2, :, :] = real.(P*(fterm_ct1 + fterm_ct2)) #Mod THIS SHOULD be Nx*f2-1 + f1 or do the reshaping in loss func.
 
                 #Reset f2 specific tmp arrays to 0
                 fterm_a[f_i2] .= 0
@@ -287,72 +287,65 @@ module Deriv_Utils
 
 
         end
-        return vcat(dS1dp, dS2dp) #Mod
+        return vcat(dS1dp, reshape(dS2dp, (Nf^2, Nx, Nx))) #Mod
     end
 
-    function wst_S20_deriv(image::Array{Float64,2}, filter_hash::Dict) #make this faster
-        function conv(a,b)
-            ifft(fft(a) .* fft(b))
-        end
+    function wst_S20_deriv(image::Array{Float64,2}, filter_hash::Dict, nthread::Int=1)
 
-        # Use 2 threads for FFT
-        FFTW.set_num_threads(2)
+        # Use nthread threads for FFT -- but for Nx<512 nthread=1 is fastest.  Overhead?
+        FFTW.set_num_threads(nthread)
 
         # array sizes
         (Nx, Ny)  = size(image)
         (Nf, )    = size(filter_hash["filt_index"])
 
         # allocate output array
-        dS20dp  = zeros(Float64, Nx, Nx, Nf, Nf)
+        dS20dα  = zeros(Float64, Nx, Nx, Nf, Nf)
 
         # allocate image arrays for internal use
-        im_rdc_0_1 = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
-        im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
-
-        # Not sure what to do here -- for gradients I don't think we want these
-        ## 0th Order
-        #S0[1]   = mean(image)
-        #norm_im = image.-S0[1]
-        #S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
-        #norm_im ./= sqrt(Nx*Ny*S0[2])
-
-        ## 1st Order
-        im_fd_0 = fft(image)  # total power=1.0
+        im_rdc = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+        im_rd  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+        im_fd  = fft(image)
 
         # unpack filter_hash
         f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
         f_val   = filter_hash["filt_value"]
-
         zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
 
-        # make a FFTW "plan" for an array of the given size and type
-        P = plan_ifft(im_fd_0)  # P is an operator, P*im is ifft(im)
+        # make a FFTW "plan" a complex array, both forward and inverse transform
+        P_fft  = plan_fft(im_fd)   # P_fft is an operator,  P_fft*im is fft(im)
+        P_ifft = plan_ifft(im_fd)  # P_ifft is an operator, P_ifft*im is ifft(im)
 
         # Loop over filters
         for f = 1:Nf
             f_i = f_ind[f]  # CartesianIndex list for filter
             f_v = f_val[f]  # Values for f_i
 
-            zarr[f_i] = f_v .* im_fd_0[f_i]
-            I_λ = P*zarr  # complex valued ifft of zarr
+            zarr[f_i] = f_v .* im_fd[f_i]
+            Z_λ = P_ifft*zarr  # complex valued ifft of zarr
             zarr[f_i] .= 0   # reset zarr for next loop
-            im_rdc_0_1[:,:,f] = I_λ
-            im_rd_0_1[:,:,f]  = abs.(I_λ)
+            im_rdc[:,:,f] = Z_λ
+            im_rd[:,:,f]  = abs.(Z_λ)
         end
 
+        zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
         for f2 = 1:Nf
-            ψ_λ  = realspace_filter(Nx, f_ind[f2], f_val[f2])
-            uvec = im_rdc_0_1[:,:,f2] ./ im_rd_0_1[:,:,f2]
+            f_i = f_ind[f2]  # CartesianIndex list for filter
+            f_v = f_val[f2]  # Values for f_i
+            uvec = im_rdc[:,:,f2] ./ im_rd[:,:,f2]
             for f1 = 1:Nf
-                cfac = im_rd_0_1[:,:,f1].*uvec
-                I1dI2 = real.(conv(cfac,ψ_λ))  #NM: Make the conv to fft change here too
-                dS20dp[:,:,f1,f2] += I1dI2
-                dS20dp[:,:,f2,f1] += I1dI2
+                temp = P_fft*(im_rd[:,:,f1].*uvec)
+                zarr[f_i] = f_v .* temp[f_i]
+
+                Z1dZ2 = real.(P_ifft*zarr)
+                #  It is possible to do this with rifft, but it is not much faster...
+                #   Z1dZ2 = myrealifft(zarr)
+                dS20dα[:,:,f1,f2] += Z1dZ2
+                dS20dα[:,:,f2,f1] += Z1dZ2
+                zarr[f_i] .= 0   # reset zarr for next loop
             end
         end
-
-        return dS20dp
-
+        return dS20dα
     end
 
 
