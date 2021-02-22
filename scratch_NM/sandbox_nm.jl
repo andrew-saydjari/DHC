@@ -7,6 +7,7 @@ using Statistics
 using Optim
 using Images, FileIO, ImageIO
 using Printf
+using SparseArrays
 
 #using Profile
 using LinearAlgebra
@@ -521,13 +522,150 @@ function wst_S1S2_derivfast(image::Array{Float64,2}, filter_hash::Dict)
     return dS1dp, dS2dp
 end
 
+#=function wst_S1S2_deriv_fd(image::Array{Float64,2}, filter_hash::Dict)
+    #Works now.
+    #Possible Bug: You assumed zero freq in wrong place and N-k is the wrong transformation.
+    # Use 2 threads for FFT
+    FFTW.set_num_threads(2)
+
+    # array sizes
+    (Nx, Ny)  = size(image)
+    (Nf, )    = size(filter_hash["filt_index"])
+
+    # allocate output array
+    dS1dp  = zeros(Float64, Nx, Nx, Nf)
+    dS2dp  = zeros(Float64, Nx, Nx, Nf, Nf)
+
+    # allocate image arrays for internal use
+    im_rdc_0_1 = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+    im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+
+    # Not sure what to do here -- for gradients I don't think we want these
+    ## 0th Order
+    #S0[1]   = mean(image)
+    #norm_im = image.-S0[1]
+    #S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
+    #norm_im ./= sqrt(Nx*Ny*S0[2])
+
+    ## 1st Order
+    im_fd_0 = fft(image)  # total power=1.0
+
+    # unpack filter_hash
+    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+    f_val   = filter_hash["filt_value"]
+
+    f_ind_rev = [[CartesianIndex(mod1(Nx+2 - ci[1],Nx), mod1(Nx+2 - ci[2],Nx)) for ci in f_Nf] for f_Nf in f_ind]
+
+    #CartesianIndex(17,17) .- f_ind
+    # tmp arrays for all tmp[f_i] = arr[f_i] .* f_v opns
+    zarr1 = zeros(ComplexF64, Nx, Nx)
+    fz_fψ1 = zeros(ComplexF64, Nx, Nx)
+    fterm_a = zeros(ComplexF64, Nx, Nx)
+    fterm_ct1 = zeros(ComplexF64, Nx, Nx)
+    fterm_ct2 = zeros(ComplexF64, Nx, Nx)
+    #rterm_bt2 = zeros(ComplexF64, Nx, Nx)
+    # make a FFTW "plan" for an array of the given size and type
+    P = plan_ifft(im_fd_0)  # P is an operator, P*im is ifft(im)
+    #phase_mat = reshape(collect(1:1:Nx), (Nx, 1)) .* reshape(collect(1:1:Nx), (1, Nx)) #Need to inst an Nx^2Nx2 mat. Instead just use it on the fly
+    #phase_mat = 2π*
+    #phase_mat = exp()
+    # Loop over filters
+    xImat = CartesianIndices((Nx, Nx))
+    for f1 = 1:Nf
+        f_i1 = f_ind[f1]  # CartesianIndex list for filter1
+        f_v1 = f_val[f1]  # Values for f_i1
+        f_i1rev = f_ind_rev[f1]
+
+        zarr1[f_i1] = f_v1 .* im_fd_0[f_i1] #F[z]
+        #zarr1_rd = P*zarr1 #for frzi
+        fz_fψ1[f_i1] = f_v1 .* zarr1[f_i1]
+        fz_fψ1_rd = P*fz_fψ1
+        dS1dp[:,:,f1] = 2 .* real.(fz_fψ1_rd) #real.(conv(I_λ, ψ_λ))
+        #Step 2: Do this using the fd space trick
+
+        #dS2 loop prep
+        #=I_λ1 = sqrt.(abs2.(zarr1_rd))
+        fI_λ1 = fft(I_λ1)
+        rterm_bt1 = zarr1_rd./I_λ1 #Z_λ1/I_λ1_bar.
+        rterm_bt2 = conj.(zarr1_rd)./I_λ1=#
+
+        for f2 = 1:Nf
+            f_i2 = f_ind[f2]  # CartesianIndex list for filter2
+            f_v2 = f_val[f2]  # Values for f_i2
+
+            a1 = fz_fψ1[f_i2] .* (f_v2).^2
+            b1 = exp.((-2π*im*) .* (f_i2 .* xImat))  #Shape: #f_i2*Nx*Nx
+            term1 = a1 .* b1
+            term2 =
+            #fterm_ct2 = fterm_bt2 .* fcψ_λ1             #Slow
+            #println(size(fterm_ct2[f_i1rev]),size(fterm_bt2[f_i1rev]),size(f_v1),size(conj.(f_v1)))
+            fterm_ct2[f_i1rev] = fterm_bt2[f_i1rev] .* f_v1 #f_v1 is real
+            #fterm_ct2slow = fterm_bt2 .* fcψ_λ1
+            dS2dp[:, :, f1, f2] = real.(P*(fterm_ct1 + fterm_ct2))
+
+            #Reset f2 specific tmp arrays to 0
+            fterm_a[f_i2] .= 0
+            fterm_ct1[f_i1] .=0
+            fterm_ct2[f_i1rev] .=0
+
+        end
+        # reset all reused variables to 0
+        zarr1[f_i1] .= 0
+        fz_fψ1[f_i1] .= 0
 
 
+    end
+    return dS1dp, dS2dp
+end
+=#
+
+function wst_S1S2_deriv_fdsparse(image::Array{Float64,2}, filter_hash::Dict)
+    #Works now.
+    #Possible Bug: You assumed zero freq in wrong place and N-k is the wrong transformation.
+    # Use 2 threads for FFT
+    FFTW.set_num_threads(2)
+
+    # array sizes
+    (Nx, Ny)  = size(image)
+    (Nf, )    = size(filter_hash["filt_index"])
+
+    # allocate output array
+    dS1dp  = zeros(Float64, Nx, Nx, Nf)
+    dS2dp  = zeros(Float64, Nx, Nx, Nf, Nf)
+
+
+    # unpack filter_hash
+    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+    f_indflat = [(tup-> (Nx*(tup[2]-1) + tup[1])).(Tuple.(fh)) for fh in filter_hash["filt_index"]]
+    nf_nz = vcat(fill.(collect(1:1:Nf), length.(f_indflat))) #Filter id repeated as many times as nz elemes
+    f_indsparse = vcat(hcat.(nf_nz, f_indflat)...) #Array of [filter_id, flattened_nz_idx]
+    f_val   = filter_hash["filt_value"]
+
+
+    im_fd_0 = reshape(fft(image), (Nx^2))
+    f_ind_comb = (x->CartesianIndex(x)).(f_indsparse[:, 2]) #k_nz for all filters concat
+    fzfψ = sparse(f_indsparse[:, 1], f_indsparse[:, 2], im_fd_0[f_ind_comb].*vcat(f_val...).^2) #Nf * Nx^2 sparse
+    #Phi values
+    knz_vals = hcat((p->[p[1], p[2]]).(vcat(filter_hash["filt_index"]...))...)' #|k_nz| x 2
+    xigrid = reshape(CartesianIndices((1:Nx, 1:Nx)), (1, Nx^2))
+    xigrid = hcat((x->[x[1], x[2]]).(xigrid)...)   #2*Nx^2
+    spvals = exp.((-2π*im)/Nx .* reshape((knz_vals*xigrid), (size(knz_vals)[1]*Nx^2))) #BUG: Fix shape issue here
+    spvals_idz = findnz(spvals)
+    Φmat = sparse(spvals_idz[1], spvals_idz[2], spvals) #sparse(repeat(f_indsparse[:, 2], Nx.^2), vcat(fill.(collect(1:1:Nx^2), size(f_indsparse)[1])...), spvals) #Nx^2 * Nx^2 sparse k_nz should vary faster
+    dS1_term = Array(fzfψ*Φmat)
+    dS1dp = reshape((2/Nx^2) .* real.(dS1_term), (Nf, Nx, Nx)) #Divide by Nx^2!!!
+    #Check the math and dS1 first
+    #fzfψ_ψ2sq = sparse(f_indsparse[:, 1], f_indsparse[:, 2], im_fd_0[f_ind_comb].*vcat(f_val...).^2) #basically want something Nf^2 * Nx^2 analogous to fzfψ
+
+    return dS1dp
+end
+
+#=
 function realconv_test(Nx, ar1, ar2)
     soln = zeros(Float64, 8)
     for x=1:8:
         soln[x] = ar1 .* ar2[x-collect(1:1:8)]
-
+=#
 
 ##Derivative test functions
 # wst_S1_deriv agrees with brute force at 1e-10 level.
@@ -566,7 +704,7 @@ function realconv_test(Nx, ar1, ar2)
 end
 
 # wst_S1_deriv agrees with brute force at 1e-10 level.
- function derivtestfast(Nx)
+ function derivtestfast(Nx, mode="fourier")
     eps = 1e-4
     fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
     im = rand(Float64, Nx, Nx).*0.1
@@ -576,18 +714,21 @@ end
     im1[2,3] += eps/2
     im0[2,3] -= eps/2
     blarg = wst_S1_deriv(im, fhash)
-    blargfast = wst_S1_deriv_fast(im, fhash)
-
+    if mode=="fourier"
+        blargfast = wst_S1S2_deriv_fdsparse(im, fhash)
+    else
+        blargfast = wst_S1_deriv_fast(im, fhash)
+    end
     der0=DHC(im0,fhash,doS2=false)
     der1=DHC(im1,fhash,doS2=false)
     dS = (der1-der0) ./ eps
 
-
-    diff = dS[3:end]-blarg[2,3,:]
+    diff_old = dS[3:end]-blarg[2,3,:]
+    diff = dS[3:end]-blargfast[2,3,:]
     println(dS[3:end])
     println("and")
     println(blarg[2,3,:])
-    println("stdev: ",std(diff))
+    println("stdev: ",std(diff_old))
     println("New fewer conv ds1")
     println(dS[3:end])
     println("and")
@@ -608,7 +749,7 @@ end
     return
 end
 
-
+derivtestfast(16, "fourier")
 
 
 function derivtestS1S2(Nx; mode="slow")
@@ -1097,7 +1238,10 @@ end
 
 # read dust map
 dust = Float64.(readdust())
-dust = dust[1:256,1:256]
+dust = dust[1:16,1:16]
+println("Real=",sum(abs2.(dust)))
+println("Real=",sum(abs2.(fft(dust))))
+
 
 Nx    = 64
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
