@@ -482,9 +482,6 @@ function readdust()
 end
 
 
-
-
-
 function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
     # fixmask -  0=float in fit   1=fixed
 
@@ -517,11 +514,10 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
         S20arr = (DHC_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
         diff   = (S20arr - S_targ)./(S20sig.^2)
         if iso
-            M20 = fhash["S2_iso_mat"]
-            (Nwt,Nind) = size(M20)
-            diffwt   = zeros(Nf*Nf)
-            for ind = 1:Nind  diffwt[M20.colptr[ind]] = diff[M20.rowval[ind]]  end
-        else diffwt = diff end
+            diffwt = diff[indiso]
+        else
+            diffwt = diff
+        end
 
         wtgrid = 2 .* (reshape(diffwt, Nf, Nf) + reshape(diffwt, Nf, Nf)')
 
@@ -539,6 +535,12 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
     (Nx, Ny)  = size(im_init)
     if Nx != Ny error("Input image must be square") end
     (N1iso, Nf)    = size(fhash["S1_iso_mat"])
+    if iso
+        M20 = fhash["S2_iso_mat"]
+        (Nwt,Nind) = size(M20)
+        indiso = zeros(Int64,Nind)
+        for ind = 1:Nind  indiso[M20.colptr[ind]] = M20.rowval[ind]  end
+    end
 
 
     # index list of pixels to float in fit
@@ -603,7 +605,7 @@ end
 dust = Float64.(readdust())
 dust = dust[1:256,1:256]
 
-Nx     = 64
+Nx     = 32
 doiso  = true
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
