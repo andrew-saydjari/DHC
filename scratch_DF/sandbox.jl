@@ -1,14 +1,14 @@
-using Statistics
 using Plots
+
+using Statistics
 using BenchmarkTools
 using Profile
 using FFTW
-using Statistics
+
 using Optim
 using Measures
 using Images, FileIO
 
-#using Profile
 using LinearAlgebra
 using SparseArrays
 
@@ -219,7 +219,7 @@ derivtest2(8)
 
 
 
-Nx=128
+Nx=1024
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 im = zeros(Float64, Nx, Nx)
 im[6,6]=1.0
@@ -227,17 +227,17 @@ im[6,6]=1.0
 
 
 # S1 deriv time, Jan 30 version (old) compared to Feb 14 version from NM
-# Nx    old      Feb 14
-#   32     17 ms   0.5 ms
-#   64     34 ms   3.5 ms
-#  128    115 ms    20 ms
-#  256    520 ms    92 ms
-#  512   2500 ms   720 ms   540 ms with 2 threads
-# 1024   9500 ms  3300 ms  2500 ms with 2
+# Nx    old      Feb 14                            Holyfink01
+#   32     17 ms   0.5 ms                        FFTW nth
+#   64     34 ms   3.5 ms                        ~10% effect
+#  128    115 ms    20 ms                            9 ms
+#  256    520 ms    92 ms                           60 ms
+#  512   2500 ms   720 ms   540 ms with 2 threads  370 ms
+# 1024   9500 ms  3300 ms  2500 ms with 2         2100 ms
 
-Nx = 128
+Nx = 32
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-im = zeros(Float64, Nx, Nx)
+im = zeros(Float64, Nx, Nx);
 im[6,6]=1.0
 @benchmark blarg,blafb2 = wst_S1S2_derivfast(im, fhash)
 
@@ -252,25 +252,104 @@ im[6,6]=1.0
 # 512   ---
 
 
-Nx = 32
+
+
+
+
+
+function wst_S20_deriv_mine(image::Array{Float64,2}, filter_hash::Dict, nthread::Int=1)
+
+    # Use nthread threads for FFT -- but for Nx<512 nthread=1 is fastest.  Overhead?
+    #FFTW.set_num_threads(1)
+
+    # array sizes
+    (Nx, Ny)  = size(image)
+    (Nf, )    = size(filter_hash["filt_index"])
+
+    # allocate output array
+    dS20dα  = zeros(Float64, Nx, Nx, Nf, Nf)
+
+    # allocate image arrays for internal use
+    im_rdc = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+    im_rd  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+    im_fd  = fft(image)
+
+    # unpack filter_hash
+    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+    f_val   = filter_hash["filt_value"]
+    zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
+
+    # make a FFTW "plan" a complex array, both forward and inverse transform
+    P_fft  = plan_fft(im_fd)   # P_fft is an operator,  P_fft*im is fft(im)
+    P_ifft = plan_ifft(im_fd)  # P_ifft is an operator, P_ifft*im is ifft(im)
+
+    # Loop over filters
+    for f = 1:Nf
+        f_i = f_ind[f]  # CartesianIndex list for filter
+        f_v = f_val[f]  # Values for f_i
+
+        zarr[f_i] = f_v .* im_fd[f_i]
+        Z_λ = P_ifft*zarr  # complex valued ifft of zarr
+        zarr[f_i] .= 0   # reset zarr for next loop
+        im_rdc[:,:,f] = Z_λ
+        im_rd[:,:,f]  = abs.(Z_λ)
+    end
+
+    df1  = zeros(Float64, Nx, Nx, Nf)
+    println("nthread",nthread)
+    zarr = []
+    for ii=1:nthread
+        append!(zarr,[zeros(ComplexF64, Nx, Nx)])
+    end
+    println("Size1",size(zarr[threadid()]))
+    println("Size1",size(zarr))
+    #zarr = zeros(ComplexF64, Nx, Nx, nthread)  # temporary array to fill with zvals
+    for f2 = 1:Nf
+        f_i = f_ind[f2]  # CartesianIndex list for filter
+        f_v = f_val[f2]  # Values for f_i
+        uvec = im_rdc[:,:,f2] ./ im_rd[:,:,f2]
+        @threads for f1 = 1:Nf
+            #println(threadid())
+            #println("ln ",f1,"  ",f2,"  ",threadid(),"  ",length(f_i))
+            zarr[threadid()][f_i] .= f_v .* (P_fft*(im_rd[:,:,f1].*uvec))[f_i]
+            df1[:,:,f1] = real.(P_ifft*zarr[threadid()])
+            zarr[threadid()][f_i] .= 0   # reset zarr for next loop
+        end
+        for f1 = 1:Nf
+            dS20dα[:,:,f1,f2] += df1[:,:,f1]
+            dS20dα[:,:,f2,f1] += df1[:,:,f1]
+        end
+
+    end
+    return dS20dα
+end
+
+
+
+
+
+
+
+
+
+Nx = 256
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-im = zeros(Float64, Nx, Nx)
+im = zeros(Float64, Nx, Nx);
 im[6,6]=1.0
-@benchmark blarg = wst_S20_deriv(im, fhash)
+@benchmark bmine = wst_S20_deriv_mine(im, fhash,4)
+bmine = wst_S20_deriv_mine(im, fhash,4)
+blarg = wst_S20_deriv(im, fhash,4)
 
-Profile.clear()
-@profile blarg = wst_S20_deriv(im, fhash)
-Juno.profiler()
-
+std(bmine - blarg)
 
 # S20 deriv time, Jan 30
-# Nx     Jan 30  Feb 14
-#   8     28 ms   1 ms
+# Nx     Jan 30  Feb 14  Feb 20
+#   8     28 ms   1 ms     HF01     4 th   my4
 #  16    112      7
-#  32    320     50
-#  64   1000    400
-# 128   5 sec     3.3 sec
-# 256   ---      17.2 sec
+#  32    320     50          25
+#  64   1000    400         160           150
+# 128   5 sec     3.3 sec   1.2   0.6 sec 1.0
+# 256   ---      17.2 sec   8.5   4.5 sec 7.0
 # 512   ---
 
 
@@ -454,7 +533,8 @@ foo = wst_synth(init, fixmask)
 
 function readdust()
 
-    RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
+    #RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
+    RGBA_img = load("/n/home08/dfink/DHC/scratch_DF/t115_clean_small.png")
     img = reinterpret(UInt8,rawview(channelview(RGBA_img)))
 
     return img[1,:,:]
@@ -492,7 +572,7 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
         thisim = copy(im_init)
         thisim[indfloat] = vec_in
 
-        dS20dp = reshape(wst_S20_deriv(thisim, fhash), Nx*Nx, Nf*Nf)
+        dS20dp = reshape(wst_S20_deriv(thisim, fhash, 4), Nx*Nx, Nf*Nf)
         if iso
             M20 = fhash["S2_iso_mat"]
             dS20dp = dS20dp * M20'
@@ -580,7 +660,7 @@ end
 dust = Float64.(readdust())
 dust = dust[1:256,1:256]
 
-Nx     = 64
+Nx     = 256
 doiso  = true
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
@@ -604,8 +684,18 @@ S_foo = DHC_compute(foo, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
 plot_synth_QA(im, init, foo, fhash)
 
 
+function writestuff(im, init, im_out, fhash)
+    f = FITS("newfile.fits", "w")
+    write(f, im)
+    write(f, init)
+    write(f, im_out)
+    close(f)
+end
 
-function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test2.png")
+
+
+
+function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test256.png")
 
     # -------- define plot1 to append plot to a list
     function plot1(ps, image; clim=nothing, bin=1.0, fsz=16, label=nothing)
@@ -654,10 +744,75 @@ plot_synth_QA(im, init, foo, fhash)
 
 
 
+function sfft(Nx,Nind)
+    zarr = zeros(ComplexF64, Nx, Nx)
+    out  = zeros(ComplexF64, Nx, Nx, Nind)
+    for i = 1:Nind
+        zarr[1,i] = 1.0
+        out[:,:,i] = ifft(zarr)
+    end
+    return out
+end
+
+function stest(fhash, f2, uvec)
+    f_ind   = fhash["filt_index"]  # (J, L) array of filters represented as index value pairs
+    f_val   = fhash["filt_value"]
+    Nx = ?
+    Nf = ?
+    #for f2 = 1:Nf
+        f_i = f_ind[f2]  # CartesianIndex list for filter
+        f_v = f_val[f2]  # Values for f_i
+        #uvec = im_rdc[:,:,f2] ./ im_rd[:,:,f2]
+
+
+        # pre-compute some exp(ikx)
+        expikx = zeros(ComplexF64, Nx, Nx, Nf)
+        for i=1:Nf expikx[:,:,i] = ifft()
+
+
+        A = reshape(im_rd, Nx*Nx, Nf) .* uvec
+        for f1 = 1:Nf
+            temp = P_fft*(im_rd[:,:,f1].*uvec)
+            zarr[f_i] = f_v .* temp[f_i]
+
+            Z1dZ2 = real.(P_ifft*zarr)
+            #  It is possible to do this with rifft, but it is not much faster...
+            #   Z1dZ2 = myrealifft(zarr)
+            dS20dα[:,:,f1,f2] += Z1dZ2
+            dS20dα[:,:,f2,f1] += Z1dZ2
+            zarr[f_i] .= 0   # reset zarr for next loop
+        end
+    end
+
+    return
+end
+
+
+function Fourierbasis2D(Nx, f_i)
+    Nf = length(f_i)
+
+    [[2,3]'*[ci[1],ci[2]] for ci in f_i]
+    return
+end
+
+function f5(xs, ys, kx, ky)
+    lx, ly = length(xs), length(ys)
+    res = Array{ComplexF64, 2}(undef,lx*ly, 2)
+    ind = 1
+    ikx = Complex(0,kx)
+    iky = Complex(0,ky)
+    for y in ys, x in xs
+        res[ind, 1] = exp(ikx*x + iky*y)
+        #res[ind, 2] = y
+        ind += 1
+    end
+    return res
+end
+
 # using dchisq function with S20
 # size   t(BFGS) t(LBFGS) [sec]
 # 8x8      30
-# 16x16    90
-# 32x32   189                           74
+# 16x16    90                                           iso on HF01
+# 32x32   189                           74                  32
 # 64x64  1637                          531      642 iso
 # 128x128                              2 hrs
