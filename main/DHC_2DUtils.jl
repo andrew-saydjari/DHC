@@ -12,6 +12,7 @@ module DHC_2DUtils
     export fink_filter_hash
     export wst_S1_deriv
     export wst_S20_deriv
+    export wst_S20_deriv_sum
     export DHC_compute
     export fink_filter_bank_3dizer
     export DHC_compute_3d

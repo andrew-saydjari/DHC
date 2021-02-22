@@ -268,7 +268,7 @@ function S20test(fhash)
     return
 end
 
-Nx = 256
+Nx = 16
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 (Nf, )    = size(fhash["filt_index"])
 im = rand(Nx,Nx);
@@ -283,20 +283,19 @@ Profile.clear()
 Juno.profiler()
 
 
-# S20 deriv time, Jan 30
+# S20 deriv time, Mac laptop
 # Nx     Jan 30  Feb 14  Feb 21
 #   8     28 ms   1 ms
-#  16    112      7
-#  32    320     50        2 ms
-#  64   1000    400       17 ms
-# 128   5 sec     3.3 s   90 ms
-# 256   ---      17.2 s  0.7 s
-# 512   ---
+#  16    112      7      0.6 ms
+#  32    320     50        2
+#  64   1000    400       17
+# 128   5 sec     3.3 s   90
+# 256   ---      17.2 s  0.65 s
+# 512   ---               2.9 s
 
 
 
 print(1)
-
 
 
 # wst_S1_deriv agrees with brute force at 1e-10 level.
@@ -500,7 +499,8 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
 
         # should have some kind of weight here
         chisq = diff'*diff
-        println(chisq)
+        if mod(iter,10) == 0 println(iter, "   ", chisq) end
+        iter += 1
         return chisq
 
     end
@@ -532,6 +532,7 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
         storage .= dchisq
     end
 
+    iter = 0
     (Nx, Ny)  = size(im_init)
     if Nx != Ny error("Input image must be square") end
     (N1iso, Nf)    = size(fhash["S1_iso_mat"])
@@ -605,13 +606,13 @@ end
 dust = Float64.(readdust())
 dust = dust[1:256,1:256]
 
-Nx     = 32
+Nx     = 128
 doiso  = true
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
 i0 = 3+(doiso ? N1iso : Nf)
 im    = imresize(dust,(Nx,Nx))
-fixmask = rand(Nx,Nx) .< 0.1
+fixmask = rand(Nx,Nx) .< 0.01
 
 
 S_targ = DHC_compute(im, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
@@ -774,4 +775,4 @@ end
 # 16x16
 # 32x32
 # 64x64   134
-# 128x128                              2 hrs
+# 128x128           221
