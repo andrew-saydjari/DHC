@@ -326,30 +326,104 @@ end
 
 
 
+function wst_S20_deriv_sum(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64}, nthread::Int=1)
+
+    # Use nthread threads for FFT -- but for Nx<512 nthread=1 is fastest.  Overhead?
+    # On Cascade Lake box, 4 is good for 2D, 8 or 16 for 3D FFTs
+    FFTW.set_num_threads(nthread)
+
+    # array sizes
+    (Nx, Ny)  = size(image)
+    (Nf, )    = size(filter_hash["filt_index"])
+
+    # allocate image arrays for internal use
+    uvec   = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+    im_rd  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+    im_fd  = fft(image)
+
+    # unpack filter_hash
+    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+    f_val   = filter_hash["filt_value"]
+    zarr    = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
+
+    # make a FFTW "plan" a complex array, both forward and inverse transform
+    P_fft  = plan_fft(im_fd)   # P_fft is an operator,  P_fft*im is fft(im)
+    P_ifft = plan_ifft(im_fd)  # P_ifft is an operator, P_ifft*im is ifft(im)
+
+    # Loop over filters
+    for f = 1:Nf
+        f_i = f_ind[f]  # CartesianIndex list for filter
+        f_v = f_val[f]  # Values for f_i
+
+        zarr[f_i] = f_v .* im_fd[f_i]
+        Z_λ = P_ifft*zarr  # complex valued ifft of zarr
+        zarr[f_i] .= 0   # reset zarr for next loop
+        im_rd[:,:,f] = abs.(Z_λ)
+        uvec[:,:,f]  = Z_λ ./ im_rd[:,:,f]
+
+    end
+
+    zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
+    for f2 = 1:Nf
+        f_i = f_ind[f2]  # CartesianIndex list for filter
+        f_v = f_val[f2]  # Values for f_i
+
+        Wtot = reshape( reshape(im_rd,Nx*Nx,Nf)*wt[:,f2], Nx, Nx)
+        temp = P_fft*(Wtot.*uvec[:,:,f2])
+        zarr[f_i] .+= f_v .* temp[f_i]
+    end
+    ΣdS20dα = real.(P_ifft*zarr)
+
+    return ΣdS20dα
+end
 
 
+function S20test(fhash)
+    (Nf, )    = size(fhash["filt_index"])
+    Nx        = fhash["npix"]
+    im = rand(Nx,Nx)
+    mywts = rand(Nf*Nf)
 
+    # this is symmetrical, but not because S20 is symmetrical!
+    wtgrid = reshape(mywts, Nf, Nf) + reshape(mywts, Nf, Nf)'
+    wtvec  = reshape(wtgrid, Nf*Nf)
 
+    # Use new faster code
+    sum1 = wst_S20_deriv_sum(im, fhash, wtgrid, 1)
 
+    # Compare to established code
+    dS20 = reshape(wst_S20_deriv(im, fhash, 1),Nx,Nx,Nf*Nf)
+    sum2 = zeros(Float64, Nx, Nx)
+    for i=1:Nf*Nf sum2 += (dS20[:,:,i].*mywts[i]) end
 
-Nx = 256
+    println("Stdev: ",std(sum1-sum2))
+
+    return
+end
+
+Nx = 128
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-im = zeros(Float64, Nx, Nx);
-im[6,6]=1.0
-@benchmark bmine = wst_S20_deriv_mine(im, fhash,4)
-bmine = wst_S20_deriv_mine(im, fhash,4)
-blarg = wst_S20_deriv(im, fhash,4)
+(Nf, )    = size(fhash["filt_index"])
+im = rand(Nx,Nx);
+wts = rand(Nf,Nf);
+@benchmark wst_S20_deriv(im, fhash, 1)
 
-std(bmine - blarg)
+@benchmark wst_S20_deriv_sum(im, fhash, wts, 1)
+
+
+Profile.clear()
+@profile wst_S20_deriv_sum(im, fhash, wts, 1)
+Juno.profiler()
+
 
 # S20 deriv time, Jan 30
-# Nx     Jan 30  Feb 14  Feb 20
-#   8     28 ms   1 ms     HF01     4 th   my4
+# Nx     Jan 30  Feb 14  Feb 21
+#   8     28 ms   1 ms
 #  16    112      7
-#  32    320     50          25
-#  64   1000    400         160           150
-# 128   5 sec     3.3 sec   1.2   0.6 sec 1.0
-# 256   ---      17.2 sec   8.5   4.5 sec 7.0
+#  32    320     50
+#  64   1000    400       17 ms
+# 128   5 sec     3.3 s   90 ms
+# 256   ---      17.2 s  1.3 s
 # 512   ---
 
 
