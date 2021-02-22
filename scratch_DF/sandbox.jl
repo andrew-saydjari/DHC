@@ -274,7 +274,7 @@ fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 (Nf, )    = size(fhash["filt_index"])
 im = rand(Nx,Nx);
 wts = rand(Nf,Nf);
-@benchmark wst_S20_deriv(im, fhash, 1)
+#@benchmark wst_S20_deriv(im, fhash, 1)
 
 @benchmark wst_S20_deriv_sum(im, fhash, wts, 1)
 
@@ -285,14 +285,14 @@ Juno.profiler()
 
 
 # S20 deriv time, Mac laptop
-# Nx     Jan 30  Feb 14  Feb 21
+# Nx     Jan 30  Feb 14  Feb 21    HF01
 #   8     28 ms   1 ms
-#  16    112      7      0.6 ms
-#  32    320     50        2
-#  64   1000    400       17
-# 128   5 sec     3.3 s   90
-# 256   ---      17.2 s  0.65 s
-# 512   ---               2.9 s
+#  16    112      7      0.6 ms    0.4 ms
+#  32    320     50        2       1.3
+#  64   1000    400       17        10
+# 128   5 sec     3.3 s   90        50
+# 256   ---      17.2 s  0.65 s   0.48 s
+# 512   ---               2.9 s   1.85
 
 
 
@@ -472,7 +472,7 @@ foo = wst_synth(init, fixmask)
 # 128x128        est 28,000  (8 hrs)
 
  
- function readdust()
+function readdust()
 
     RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
     #RGBA_img = load("/n/home08/dfink/DHC/scratch_DF/t115_clean_small.png")
@@ -511,12 +511,12 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
         thisim = copy(im_init)
         thisim[indfloat] = vec_in
 
-        dS20dp = reshape(wst_S20_deriv(thisim, fhash, 8), Nx*Nx, Nf*Nf)
-#=======
-#        i0 = 3+(iso ? N1iso : Nf)
-#        S20arr = (DHC_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
-#        diff   = (S20arr - S_targ)./(S20sig.^2)
-#>>>>>>> 8e6669908d30c8ea1113abf932b5ac2933126589
+        #dS20dp = reshape(wst_S20_deriv(thisim, fhash, 8), Nx*Nx, Nf*Nf)
+
+        i0 = 3+(iso ? N1iso : Nf)
+        S20arr = (DHC_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
+        diff   = (S20arr - S_targ)./(S20sig.^2)
+
         if iso
             diffwt = diff[indiso]
         else
@@ -612,7 +612,7 @@ dustbig = Float64.(readdust())
 # Try it with log dust!!
 dust = log.(dustbig[1:256,1:256])
 
-Nx     = 128
+Nx     = 256
 doiso  = true
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
@@ -627,7 +627,7 @@ S_targ = S_targ[i0:end]
 init = copy(im)
 floatind = findall(fixmask .==0)
 #init[floatind] .+= rand(length(floatind)).*50 .-25
-init[floatind] .+= rand(length(floatind)).*0.80 .-0.4
+init[floatind] .+= rand(length(floatind)).*0.6 .-0.3
 
 S20sig = S20_weights(im, fhash, 100, iso=doiso)
 S20sig = S20sig[i0:end]
@@ -775,11 +775,14 @@ end
 # 32x32   189                           74                  32
 # 64x64  1637                          531      642 iso
 # 128x128                              2 hrs
+# 256x256                                                 8800 sec
 
 # using new wst_S20_deriv_sum on Feb 21, 2021
-# size     t(GG)  t(CG)ISO  [sec]
+# size     t(GG)  t(CG)ISO  HF01  [sec]   mem
 # 8x8
 # 16x16
 # 32x32
 # 64x64   134
-# 128x128           221
+# 128x128           221     116          
+# 256x256                   712           3.5 GB
+# 512x512
