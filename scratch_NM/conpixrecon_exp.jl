@@ -9,7 +9,8 @@ using Images, FileIO, ImageIO
 using Printf
 using SparseArrays
 using Distributions
-using Weave
+using Measures
+#using Weave
 
 #using Profile
 using LinearAlgebra
@@ -126,7 +127,7 @@ function img_reconfunc(input, s_targ_mean, s_targ_invcov, mask, coeff_choice, op
         println("Clever: ",clever[Nx*(1)+1])
 
 
-        res = optimize(loss_func, dloss, reshape(input, (Nx^2, 1)), BFGS(), Optim.Options(iterations = get(optim_settings, "iterations", 100), store_trace = true, show_trace = true))
+        res = optimize(loss_func, dloss, reshape(input, (Nx^2, 1)), ConjugateGradient(), Optim.Options(iterations = get(optim_settings, "iterations", 100), store_trace = true, show_trace = true))
         result_img = zeros(Float64, Nx, Nx)
         result_img = Optim.minimizer(res)
 
@@ -332,7 +333,50 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
     return im_synth
 end
 
+function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test2.png")
 
+    # -------- define plot1 to append plot to a list
+    function plot1(ps, image; clim=nothing, bin=1.0, fsz=16, label=nothing)
+        # ps    - list of plots to append to
+        # image - image to heatmap
+        # clim  - tuple of color limits (min, max)
+        # bin   - bin down by this factor, centered on nx/2+1
+        # fsz   - font size
+        marg   = 1mm
+        nx, ny = size(image)
+        nxb    = nx/round(Integer, 2*bin)
+
+        # -------- center on nx/2+1
+        i0 = max(1,round(Integer, (nx/2+2)-nxb-1))
+        i1 = min(nx,round(Integer, (nx/2)+nxb+1))
+        lims = [i0,i1]
+        subim = image[i0:i1,i0:i1]
+        push!(ps, heatmap(image, aspect_ratio=:equal, clim=clim,
+            xlims=lims, ylims=lims, size=(400,400),
+            legend=false, xtickfontsize=fsz, ytickfontsize=fsz,#tick_direction=:out,
+            rightmargin=marg, leftmargin=marg, topmargin=marg, bottommargin=marg))
+        if label != nothing
+            annotate!(lims'*[.96,.04],lims'*[.09,.91],text(label,:left,:white,32))
+        end
+        return
+    end
+
+    # -------- initialize array of plots
+    ps   = []
+    clim  = (0,200)
+    clim2 = (0,200).-100
+
+    # -------- 6 panel QA plot
+    plot1(ps, ImTrue, clim=clim, label="True")
+    plot1(ps, ImSynth, clim=clim, label="Synth")
+    plot1(ps, ImInit, clim=clim, label="Init")
+    plot1(ps, ImInit-ImTrue, clim=clim2, label="Init-True")
+    plot1(ps, ImInit-ImSynth, clim=clim2, label="Init-Synth")
+    plot1(ps, ImSynth-ImTrue, clim=clim2, label="Synth-True")
+
+    myplot = plot(ps..., layout=(3,2), size=(1400,2000))
+    savefig(myplot, fname)
+end
 ####Testing Examples#############
 #Sec1
 dust = readdust()
@@ -362,8 +406,8 @@ noisyimg = img + n
 s_targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=false, doS20=true)[3+length(fhash["filt_index"]):end]
 denoised_img = wst_synthS20(noisyimg, falses(Nx,Nx), s_targ, mean(img)/20.0)
 
-#For some reason the abve code doesnt work.
-#Sec2
+#For some reason the above code doesnt work.
+#Sec2: This now works!
 #Using the exact same example as in sandbox_DFcopy.
 dust = Float64.(readdust())
 dust = dust[1:256,1:256]
@@ -394,23 +438,22 @@ foo = wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
 #2.2. Using your code.
 invcovar = Diagonal(S20_weights(img, fhash, 100, iso=doiso).^(-2))
 s20targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
-myfoogen = img_reconfunc(init, s20targ,  invcovar, fixmask, "S20", Dict([("iterations", 100)]))
+myfoogens20 = img_reconfunc(init, s20targ,  invcovar, fixmask, "S20", Dict([("iterations", 100)]))
 
 
 #Need a new invcovar (S2weights) for doing S2
-invcovarS2 = Diagonal(S2_weights(img, fhash, 100, iso=doiso).^(-2))
+invcovarS2 = Diagonal(S2_weights(img, fhash, 100, iso=doiso).^(-2)) #This doesn't work for S2: use invcovar computed for S20 for S2 as well for the timebeing.
 s2targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=true, doS20=false, norm=false, iso=doiso)
 println(size(img), size(init), size(s2targ), size(invcovar), size(fixmask))
-myfoogen = img_reconfunc(init, s2targ,  invcovar, fixmask, "S2", Dict([("iterations", 100)]))
+reconS2cg = img_reconfunc(init, s2targ,  invcovar, fixmask, "S2", Dict([("iterations", 100)]))
+#Weird bug where the code works using invcovar but doesnt when you use invcovars2
+#myfoogen used S20's invcovar
+#myfoogenS2 uses the correct incovar
+#myfoogens20 uses s20
 
-
-
-
-
-
-
-
-
+plot_synth_QA(img, init, myfoogens20, fhash, fname="scratch_NM/TestPlots/s20_100itns.png")
+plot_synth_QA(img, init, myfoogenS2, fhash, fname="scratch_NM/TestPlots/s2_100itns.png")
+plot_synth_QA(img, init, reconS2cg, fhash, fname="scratch_NM/TestPlots/s2_100itns_cg.png")
 
 
 
