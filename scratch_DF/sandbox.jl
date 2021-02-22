@@ -273,7 +273,7 @@ fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 (Nf, )    = size(fhash["filt_index"])
 im = rand(Nx,Nx);
 wts = rand(Nf,Nf);
-@benchmark wst_S20_deriv(im, fhash, 1)
+#@benchmark wst_S20_deriv(im, fhash, 1)
 
 @benchmark wst_S20_deriv_sum(im, fhash, wts, 1)
 
@@ -284,14 +284,14 @@ Juno.profiler()
 
 
 # S20 deriv time, Mac laptop
-# Nx     Jan 30  Feb 14  Feb 21
+# Nx     Jan 30  Feb 14  Feb 21    HF01
 #   8     28 ms   1 ms
-#  16    112      7      0.6 ms
-#  32    320     50        2
-#  64   1000    400       17
-# 128   5 sec     3.3 s   90
-# 256   ---      17.2 s  0.65 s
-# 512   ---               2.9 s
+#  16    112      7      0.6 ms    0.4 ms
+#  32    320     50        2       1.3
+#  64   1000    400       17        10
+# 128   5 sec     3.3 s   90        50
+# 256   ---      17.2 s  0.65 s   0.48 s
+# 512   ---               2.9 s   1.85
 
 
 
@@ -606,7 +606,7 @@ end
 dust = Float64.(readdust())
 dust = dust[1:256,1:256]
 
-Nx     = 128
+Nx     = 256
 doiso  = true
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
@@ -768,11 +768,14 @@ end
 # 32x32   189                           74                  32
 # 64x64  1637                          531      642 iso
 # 128x128                              2 hrs
+# 256x256                                                 8800 sec
 
 # using new wst_S20_deriv_sum on Feb 21, 2021
-# size     t(GG)  t(CG)ISO  [sec]
+# size     t(GG)  t(CG)ISO  HF01  [sec]   mem
 # 8x8
 # 16x16
 # 32x32
 # 64x64   134
-# 128x128           221
+# 128x128           221     116
+# 256x256                   712           3.5 GB
+# 512x512
