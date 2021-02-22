@@ -11,7 +11,6 @@ using Images, FileIO
 
 using LinearAlgebra
 using SparseArrays
-using Base.Threads
 
 # put the cwd on the path so Julia can find the module
 push!(LOAD_PATH, pwd()*"/main")
@@ -471,8 +470,8 @@ foo = wst_synth(init, fixmask)
 # 64x64          1645
 # 128x128        est 28,000  (8 hrs)
 
- 
- function readdust()
+
+function readdust()
 
     RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
     #RGBA_img = load("/n/home08/dfink/DHC/scratch_DF/t115_clean_small.png")
@@ -511,12 +510,9 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
         thisim = copy(im_init)
         thisim[indfloat] = vec_in
 
-        dS20dp = reshape(wst_S20_deriv(thisim, fhash, 8), Nx*Nx, Nf*Nf)
-#=======
-#        i0 = 3+(iso ? N1iso : Nf)
-#        S20arr = (DHC_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
-#        diff   = (S20arr - S_targ)./(S20sig.^2)
-#>>>>>>> 8e6669908d30c8ea1113abf932b5ac2933126589
+        i0 = 3+(iso ? N1iso : Nf)
+        S20arr = (DHC_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
+        diff   = (S20arr - S_targ)./(S20sig.^2)
         if iso
             diffwt = diff[indiso]
         else
@@ -607,10 +603,8 @@ end
 
 
 # read dust map
-dustbig = Float64.(readdust())
-
-# Try it with log dust!!
-dust = log.(dustbig[1:256,1:256])
+dust = Float64.(readdust())
+dust = dust[1:256,1:256]
 
 Nx     = 128
 doiso  = true
@@ -618,7 +612,7 @@ fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
 i0 = 3+(doiso ? N1iso : Nf)
 im    = imresize(dust,(Nx,Nx))
-fixmask = rand(Nx,Nx) .< 0.01
+fixmask = rand(Nx,Nx) .< 0.001
 
 
 S_targ = DHC_compute(im, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
@@ -626,8 +620,7 @@ S_targ = S_targ[i0:end]
 
 init = copy(im)
 floatind = findall(fixmask .==0)
-#init[floatind] .+= rand(length(floatind)).*50 .-25
-init[floatind] .+= rand(length(floatind)).*0.80 .-0.4
+init[floatind] .+= rand(length(floatind)).*50 .-25
 
 S20sig = S20_weights(im, fhash, 100, iso=doiso)
 S20sig = S20sig[i0:end]
@@ -654,7 +647,7 @@ end
 
 
 
-function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test3.png")
+function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test256.png")
 
     # -------- define plot1 to append plot to a list
     function plot1(ps, image; clim=nothing, bin=1.0, fsz=16, label=nothing)
