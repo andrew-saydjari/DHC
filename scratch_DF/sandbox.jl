@@ -325,59 +325,6 @@ function wst_S20_deriv_mine(image::Array{Float64,2}, filter_hash::Dict, nthread:
 end
 
 
-
-function wst_S20_deriv_sum(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64}, nthread::Int=1)
-
-    # Use nthread threads for FFT -- but for Nx<512 nthread=1 is fastest.  Overhead?
-    # On Cascade Lake box, 4 is good for 2D, 8 or 16 for 3D FFTs
-    FFTW.set_num_threads(nthread)
-
-    # array sizes
-    (Nx, Ny)  = size(image)
-    (Nf, )    = size(filter_hash["filt_index"])
-
-    # allocate image arrays for internal use
-    uvec   = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
-    im_rd  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
-    im_fd  = fft(image)
-
-    # unpack filter_hash
-    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
-    f_val   = filter_hash["filt_value"]
-    zarr    = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
-
-    # make a FFTW "plan" a complex array, both forward and inverse transform
-    P_fft  = plan_fft(im_fd)   # P_fft is an operator,  P_fft*im is fft(im)
-    P_ifft = plan_ifft(im_fd)  # P_ifft is an operator, P_ifft*im is ifft(im)
-
-    # Loop over filters
-    for f = 1:Nf
-        f_i = f_ind[f]  # CartesianIndex list for filter
-        f_v = f_val[f]  # Values for f_i
-
-        zarr[f_i] = f_v .* im_fd[f_i]
-        Z_λ = P_ifft*zarr  # complex valued ifft of zarr
-        zarr[f_i] .= 0   # reset zarr for next loop
-        im_rd[:,:,f] = abs.(Z_λ)
-        uvec[:,:,f]  = Z_λ ./ im_rd[:,:,f]
-
-    end
-
-    zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
-    for f2 = 1:Nf
-        f_i = f_ind[f2]  # CartesianIndex list for filter
-        f_v = f_val[f2]  # Values for f_i
-
-        Wtot = reshape( reshape(im_rd,Nx*Nx,Nf)*wt[:,f2], Nx, Nx)
-        temp = P_fft*(Wtot.*uvec[:,:,f2])
-        zarr[f_i] .+= f_v .* temp[f_i]
-    end
-    ΣdS20dα = real.(P_ifft*zarr)
-
-    return ΣdS20dα
-end
-
-
 function S20test(fhash)
     (Nf, )    = size(fhash["filt_index"])
     Nx        = fhash["npix"]
@@ -401,7 +348,7 @@ function S20test(fhash)
     return
 end
 
-Nx = 128
+Nx = 256
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 (Nf, )    = size(fhash["filt_index"])
 im = rand(Nx,Nx);
@@ -420,10 +367,10 @@ Juno.profiler()
 # Nx     Jan 30  Feb 14  Feb 21
 #   8     28 ms   1 ms
 #  16    112      7
-#  32    320     50
+#  32    320     50        2 ms
 #  64   1000    400       17 ms
 # 128   5 sec     3.3 s   90 ms
-# 256   ---      17.2 s  1.3 s
+# 256   ---      17.2 s  0.7 s
 # 512   ---
 
 
@@ -607,8 +554,8 @@ foo = wst_synth(init, fixmask)
 
 function readdust()
 
-    #RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
-    RGBA_img = load("/n/home08/dfink/DHC/scratch_DF/t115_clean_small.png")
+    RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
+    #RGBA_img = load("/n/home08/dfink/DHC/scratch_DF/t115_clean_small.png")
     img = reinterpret(UInt8,rawview(channelview(RGBA_img)))
 
     return img[1,:,:]
@@ -646,22 +593,24 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
         thisim = copy(im_init)
         thisim[indfloat] = vec_in
 
-        dS20dp = reshape(wst_S20_deriv(thisim, fhash, 4), Nx*Nx, Nf*Nf)
+        i0 = 3+(iso ? N1iso : Nf)
+        S20arr = (DHC_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
+        diff   = (S20arr - S_targ)./(S20sig.^2)
         if iso
             M20 = fhash["S2_iso_mat"]
-            dS20dp = dS20dp * M20'
-        end
-        i0 = 3+(iso ? N1iso : Nf)
+            (Nwt,Nind) = size(M20)
+            diffwt   = zeros(Nf*Nf)
+            for ind = 1:Nind  diffwt[M20.colptr[ind]] = diff[M20.rowval[ind]]  end
+        else diffwt = diff end
 
-        S20arr = (DHC_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
+        wtgrid = 2 .* (reshape(diffwt, Nf, Nf) + reshape(diffwt, Nf, Nf)')
 
-        # put both factors of S20sig in this array to weight
-        diff   = (S20arr - S_targ)./(S20sig.^2)
-        #println("size of diff", size(diff))
-        #println("size of dS20dp", size(reshape(dS20dp, Nx*Nx, Nf*Nf)))
+        dchisq_im = wst_S20_deriv_sum(thisim, fhash, wtgrid, 1)
+
+
         # dSdp matrix * S1-S_targ is dchisq
-        #dchisq_im = (reshape(dS20dp, Nx*Nx, Nf*Nf) * diff).*2
-        dchisq_im = (dS20dp * diff).*2
+        # dchisq_im = (reshape(dS20dp, Nx*Nx, Nf*Nf) * diff).*2
+        # dchisq_im = (dS20dp * diff).*2
         dchisq = reshape(dchisq_im, Nx, Nx)[indfloat]
 
         storage .= dchisq
@@ -734,7 +683,7 @@ end
 dust = Float64.(readdust())
 dust = dust[1:256,1:256]
 
-Nx     = 256
+Nx     = 64
 doiso  = true
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
@@ -754,6 +703,12 @@ S20sig = S20_weights(im, fhash, 100, iso=doiso)
 S20sig = S20sig[i0:end]
 foo = wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
 S_foo = DHC_compute(foo, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
+
+
+Profile.clear()
+@profile foo=wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
+Juno.profiler()
+
 
 plot_synth_QA(im, init, foo, fhash)
 
@@ -889,4 +844,12 @@ end
 # 16x16    90                                           iso on HF01
 # 32x32   189                           74                  32
 # 64x64  1637                          531      642 iso
+# 128x128                              2 hrs
+
+# using new wst_S20_deriv_sum on Feb 21, 2021
+# size     t(GG)  t(CG)ISO  [sec]
+# 8x8
+# 16x16
+# 32x32
+# 64x64   134
 # 128x128                              2 hrs
