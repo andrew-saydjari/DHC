@@ -20,8 +20,6 @@ module DHC_2DUtils
     export S2_iso_matrix3d
     export isoMaker
 
-
-
     function fink_filter_bank(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true)
         #c     - sets the scale sampling rate (1 is dyadic, 2 is half dyadic)
         #L     - number of angular bins (usually 8*pc or 16*pc)
@@ -175,7 +173,6 @@ module DHC_2DUtils
 
         return filt, info
     end
-
 
     ## Make a list of non-zero pixels for the (Fourier plane) filters
     function fink_filter_list(filt)
@@ -613,99 +610,6 @@ module DHC_2DUtils
     end
 
 
-    function DHC_compute_old(image::Array{Float64,2}, filter_hash, filter_hash2)
-        # Use 2 threads for FFT
-        FFTW.set_num_threads(2)
-
-        # array sizes
-        (Nx, Ny)  = size(image)
-        (Nf, )    = size(filter_hash["filt_index"])
-
-        # allocate coeff arrays
-        out_coeff = []
-        S0  = zeros(Float64, 2)
-        S1  = zeros(Float64, Nf)
-        S20 = zeros(Float64, Nf, Nf)
-        S12 = zeros(Float64, Nf, Nf)
-        S2  = zeros(Float64, Nf, Nf)  # traditional 2nd order
-
-        # allocate image arrays for internal use
-        im_fdf_0_1 = zeros(Float64,           Nx, Ny, Nf)   # this must be zeroed!
-        im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf)
-
-        ## 0th Order
-        S0[1]   = mean(image)
-        norm_im = image.-S0[1]
-        S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
-        norm_im ./= sqrt(Nx*Ny*S0[2])
-
-        append!(out_coeff,S0[:])
-
-        ## 1st Order
-        im_fd_0 = fft(norm_im)  # total power=1.0
-
-        # unpack filter_hash
-        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
-        f_val   = filter_hash["filt_value"]
-
-        f_ind2   = filter_hash2["filt_index"]  # (J, L) array of filters represented as index value pairs
-        f_val2   = filter_hash2["filt_value"]
-
-        zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
-
-        # make a FFTW "plan" for an array of the given size and type
-        P   = plan_ifft(im_fd_0)   # P is an operator, P*im is ifft(im)
-
-        ## Main 1st Order and Precompute 2nd Order
-        for f = 1:Nf
-            S1tot = 0.0
-            f_i = f_ind[f]  # CartesianIndex list for filter
-            f_v = f_val[f]  # Values for f_i
-            # for (ind, val) in zip(f_i, f_v)   # this is slower!
-            if length(f_i) > 0
-                for i = 1:length(f_i)
-                    ind       = f_i[i]
-                    zval      = f_v[i] * im_fd_0[ind]
-                    S1tot    += abs2(zval)
-                    zarr[ind] = zval
-                    im_fdf_0_1[ind,f] = abs(zval)
-                end
-                S1[f] = S1tot/(Nx*Ny)  # image power
-                im_rd_0_1[:,:,f] .= abs2.(P*zarr)
-                zarr[f_i] .= 0
-            end
-        end
-        append!(out_coeff, S1[:])
-
-        # we stored the abs()^2, so take sqrt (this is faster to do all at once)
-        im_rd_0_1 .= sqrt.(im_rd_0_1)
-
-        ## 2nd Order
-        #Amat = reshape(im_fdf_0_1, Nx*Ny, Nf)
-        #S12  = Amat' * Amat
-        #Amat = reshape(im_rd_0_1, Nx*Ny, Nf)
-        #S20  = Amat' * Amat
-
-        #append!(out_coeff, S20)
-        #append!(out_coeff, S12)
-
-        ## Traditional second order
-        for f1 = 1:Nf
-            thisim = fft(im_rd_0_1[:,:,f1])  # Could try rfft here
-            # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
-            # Loop over f2 and do second-order convolution
-            for f2 = 1:Nf
-                f_i = f_ind2[f2]  # CartesianIndex list for filter
-                f_v = f_val2[f2]  # Values for f_i
-                # sum im^2 = sum(|fft|^2/npix)
-                S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)
-            end
-        end
-        append!(out_coeff, S2)
-
-        return out_coeff
-    end
-
     function fink_filter_bank_3dizer(hash, cz; nz=256)
         # -------- set parameters
         nx = convert(Int64,hash["npix"])
@@ -767,9 +671,9 @@ module DHC_2DUtils
 
         # -------- metadata dictionary
         info=Dict()
-        info["2d_npix"]         = hash["npix"]
-        info["2d_j_value"]      = hash["j_value"]
-        info["2d_theta_value"]  = hash["theta_value"]
+        info["npix"]         = hash["npix"]
+        info["j_value"]      = hash["j_value"]
+        info["theta_value"]  = hash["theta_value"]
         info["2d_psi_index"]    = hash["psi_index"]
         info["2d_phi_index"]    = hash["phi_index"]
         info["2d_J_L"]          = hash["J_L"]
@@ -787,8 +691,15 @@ module DHC_2DUtils
         info["filt_index"]      = filtind
         info["filt_value"]      = filtval
 
+        # -------- compute matrix that projects iso coeffs, add to hash
+        S1_iso_mat = S1_iso_matrix_3d(info)
+        info["S1_iso_mat"] = S1_iso_mat
+        S2_iso_mat = S2_iso_matrix_3d(info)
+        info["S2_iso_mat"] = S2_iso_mat
+
         return info
     end
+
 
     function DHC_compute_3d(image::Array{Float64,3}, filter_hash; FFTthreads=2)
         # Use 2 threads for FFT
@@ -883,6 +794,7 @@ module DHC_2DUtils
         return out_coeff
     end
 
+
     function S1_iso_matrix3d(fhash)
         # fhash is the filter hash output by fink_filter_hash
         # The output matrix converts an S1 coeff vector to S1iso by
@@ -928,6 +840,7 @@ module DHC_2DUtils
         return sparse(Mat)
     end
 
+
     function S2_iso_matrix3d(fhash)
         # fhash is the filter hash output by fink_filter_hash
         # The output matrix converts an S2 coeff vector to S2iso by
@@ -941,8 +854,8 @@ module DHC_2DUtils
         #if Omega Ω_ind = fhash["Omega_index"] end
 
         # unpack fhash
-        Nl      = length(fhash["2d_theta_value"])
-        Nj      = length(fhash["2d_j_value"])
+        Nl      = length(fhash["theta_value"])
+        Nj      = length(fhash["j_value"])
         Nk      = length(fhash["k_value"])
         Nf      = length(fhash["filt_value"])
         ψ_ind   = fhash["psi_index"]
@@ -1033,6 +946,7 @@ module DHC_2DUtils
         #
         return sparse(Mat)
     end
+
 
     function isoMaker(coeff, S1Mat, S2Mat)
         NS1 = size(S1mat)[2]
