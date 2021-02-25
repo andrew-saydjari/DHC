@@ -10,6 +10,7 @@ using Printf
 using SparseArrays
 using Distributions
 using Measures
+#using Plotly
 #using Weave
 
 #using Profile
@@ -62,8 +63,84 @@ end
 
 #function optim_subroutine()
 
+function img_reconfuncS2(input, filter_hash, s_targ_mean, s_targ_invcov, mask, optim_settings; coeff_mask=nothing)
+    println("Coeff mask:", (coeff_mask!=nothing))
+    (Nx, Ny)  = size(input)
+    if Nx != Ny error("Input image must be square") end
+    #filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 
-function img_reconfunc(input, s_targ_mean, s_targ_invcov, mask, coeff_choice, optim_settings)
+    (Nf, )    = size(filter_hash["filt_index"])
+    if Nf == 0 error("filter hash corrupted") end
+    println("S2")
+
+    if coeff_mask!=nothing
+        if length(coeff_mask)!= 2+Nf + Nf^2 error("Wrong dim mask") end
+        if size(s_targ_mean)[1]!=count((i->(i==true)), coeff_mask) error("s_targ_mean should only contain coeffs to be optimized") end
+        #if ((s_targ_invcov!=I) & size(s_targ_invcov)[1]!=count((i->(i==true)), coeff_mask)) error("s_targ_invcov should only contain coeffs to be optimized") end
+        #if (s_targ_invcov!=I)  error("E1") end
+        if size(s_targ_invcov)[1]!=count((i->(i==true)), coeff_mask) error("E2") end
+    else #No mask: all coeffs (default: All S1 and S2 coeffs will be optim wrt)
+        #Currently assuming inputs have mean, var params in case that's something we wanna optimize at some point
+        if size(s_targ_mean)[1]== (2+Nf+Nf^2)
+            s_targ_mean = s_targ_mean[3:end]
+        else
+            error("s_targ_mean of wrong size")
+        end
+        if (s_targ_invcov!=I) & (size(s_targ_invcov)==(2+Nf+Nf^2, 2+Nf+Nf^2))
+            s_targ_invcov = s_targ_invcov[3:end, 3:end]
+        else
+            error("s_targ_invcov of wrong size")
+        end
+        #At this point both have dims S1+S2
+        #3:end
+        coeff_mask = fill(true, 2+Nf+Nf^2)
+        coeff_mask[1] = false
+        coeff_mask[2] = false
+    end
+    #After this all cases have a coeffmask
+    function loss_func(img_curr)
+        #println("Img",size(img_curr))
+        s_curr = Deriv_Utils.DHC(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=true, doS12=false, doS20=false)[coeff_mask]
+        neglogloss = 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean)
+        #println("In Loss:",size(s_curr))
+        #println("NegLogLoss",neglogloss[1])
+        return neglogloss[1]
+    end
+
+    function dloss(storage_grad, img_curr)
+        s_curr = Deriv_Utils.DHC(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false)[coeff_mask]
+        diff = s_curr - s_targ_mean
+        #diff = diff
+        dS1S2 = Transpose(reshape(Deriv_Utils.wst_S1S2_derivfast(reshape(img_curr, (Nx, Nx)), filter_hash), (:, Nx^2))) #(Nf+Nf^2, Nx, Nx)->(Nx^2, Nf+Nf^2) Cant directly do this without handling S1 coeffs
+        dS1S2 = dS1S2[:, coeff_mask[3:end]] #SelCoeff, Nx^2
+        term1 = s_targ_invcov * diff #(Nf+Nf^2) x 1
+        #WARNING: Uses the Deriv_Utils version of dS1S2. Need to rewrite if you want to use the DHC_2DUtils one.
+        #println("In dLoss:",size(diff), size(term1), size(term2))
+        #println(size(term1),size(term2),size(storage_grad))
+        mul!(storage_grad, dS1S2, term1) #Nx^2x1
+        #storage_grad .=  term1 * term2
+    end
+    #Debugging stuff
+    println("Chisq derivative check")
+    eps = zeros(size(input))
+    eps[1, 2] = 1e-4
+    chisq1 = loss_func(input+eps./2)
+    chisq0 = loss_func(input-eps./2)
+    brute  = (chisq1-chisq0)/1e-4
+
+    clever = reshape(zeros(size(input)), (Nx*Nx, 1))
+    _bar = dloss(clever, reshape(input, (Nx^2, 1)))
+    println("Brute:  ",brute)
+    println("Clever: ",clever[Nx*(1)+1])
+
+
+    res = optimize(loss_func, dloss, reshape(input, (Nx^2, 1)), ConjugateGradient(), Optim.Options(iterations = get(optim_settings, "iterations", 100), store_trace = true, show_trace = true))
+    result_img = zeros(Float64, Nx, Nx)
+    result_img = Optim.minimizer(res)
+    return reshape(result_img, (Nx, Nx))
+end
+
+function img_reconfunc_old(input, s_targ_mean, s_targ_invcov, mask, coeff_choice, optim_settings; coeff_subset=nothing)
     #=
     input: Square.
     s_targ_mean, s_targ_invcov should have the same format as the raw output of the appropriate DHC call. i.e. you need to exclude S0/S1 from s_targ_mean below.
@@ -82,12 +159,14 @@ function img_reconfunc(input, s_targ_mean, s_targ_invcov, mask, coeff_choice, op
 
     #Handle optimizer settings
     #storage_beta = Array{Float64, 2}(undef, 1, Nx^2)
+    #Handle reshaping -- make less flexi and change to asserts to make less messy
     if coeff_choice=="S2"
         #Doesn't work currently.
         println("S2")
         if size(s_targ_mean)[1]!=(Nf+Nf^2)
             s_targ_mean = s_targ_mean[3:end]
         end
+
         if (s_targ_invcov!=I) & (size(s_targ_invcov)!=(Nf+Nf^2, Nf+Nf^2))
             s_targ_invcov = s_targ_invcov[3:end, 3:end]
         end
@@ -214,7 +293,7 @@ function S2_weights(im, fhash, Nsam=10; iso=iso)
         noise = rand(Nx,Nx)
         S2arr[:,j] = DHC_compute(im+noise, fhash, doS2=true, doS20=false, norm=false, iso=iso)
     end
-
+    
     wt = zeros(Float64, Ns)
     for i=1:Ns
         wt[i] = std(S2arr[i,:])
@@ -378,7 +457,9 @@ function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test2.png")
     savefig(myplot, fname)
 end
 ####Testing Examples#############
-#Sec1
+#Experiment 1: all pixels floating,
+#Sec1: Don't use this--this was before I fixed the plotting / function bugs--skip to Sec2!!!
+#=
 dust = readdust()
 dust = Array{Float64}(dust[1:16, 1:16])
 
@@ -405,7 +486,7 @@ n = reshape(rand(Normal(0, mean(img)/20.0), Nx^2), (Nx, Nx))
 noisyimg = img + n
 s_targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=false, doS20=true)[3+length(fhash["filt_index"]):end]
 denoised_img = wst_synthS20(noisyimg, falses(Nx,Nx), s_targ, mean(img)/20.0)
-
+=#
 #For some reason the above code doesnt work.
 #Sec2: This now works!
 #Using the exact same example as in sandbox_DFcopy.
@@ -422,9 +503,6 @@ img    = imresize(dust,(Nx,Nx))
 fixmask = falses((Nx, Nx))
 
 
-S_targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
-S_targ = S_targ[i0:end]
-
 init = copy(img)
 floatind = findall(fixmask .==0)
 init[floatind] .+= rand(length(floatind)).*50 .-25
@@ -433,27 +511,137 @@ S20sig = S20_weights(img, fhash, 100, iso=doiso)
 S20sig = S20sig[i0:end]
 
 #2.1. Using wst_synthS20
-foo = wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
+#foo = wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
 
 #2.2. Using your code.
 invcovar = Diagonal(S20_weights(img, fhash, 100, iso=doiso).^(-2))
 s20targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
-myfoogens20 = img_reconfunc(init, s20targ,  invcovar, fixmask, "S20", Dict([("iterations", 100)]))
+myfoogens20_1000itn = img_reconfunc_old(init, s20targ,  invcovar, fixmask, "S20", Dict([("iterations", 1000)]))
 
 
 #Need a new invcovar (S2weights) for doing S2
 invcovarS2 = Diagonal(S2_weights(img, fhash, 100, iso=doiso).^(-2)) #This doesn't work for S2: use invcovar computed for S20 for S2 as well for the timebeing.
 s2targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=true, doS20=false, norm=false, iso=doiso)
 println(size(img), size(init), size(s2targ), size(invcovar), size(fixmask))
-reconS2cg = img_reconfunc(init, s2targ,  invcovar, fixmask, "S2", Dict([("iterations", 100)]))
+reconS2cg_ws20 = img_reconfunc(init, s2targ,  invcovar, fixmask, "S2", Dict([("iterations", 100)]))
 #Weird bug where the code works using invcovar but doesnt when you use invcovars2
 #myfoogen used S20's invcovar
 #myfoogenS2 uses the correct incovar
 #myfoogens20 uses s20
 
 plot_synth_QA(img, init, myfoogens20, fhash, fname="scratch_NM/TestPlots/s20_100itns.png")
-plot_synth_QA(img, init, myfoogenS2, fhash, fname="scratch_NM/TestPlots/s2_100itns.png")
+plot_synth_QA(img, init, myfoogenS2, fhash, fname="scratch_NM/TestPlots/s2_100itns.png") #Used LBFGS: slightly better than CG but much slower
 plot_synth_QA(img, init, reconS2cg, fhash, fname="scratch_NM/TestPlots/s2_100itns_cg.png")
+
+#Concl: julia> maximum(s2siginvsq), minimum(s2siginvsq)
+#(1.418445018807988e55, 1.066753479196218e-7)
+
+#julia> maximum(s20siginvsq), minimum(s20siginvsq)
+#(45474.169557552836, 7.544983824162472e-8)
+#This is why it doesnt work with S2 weights:
+
+
+#Sec2.3 Adding an eps to s2w
+epsilon=1e-5
+dust = Float64.(readdust())
+dust = dust[1:256,1:256]
+
+Nx     = 64
+doiso  = false
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(N1iso, Nf)    = size(fhash["S1_iso_mat"])
+i0 = 3+(doiso ? N1iso : Nf)
+img    = imresize(dust,(Nx,Nx))
+#fixmask = rand(Nx,Nx) .< 0.1
+fixmask = falses((Nx, Nx))
+
+init = copy(img)
+floatind = findall(fixmask .==0)
+init[floatind] .+= rand(length(floatind)).*50 .-25
+
+s2targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=true, doS20=false, norm=false, iso=doiso)
+s2w = S2_weights(img, fhash, 100, iso=doiso)
+s2w[findall(s2w .< epsilon)] .= s2w[findall(s2w .< epsilon)] .+ 1e-5
+
+invcovarS2 = Diagonal(s2w.^(-2))
+reconS2cgeps_1000itn = img_reconfunc_old(init, s2targ,  invcovarS2, fixmask, "S2", Dict([("iterations", 1000)]))
+#reconS2cgeps_new = img_reconfuncS2(init, fhash, s2targ, invcovarS2, fixmask, Dict([("iterations", 100)]))
+#Sec2.4: j1<=j2+Using the new S2 specific function
+#2.4.1: Without j1<=j2: Check
+Nx=64
+Omega_bool = true
+test = img[1:Nx, 1:Nx]
+fhash64 = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=Omega_bool)
+filt64, f64info = fink_filter_bank(1, 8, nx=Nx, wd=1, pc=1, shift=false, Omega=true, safety_on=true)
+s2targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=true, doS20=false, norm=false, iso=doiso)
+Nf = length(fhash64["filt_index"])
+
+#Mask cons
+J=log2(Nx) - 2
+L = 8
+Nf = length(fhash64["filt_index"])
+#finoffx = Omega_bool ? 2: 1
+#j1 = reshape(f64info["J_L"][1:(end-finoffx)], ())
+fjvals = f64info["J_L"][:, 1]
+outerjf1f2 =Array{Tuple{Int, Int}}(undef, length(fjvals), length(fjvals))
+for f1=1:Nf
+    for f2=1:Nf
+        outerjf1f2[f1, f2] = (fjvals[f1], fjvals[f2])
+    end
+end
+bool_incl = (tu->(tu[1]<=tu[2])).(outerjf1f2)
+booltot_flat = cat([false, false], fill(true, Nf), bool_incl[:], dims=1) #false if we don't wanna optimize
+
+s2w = S2_weights(img, fhash, 100, iso=doiso)
+#maximum(s2w[booltot_flat]), minimum(s2w[booltot_flat])
+#(3604, 0.002) Without booltot, the minimum is 1e-28
+
+invcovarS2 = Diagonal(s2w.^(-2))
+invcovarS2 = invcovarS2[booltot_flat, booltot_flat]
+img_s2restr = img_reconfuncS2(init, fhash, s2targ[booltot_flat], invcovarS2, fixmask, Dict([("iterations", 100)]), coeff_mask = booltot_flat)
+
+img_s2restr1k = img_reconfuncS2(init, fhash, s2targ[booltot_flat], invcovarS2, fixmask, Dict([("iterations", 1000)]), coeff_mask = booltot_flat)
+
+#mean(abs.(reconS2cgeps_1000itn - img)), mean(abs.(reshape(img_s2restr1k, (Nx, Nx)) - img)),mean(abs.(myfoogens20_1000itn - img))
+#(5.20568411412877, 5.239126791722001, 4.973186001871807)
+#mean(abs.(reconS2cgeps_1000itn - img)), mean(abs.(reshape(img_s2restr1k, (Nx, Nx)) - img)),mean(abs.(myfoogens20_1000itn - img))
+#(5.20568411412877, 5.239126791722001, 4.973186001871807)
+
+#Experiment 2: Non-informative init: Doesn't work
+dust = Float64.(readdust())
+dust = dust[1:256,1:256]
+
+Nx     = 64
+doiso  = false
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(N1iso, Nf)    = size(fhash["S1_iso_mat"])
+i0 = 3+(doiso ? N1iso : Nf)
+img    = imresize(dust,(Nx,Nx))
+#fixmask = rand(Nx,Nx) .< 0.1
+fixmask = falses((Nx, Nx))
+
+init = copy(img)
+floatind = findall(fixmask .==0)
+init[floatind] .+= rand(length(floatind)).*50 .-25
+
+S20sig = S20_weights(img, fhash, 100, iso=doiso)
+S20sig = S20sig[i0:end]
+
+invcovar = Diagonal(S20_weights(img, fhash, 100, iso=doiso).^(-2))
+s20targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
+myfoogens20 = img_reconfunc(fill(mean(img), (Nx, Nx)), s20targ,  invcovar, fixmask, "S20", Dict([("iterations", 1000)]))
+
+#mean(abs.(myfoogens20_500itn - img)), mean(abs.(reconS2cgeps_500itn - img))
+#(5.11, 5.82)
+
+#Plotting: Scatter
+trace1 = Plotly.scatter(;x=reshape(img, (Nx^2)), y=reshape(myfoogens20_500itn, (Nx^2)), mode="markers", name="S20 Reconstruction")
+trace2 = Plotly.scatter(;x=reshape(img, (Nx^2)), y=reshape(reconS2cgeps_500itn, (Nx^2)), mode="markers", name="S2 Reconstruction (w eps)")
+data = [trace1, trace2]
+layout = Layout(;title="Reconstruction Value vs True Value")
+response = Plotly.plot(data, layout)
+
+#plot_url = response["url"]
 
 
 
