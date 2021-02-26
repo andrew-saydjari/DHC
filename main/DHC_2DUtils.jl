@@ -8,6 +8,7 @@ module DHC_2DUtils
     using Test
     #Review: should always use using ? is this a convention to follow?
     #Review: probably should make this import only if available, CUDA install is annoying for many cases
+    import Pkg
     import CUDA
 
     export fink_filter_bank
@@ -463,6 +464,8 @@ module DHC_2DUtils
 
     function DHC_compute_gpu(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
         doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false,batch_mode::Bool=false,opt_memory::Bool=false,max_memory::Int64=0)
+
+        #@assert CUDA_exists "CUDA does not exist"
         @assert !iso "Isotropic is not implemented on GPU"
         # image        - input for WST
         # filter_hash  - filter hash from fink_filter_hash
