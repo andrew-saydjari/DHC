@@ -20,8 +20,6 @@ module DHC_2DUtils
     export S2_iso_matrix3d
     export isoMaker
 
-
-
     function fink_filter_hash(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true)
         # -------- compute the filter bank
         filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on)
@@ -519,9 +517,9 @@ module DHC_2DUtils
         info["filt_value"]      = filtval
 
         # -------- compute matrix that projects iso coeffs, add to hash
-        S1_iso_mat = S1_iso_matrix_3d(info)
+        S1_iso_mat = S1_iso_matrix3d(info)
         info["S1_iso_mat"] = S1_iso_mat
-        S2_iso_mat = S2_iso_matrix_3d(info)
+        S2_iso_mat = S2_iso_matrix3d(info)
         info["S2_iso_mat"] = S2_iso_mat
 
         return info
@@ -635,8 +633,8 @@ module DHC_2DUtils
         #if Omega Ω_ind = fhash["Omega_index"] end
 
         # unpack fhash
-        Nl      = length(fhash["2d_theta_value"])
-        Nj      = length(fhash["2d_j_value"])
+        Nl      = length(fhash["theta_value"])
+        Nj      = length(fhash["j_value"])
         Nk      = length(fhash["k_value"])
         Nf      = length(fhash["filt_value"])
         ψ_ind   = fhash["psi_index"]
