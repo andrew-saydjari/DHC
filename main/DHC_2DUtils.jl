@@ -54,9 +54,11 @@ module DHC_2DUtils
 
         if threeD
             hash=fink_filter_bank_3dizer(hash, cz=cz,nz=nz)
+            hash=list_to_box(hash,dim=threeD ? 3 : 2)
+        else
+            mms,vals=fink_filter_box(filt)
         end
 
-        hash=list_to_box(hash,dim=threeD? 3:2)
 
         # -------- pack everything you need into the info structure
         hash["filt_mms"] = mms
