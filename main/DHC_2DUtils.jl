@@ -6,9 +6,7 @@ module DHC_2DUtils
     using SparseArrays
     using Statistics
     using Test
-    #Review: should always use using ? is this a convention to follow?
-    #Review: probably should make this import only if available, CUDA install is annoying for many cases
-    import Pkg
+
     import CUDA
 
     export fink_filter_bank
@@ -44,16 +42,31 @@ module DHC_2DUtils
         return hash
     end
 
-    function fink_filter_hash_gpu(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true)
+    function fink_filter_hash_gpu(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
+        @assert !threeD "Not implemented"
         # -------- compute the filter bank
         filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on)
 
-        # -------- list of non-zero pixels
-        mms,vals = fink_filter_box(filt)
+        if threeD
+            #CFP this is a hack, probably it doesn't matter because we don't care about filter making speeds?
+            flist = fink_filter_list(filt)
+            hash["filt_index"] = flist[1]
+            hash["filt_value"] = flist[2]
+            S1_iso_mat = S1_iso_matrix(hash)
+            hash["S1_iso_mat"] = S1_iso_mat
+            S2_iso_mat = S2_iso_matrix(hash)
+            hash["S2_iso_mat"] = S2_iso_mat
+
+            hash=fink_filter_bank_3dizer(hash, cz=cz,nz=nz,box=true)
+            mms,vals = fink_filter_box(filt)
+
+        else
+            mms,vals = fink_filter_box(filt)
+        end
 
         # -------- pack everything you need into the info structure
         hash["filt_mms"] = mms
-        hash["filt_vals"] = vals
+        hash["filt_vals"] = [CUDA.CuArray(val) for val in vals]
 
         #Not implemented
         # -------- compute matrix that projects iso coeffs, add to hash
@@ -355,6 +368,8 @@ module DHC_2DUtils
         if Nx != Ny error("Input image must be square") end
         (Nf, )    = size(filter_hash["filt_index"])
         if Nf == 0  error("filter hash corrupted") end
+        @assert Nx==filter_hash["npix"] "Filter size should match npix"
+        @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
 
         # allocate coeff arrays
         out_coeff = []
@@ -463,7 +478,6 @@ module DHC_2DUtils
     function DHC_compute_gpu(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
         doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false,batch_mode::Bool=false,opt_memory::Bool=false,max_memory::Int64=0)
 
-        #@assert CUDA_exists "CUDA does not exist"
         @assert !iso "Isotropic is not implemented on GPU"
         # image        - input for WST
         # filter_hash  - filter hash from fink_filter_hash
@@ -480,6 +494,8 @@ module DHC_2DUtils
         if Nx != Ny error("Input image must be square") end
         (Nf, )    = size(filter_hash["filt_vals"])
         if Nf == 0  error("filter hash corrupted") end
+        @assert Nx==filter_hash["npix"] "Filter size should match npix"
+        @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
 
         # allocate coeff arrays
         out_coeff = []
@@ -514,7 +530,6 @@ module DHC_2DUtils
         # unpack filter_hash
         f_mms   = filter_hash["filt_mms"]  # (J, L) array of filters represented as index value pairs
         f_vals   = filter_hash["filt_vals"]
-        f_vals   =[CUDA.CuArray(f_val) for f_val in f_vals]#send all the filters to the GPU
 
         zarr = CUDA.zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
 
@@ -548,7 +563,6 @@ module DHC_2DUtils
         if doS2
             f_mms2   = filter_hash2["filt_mms"]  # (J, L) array of filters represented as index value pairs
             f_vals2   = filter_hash2["filt_vals"]
-            f_vals2   =[CUDA.CuArray(f_val) for f_val in f_vals2]#send all the filters to the GPU
 
             ## Traditional second order
             for f1 = 1:Nf
@@ -582,7 +596,8 @@ module DHC_2DUtils
         return out_coeff
     end
 
-    function fink_filter_bank_3dizer(hash, cz; nz=256)
+    function fink_filter_bank_3dizer(hash, cz; nz=256,box=false)
+        @assert !box "Not implemented"
         # -------- set parameters
         nx = convert(Int64,hash["npix"])
         n2d = size(hash["filt_value"])[1]
@@ -633,11 +648,16 @@ module DHC_2DUtils
                 #temp_ind = findall((F_p .> 1E-13) .& (F_z .> 1E-13))
                 #@views filt_tmp = F_p[temp_ind].*F_z[temp_ind]
                 ind = findall(filt_tmp .> 1E-13)
-                @views filtind[f_ind] = map(x->CartesianIndex(p_ind[x[1]][1],p_ind[x[1]][2],k_vals[x[2]]),ind)
-                #filtind[f_ind] = temp_ind[ind]
-                @views filtval[f_ind] = filt_tmp[ind]
-                @views J_L_K[f_ind,:] = [hash["J_L"][index,1],hash["J_L"][index,2],k_ind-1]
-                psi_index[hash["J_L"][index,1]+1,hash["J_L"][index,2]+1,k_ind] = f_ind
+                if box
+                    print("NI")
+                else
+
+                    @views filtind[f_ind] = map(x->CartesianIndex(p_ind[x[1]][1],p_ind[x[1]][2],k_vals[x[2]]),ind)
+                    #filtind[f_ind] = temp_ind[ind]
+                    @views filtval[f_ind] = filt_tmp[ind]
+                    @views J_L_K[f_ind,:] = [hash["J_L"][index,1],hash["J_L"][index,2],k_ind-1]
+                    psi_index[hash["J_L"][index,1]+1,hash["J_L"][index,2]+1,k_ind] = f_ind
+                end
             end
         end
 
@@ -660,14 +680,27 @@ module DHC_2DUtils
         info["J_L_K"]           = psi_index
         info["psi_index"]       = psi_index
         info["k_value"]         = k_value
-        info["filt_index"]      = filtind
-        info["filt_value"]      = filtval
+        if box
+            hash["filt_index"]=nothing
+            hash["filt_value"]=nothing
+            hash["filt_mms"]=filtmms
+            hash["filt_vals"]=filtvals
+        else
+            info["filt_index"]      = filtind
+            info["filt_value"]      = filtval
+        end
 
         # -------- compute matrix that projects iso coeffs, add to hash
         S1_iso_mat = S1_iso_matrix3d(info)
         info["S1_iso_mat"] = S1_iso_mat
         S2_iso_mat = S2_iso_matrix3d(info)
         info["S2_iso_mat"] = S2_iso_mat
+
+        #
+        if box
+            info["S1_iso_mat"]=nothing
+            info["S2_iso_mat"] =nothing
+        end
 
         return info
     end
@@ -1126,5 +1159,6 @@ module DHC_2DUtils
         end
         return [filtmms, filtvals]
     end
+
 
 end # of module
