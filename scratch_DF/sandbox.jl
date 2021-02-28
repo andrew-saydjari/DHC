@@ -51,14 +51,6 @@ M = Array(Ms)
 # 256x100   90  ms   800 μs
 
 
-function myrealifft(fbar)
-    (Nx, Ny)  = size(fbar)
-    fbars = circshift(fbar[end:-1:1,end:-1:1],(1,1))
-    myarg = fbar[1:Ny÷2+1,:]+conj(fbars[1:Ny÷2+1,:])
-    irfft(myarg,Ny).* 0.5
-end
-
-
 
 function wst_S1S2_derivfast(image::Array{Float64,2}, filter_hash::Dict)
     #Works now.
@@ -253,109 +245,57 @@ im[6,6]=1.0
 
 
 
+function S20test(fhash)
+    (Nf, )    = size(fhash["filt_index"])
+    Nx        = fhash["npix"]
+    im = rand(Nx,Nx)
+    mywts = rand(Nf*Nf)
 
+    # this is symmetrical, but not because S20 is symmetrical!
+    wtgrid = reshape(mywts, Nf, Nf) + reshape(mywts, Nf, Nf)'
+    wtvec  = reshape(wtgrid, Nf*Nf)
 
+    # Use new faster code
+    sum1 = wst_S20_deriv_sum(im, fhash, wtgrid, 1)
 
+    # Compare to established code
+    dS20 = reshape(wst_S20_deriv(im, fhash, 1),Nx,Nx,Nf*Nf)
+    sum2 = zeros(Float64, Nx, Nx)
+    for i=1:Nf*Nf sum2 += (dS20[:,:,i].*mywts[i]) end
 
-function wst_S20_deriv_mine(image::Array{Float64,2}, filter_hash::Dict, nthread::Int=1)
+    println("Stdev: ",std(sum1-sum2))
 
-    # Use nthread threads for FFT -- but for Nx<512 nthread=1 is fastest.  Overhead?
-    #FFTW.set_num_threads(1)
-
-    # array sizes
-    (Nx, Ny)  = size(image)
-    (Nf, )    = size(filter_hash["filt_index"])
-
-    # allocate output array
-    dS20dα  = zeros(Float64, Nx, Nx, Nf, Nf)
-
-    # allocate image arrays for internal use
-    im_rdc = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
-    im_rd  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
-    im_fd  = fft(image)
-
-    # unpack filter_hash
-    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
-    f_val   = filter_hash["filt_value"]
-    zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
-
-    # make a FFTW "plan" a complex array, both forward and inverse transform
-    P_fft  = plan_fft(im_fd)   # P_fft is an operator,  P_fft*im is fft(im)
-    P_ifft = plan_ifft(im_fd)  # P_ifft is an operator, P_ifft*im is ifft(im)
-
-    # Loop over filters
-    for f = 1:Nf
-        f_i = f_ind[f]  # CartesianIndex list for filter
-        f_v = f_val[f]  # Values for f_i
-
-        zarr[f_i] = f_v .* im_fd[f_i]
-        Z_λ = P_ifft*zarr  # complex valued ifft of zarr
-        zarr[f_i] .= 0   # reset zarr for next loop
-        im_rdc[:,:,f] = Z_λ
-        im_rd[:,:,f]  = abs.(Z_λ)
-    end
-
-    df1  = zeros(Float64, Nx, Nx, Nf)
-    println("nthread",nthread)
-    zarr = []
-    for ii=1:nthread
-        append!(zarr,[zeros(ComplexF64, Nx, Nx)])
-    end
-    println("Size1",size(zarr[threadid()]))
-    println("Size1",size(zarr))
-    #zarr = zeros(ComplexF64, Nx, Nx, nthread)  # temporary array to fill with zvals
-    for f2 = 1:Nf
-        f_i = f_ind[f2]  # CartesianIndex list for filter
-        f_v = f_val[f2]  # Values for f_i
-        uvec = im_rdc[:,:,f2] ./ im_rd[:,:,f2]
-        @threads for f1 = 1:Nf
-            #println(threadid())
-            #println("ln ",f1,"  ",f2,"  ",threadid(),"  ",length(f_i))
-            zarr[threadid()][f_i] .= f_v .* (P_fft*(im_rd[:,:,f1].*uvec))[f_i]
-            df1[:,:,f1] = real.(P_ifft*zarr[threadid()])
-            zarr[threadid()][f_i] .= 0   # reset zarr for next loop
-        end
-        for f1 = 1:Nf
-            dS20dα[:,:,f1,f2] += df1[:,:,f1]
-            dS20dα[:,:,f2,f1] += df1[:,:,f1]
-        end
-
-    end
-    return dS20dα
+    return
 end
 
-
-
-
-
-
-
-
-
-Nx = 256
+Nx = 16
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-im = zeros(Float64, Nx, Nx);
-im[6,6]=1.0
-@benchmark bmine = wst_S20_deriv_mine(im, fhash,4)
-bmine = wst_S20_deriv_mine(im, fhash,4)
-blarg = wst_S20_deriv(im, fhash,4)
+(Nf, )    = size(fhash["filt_index"])
+im = rand(Nx,Nx);
+wts = rand(Nf,Nf);
+#@benchmark wst_S20_deriv(im, fhash, 1)
 
-std(bmine - blarg)
+@benchmark wst_S20_deriv_sum(im, fhash, wts, 1)
 
-# S20 deriv time, Jan 30
-# Nx     Jan 30  Feb 14  Feb 20
-#   8     28 ms   1 ms     HF01     4 th   my4
-#  16    112      7
-#  32    320     50          25
-#  64   1000    400         160           150
-# 128   5 sec     3.3 sec   1.2   0.6 sec 1.0
-# 256   ---      17.2 sec   8.5   4.5 sec 7.0
-# 512   ---
+
+Profile.clear()
+@profile wst_S20_deriv_sum(im, fhash, wts, 1)
+Juno.profiler()
+
+
+# S20 deriv time, Mac laptop
+# Nx     Jan 30  Feb 14  Feb 21    HF01
+#   8     28 ms   1 ms
+#  16    112      7      0.6 ms    0.4 ms
+#  32    320     50        2       1.3
+#  64   1000    400       17        10
+# 128   5 sec     3.3 s   90        50
+# 256   ---      17.2 s  0.65 s   0.48 s
+# 512   ---               2.9 s   1.85
 
 
 
 print(1)
-
 
 
 # wst_S1_deriv agrees with brute force at 1e-10 level.
@@ -533,15 +473,12 @@ foo = wst_synth(init, fixmask)
 
 function readdust()
 
-    #RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
-    RGBA_img = load("/n/home08/dfink/DHC/scratch_DF/t115_clean_small.png")
+    RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
+    #RGBA_img = load("/n/home08/dfink/DHC/scratch_DF/t115_clean_small.png")
     img = reinterpret(UInt8,rawview(channelview(RGBA_img)))
 
     return img[1,:,:]
 end
-
-
-
 
 
 function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
@@ -562,7 +499,8 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
 
         # should have some kind of weight here
         chisq = diff'*diff
-        println(chisq)
+        if mod(iter,10) == 0 println(iter, "   ", chisq) end
+        iter += 1
         return chisq
 
     end
@@ -572,30 +510,38 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
         thisim = copy(im_init)
         thisim[indfloat] = vec_in
 
-        dS20dp = reshape(wst_S20_deriv(thisim, fhash, 4), Nx*Nx, Nf*Nf)
-        if iso
-            M20 = fhash["S2_iso_mat"]
-            dS20dp = dS20dp * M20'
-        end
         i0 = 3+(iso ? N1iso : Nf)
-
         S20arr = (DHC_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
-
-        # put both factors of S20sig in this array to weight
         diff   = (S20arr - S_targ)./(S20sig.^2)
-        #println("size of diff", size(diff))
-        #println("size of dS20dp", size(reshape(dS20dp, Nx*Nx, Nf*Nf)))
+        if iso
+            diffwt = diff[indiso]
+        else
+            diffwt = diff
+        end
+
+        wtgrid = 2 .* (reshape(diffwt, Nf, Nf) + reshape(diffwt, Nf, Nf)')
+
+        dchisq_im = wst_S20_deriv_sum(thisim, fhash, wtgrid, 1)
+
+
         # dSdp matrix * S1-S_targ is dchisq
-        #dchisq_im = (reshape(dS20dp, Nx*Nx, Nf*Nf) * diff).*2
-        dchisq_im = (dS20dp * diff).*2
+        # dchisq_im = (reshape(dS20dp, Nx*Nx, Nf*Nf) * diff).*2
+        # dchisq_im = (dS20dp * diff).*2
         dchisq = reshape(dchisq_im, Nx, Nx)[indfloat]
 
         storage .= dchisq
     end
 
+    iter = 0
     (Nx, Ny)  = size(im_init)
     if Nx != Ny error("Input image must be square") end
     (N1iso, Nf)    = size(fhash["S1_iso_mat"])
+    if iso
+        M20 = fhash["S2_iso_mat"]
+        (Nwt,Nind) = size(M20)
+        indiso = zeros(Int64,Nind)
+        for ind = 1:Nind  indiso[M20.colptr[ind]] = M20.rowval[ind]  end
+    end
 
 
     # index list of pixels to float in fit
@@ -666,7 +612,7 @@ fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
 i0 = 3+(doiso ? N1iso : Nf)
 im    = imresize(dust,(Nx,Nx))
-fixmask = rand(Nx,Nx) .< 0.1
+fixmask = rand(Nx,Nx) .< 0.001
 
 
 S_targ = DHC_compute(im, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
@@ -680,6 +626,12 @@ S20sig = S20_weights(im, fhash, 100, iso=doiso)
 S20sig = S20sig[i0:end]
 foo = wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
 S_foo = DHC_compute(foo, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
+
+
+Profile.clear()
+@profile foo=wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
+Juno.profiler()
+
 
 plot_synth_QA(im, init, foo, fhash)
 
@@ -816,3 +768,14 @@ end
 # 32x32   189                           74                  32
 # 64x64  1637                          531      642 iso
 # 128x128                              2 hrs
+# 256x256                                                 8800 sec
+
+# using new wst_S20_deriv_sum on Feb 21, 2021
+# size     t(GG)  t(CG)ISO  HF01  [sec]   mem
+# 8x8
+# 16x16
+# 32x32
+# 64x64   134
+# 128x128           221     116
+# 256x256                   712           3.5 GB
+# 512x512
