@@ -705,7 +705,6 @@ function wst_S12_deriv(image::Array{Float64,2}, filter_hash::Dict)
     dabsz_absz = zeros(Float64, Nf, Nf, Nx, Nx)  # Lookup arrays for dS12 terms
     xigrid = reshape(CartesianIndices((1:Nx, 1:Nx)), (1, Nx^2))
     xigrid = hcat((x->[x[1], x[2]]).(xigrid)...) #2*Nx^2
-    kgrid  =
 
     for f1 = 1:Nf
         f_i1 = f_ind[f1]  # CartesianIndex list for filter1
