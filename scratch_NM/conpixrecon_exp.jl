@@ -13,7 +13,7 @@ using Measures
 #using Plotly
 #using Weave
 
-#using Profile
+using Profile
 using LinearAlgebra
 
 
@@ -63,7 +63,10 @@ end
 
 #function optim_subroutine()
 
-function img_reconfuncS2(input, filter_hash, s_targ_mean, s_targ_invcov, mask, optim_settings; coeff_mask=nothing)
+function img_reconfuncS2(input, filter_hash, s_targ_mean, s_targ_invcov, pixmask, optim_settings; coeff_mask=nothing)
+    #=
+    input: same as the initial image. When trues in pixmask, assumed to contain the correct value in those pixels.
+    =#
     println("Coeff mask:", (coeff_mask!=nothing))
     (Nx, Ny)  = size(input)
     if Nx != Ny error("Input image must be square") end
@@ -72,6 +75,8 @@ function img_reconfuncS2(input, filter_hash, s_targ_mean, s_targ_invcov, mask, o
     (Nf, )    = size(filter_hash["filt_index"])
     if Nf == 0 error("filter hash corrupted") end
     println("S2")
+    pixmask = pixmask[:] #flattened: Nx^2s
+    cpvals = copy(input[:])[pixmask] #constrained pix values
 
     if coeff_mask!=nothing
         if length(coeff_mask)!= 2+Nf + Nf^2 error("Wrong dim mask") end
@@ -112,13 +117,13 @@ function img_reconfuncS2(input, filter_hash, s_targ_mean, s_targ_invcov, mask, o
         diff = s_curr - s_targ_mean
         #diff = diff
         dS1S2 = Transpose(reshape(Deriv_Utils.wst_S1S2_derivfast(reshape(img_curr, (Nx, Nx)), filter_hash), (:, Nx^2))) #(Nf+Nf^2, Nx, Nx)->(Nx^2, Nf+Nf^2) Cant directly do this without handling S1 coeffs
-        dS1S2 = dS1S2[:, coeff_mask[3:end]] #SelCoeff, Nx^2
-        term1 = s_targ_invcov * diff #(Nf+Nf^2) x 1
+        dS1S2 = dS1S2[:, coeff_mask[3:end]] #Nx^2 * |SelCoeff|
+        dS1S2[pixmask, :] .= 0 #Zeroing out wrt fixed params
+        term1 = s_targ_invcov * diff #(Nf+Nf^2) or |SelCoeff| x 1
         #WARNING: Uses the Deriv_Utils version of dS1S2. Need to rewrite if you want to use the DHC_2DUtils one.
         #println("In dLoss:",size(diff), size(term1), size(term2))
         #println(size(term1),size(term2),size(storage_grad))
         mul!(storage_grad, dS1S2, term1) #Nx^2x1
-        #storage_grad .=  term1 * term2
     end
     #Debugging stuff
     println("Chisq derivative check")
@@ -293,13 +298,14 @@ function S2_weights(im, fhash, Nsam=10; iso=iso)
         noise = rand(Nx,Nx)
         S2arr[:,j] = DHC_compute(im+noise, fhash, doS2=true, doS20=false, norm=false, iso=iso)
     end
-    
     wt = zeros(Float64, Ns)
     for i=1:Ns
         wt[i] = std(S2arr[i,:])
     end
+    msub = S2arr .- mean(S2arr, dims=2)
+    cov = (msub * msub')./(Nsam-1)
 
-    return wt
+    return wt, cov
 end
 ####Comparison Functions#########
 #Basically sandbox_DF funcs
@@ -323,8 +329,10 @@ function S20_weights(im, fhash, Nsam=10; iso=iso)
     for i=1:Ns
         wt[i] = std(S20arr[i,:])
     end
+    msub = S20arr .- mean(S20arr, dims=2)
+    cov = (msub * msub')./(Nsam-1)
 
-    return wt
+    return wt, cov
 end
 
 function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
@@ -507,20 +515,23 @@ init = copy(img)
 floatind = findall(fixmask .==0)
 init[floatind] .+= rand(length(floatind)).*50 .-25
 
-S20sig = S20_weights(img, fhash, 100, iso=doiso)
-S20sig = S20sig[i0:end]
+S20sig, cov = S20_weights(img, fhash, 100, iso=doiso)
+#S20sig = S20sig[i0:end]
 
 #2.1. Using wst_synthS20
 #foo = wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
 
 #2.2. Using your code.
-invcovar = Diagonal(S20_weights(img, fhash, 100, iso=doiso).^(-2))
+#S20 ---------------------------------
+s20w, covs20 = S20_weights(img, fhash, 100, iso=doiso)
+invcovar = Diagonal(s20w.^(-2))
 s20targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
-myfoogens20_1000itn = img_reconfunc_old(init, s20targ,  invcovar, fixmask, "S20", Dict([("iterations", 1000)]))
+myfoogens20_100itn = img_reconfunc_old(init, s20targ,  invcovar, fixmask, "S20", Dict([("iterations", 100)]))
 
 
 #Need a new invcovar (S2weights) for doing S2
-invcovarS2 = Diagonal(S2_weights(img, fhash, 100, iso=doiso).^(-2)) #This doesn't work for S2: use invcovar computed for S20 for S2 as well for the timebeing.
+s2w, covs2 = S2_weights(img, fhash, 100, iso=doiso)
+invcovarS2 = Diagonal(s2w.^(-2)) #This doesn't work for S2: use invcovar computed for S20 for S2 as well for the timebeing.
 s2targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=true, doS20=false, norm=false, iso=doiso)
 println(size(img), size(init), size(s2targ), size(invcovar), size(fixmask))
 reconS2cg_ws20 = img_reconfunc(init, s2targ,  invcovar, fixmask, "S2", Dict([("iterations", 100)]))
@@ -533,12 +544,19 @@ plot_synth_QA(img, init, myfoogens20, fhash, fname="scratch_NM/TestPlots/s20_100
 plot_synth_QA(img, init, myfoogenS2, fhash, fname="scratch_NM/TestPlots/s2_100itns.png") #Used LBFGS: slightly better than CG but much slower
 plot_synth_QA(img, init, reconS2cg, fhash, fname="scratch_NM/TestPlots/s2_100itns_cg.png")
 
+
+
+
 #Concl: julia> maximum(s2siginvsq), minimum(s2siginvsq)
 #(1.418445018807988e55, 1.066753479196218e-7)
 
 #julia> maximum(s20siginvsq), minimum(s20siginvsq)
 #(45474.169557552836, 7.544983824162472e-8)
 #This is why it doesnt work with S2 weights:
+
+
+
+
 
 
 #Sec2.3 Adding an eps to s2w
@@ -560,11 +578,11 @@ floatind = findall(fixmask .==0)
 init[floatind] .+= rand(length(floatind)).*50 .-25
 
 s2targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=true, doS20=false, norm=false, iso=doiso)
-s2w = S2_weights(img, fhash, 100, iso=doiso)
+s2w, cov = S2_weights(img, fhash, 100, iso=doiso)
 s2w[findall(s2w .< epsilon)] .= s2w[findall(s2w .< epsilon)] .+ 1e-5
 
 invcovarS2 = Diagonal(s2w.^(-2))
-reconS2cgeps_1000itn = img_reconfunc_old(init, s2targ,  invcovarS2, fixmask, "S2", Dict([("iterations", 1000)]))
+reconS2cgeps_100itn = img_reconfuncS2(init, fhash, s2targ,  invcovarS2, fixmask, Dict([("iterations", 100)]))
 #reconS2cgeps_new = img_reconfuncS2(init, fhash, s2targ, invcovarS2, fixmask, Dict([("iterations", 100)]))
 #Sec2.4: j1<=j2+Using the new S2 specific function
 #2.4.1: Without j1<=j2: Check
@@ -584,15 +602,19 @@ Nf = length(fhash64["filt_index"])
 #j1 = reshape(f64info["J_L"][1:(end-finoffx)], ())
 fjvals = f64info["J_L"][:, 1]
 outerjf1f2 =Array{Tuple{Int, Int}}(undef, length(fjvals), length(fjvals))
+f1f2idx =Array{Tuple{Int, Int}}(undef, length(fjvals), length(fjvals))
 for f1=1:Nf
     for f2=1:Nf
         outerjf1f2[f1, f2] = (fjvals[f1], fjvals[f2])
+        f1f2idx[f1, f2] = (f1, f2)
     end
 end
+f1f2idx_flat = f1f2idx[:]
 bool_incl = (tu->(tu[1]<=tu[2])).(outerjf1f2)
 booltot_flat = cat([false, false], fill(true, Nf), bool_incl[:], dims=1) #false if we don't wanna optimize
+largemask = s2targ .> 1e-5
 
-s2w = S2_weights(img, fhash, 100, iso=doiso)
+s2w, covs2 = S2_weights(img, fhash, 100, iso=doiso)
 #maximum(s2w[booltot_flat]), minimum(s2w[booltot_flat])
 #(3604, 0.002) Without booltot, the minimum is 1e-28
 
@@ -633,6 +655,110 @@ myfoogens20 = img_reconfunc(fill(mean(img), (Nx, Nx)), s20targ,  invcovar, fixma
 
 #mean(abs.(myfoogens20_500itn - img)), mean(abs.(reconS2cgeps_500itn - img))
 #(5.11, 5.82)
+#Q2: S2, S20 differences
+#mean(s2wsel), median(s2wsel), mean(s2wsel./s2sel), median(s2wsel./s2sel)
+#(20.845713040948258, 2.2510762633937498, 0.009551723133768989, 0.008862903344736044)
+#mean(s20w), median(s20w), mean(s20w./s20targ), median(s20w./s20targ)
+#(137.99458258542106, 70.5409237758934, 0.0016749817200681092, 0.0016540522310717976)
+#mean(s2w), median(s2w), mean(s2w./s2targ), median(s2w./s2targ)
+#(13.192017376387687, 0.6169549962485834, 0.019359754705979722, 0.009315575046683549)
+
+#Experiment 3: Constrained Pixels: Code Checks
+epsilon=1e-5
+dust = Float64.(readdust())
+dust = dust[1:256,1:256]
+
+Nx     = 64
+doiso  = false
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(N1iso, Nf)    = size(fhash["S1_iso_mat"])
+i0 = 3+(doiso ? N1iso : Nf)
+img    = imresize(dust,(Nx,Nx))
+fixmask = rand(Nx,Nx) .< 0.1
+#fixmask = falses(Nx, Nx)
+#Sanity check: fixmask = trues(Nx, Nx). Was 0.
+init = copy(img)
+floatind = findall(fixmask .==0)
+init[floatind] .+= rand(length(floatind)).*50 .-25
+
+s2targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=true, doS20=false, norm=false, iso=doiso)
+s2w, cov = S2_weights(img, fhash, 100, iso=doiso)
+s2w[findall(s2w .< epsilon)] .= s2w[findall(s2w .< epsilon)] .+ 1e-5
+
+invcovarS2 = Diagonal(s2w.^(-2))
+#Profile.clear()
+reconS2cgeps_check = img_reconfuncS2(init, fhash, s2targ,  invcovarS2, fixmask, Dict([("iterations", 100)]))
+#Juno.profiler()
+#Profile.print(format=:tree, sortedby=:count)
+
+#why is this so slow for some reason?? Takes 80s for 100 itns with all free but now takes 80s for 10itns
+#Check
+#reconS2cgeps_10pct[fixmask] .== img[fixmask]
+
+#3.1. Using 64 different parts of the same larger dust img for the 32^2 case
+epsilon = 1e-5
+doiso=false
+heatmap(dust)
+Nx=32
+LargeNx = 256
+numtiles = convert(Int8, LargeNx/Nx)
+dbnimg = []
+x_end = collect(1:1:256)
+x_end = x_end[mod.(x_end, Nx).==0]
+for rid in x_end
+    for cid in x_end
+        push!(dbnimg, dust[rid-Nx+1:rid, cid-Nx+1:cid])
+    end
+end
+dbnimg = (x->reshape(x, (Nx, Nx))).(dbnimg)
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+Nf = length(fhash["filt_index"])
+s2dbn = (x->DHC_2DUtils.DHC_compute(x, fhash, doS2=true, doS20=false, norm=false, iso=doiso)).(dbnimg[2:end])
+s2dbn = hcat(s2dbn...)
+s2mean = mean(s2dbn, dims=2)
+s2sig = std(s2dbn, dims=2)
+s2sig[findall(s2sig.<epsilon)] .+= epsilon
+s2sig = s2sig[:]
+invcovar = Diagonal(s2sig.^(-2))
+
+
+heatmap(dbnimg[1], title="Ground Truth")
+
+fixmask = rand(Nx,Nx) .< 0.5
+#fixmask = falses(Nx, Nx)
+#Sanity check: fixmask = trues(Nx, Nx). Was 0.
+init = copy(dbnimg[34])
+floatind = findall(fixmask .==0)
+init[fixmask] .= dbnimg[1][fixmask]
+#heatmap(init, title="Init10pct")
+
+dbns2_50pct = img_reconfuncS2(init, fhash, s2mean,  invcovar, fixmask, Dict([("iterations", 100)]))
+maximum(s2sig), minimum(s2sig)
+
+plot_synth_QA(dbnimg[1], init, dbns2_10pct, fhash, fname="scratch_NM/TestPlots/dbns2_100itns_50pct.png")
+heatmap(init, title="Init 10pct")
+heatmap(dbns2_50pct, title="Dbn10pct Reconstruction")
+
+plot(
+    heatmap(dbnimg[1], title="Ground Truth"),
+    heatmap(init, title="Init 50pct"),
+    heatmap(dbns2_50pct,title= "Reconstruction w S2dbn"),
+    heatmap(dbns2_50pct - dbnimg[1], title="Residual");
+    layout=4
+)
+#heatmap(dbns2_50pct, title="Reconstruction gn 50% pixels")
+
+strue = DHC_2DUtils.DHC_compute(dbnimg[1], fhash, doS2=true, doS20=false, norm=false, iso=doiso)
+sres = DHC_2DUtils.DHC_compute(dbns2_50pct, fhash, doS2=true, doS20=false, norm=false, iso=doiso)
+strue[1], strue[2], sres[1], sres[2]
+#gets the variance wrong -- maybe constrain this too?
+sres[3:3+Nf] - strue[3:3+Nf], mean((sres[3:3+Nf] - strue[3:3+Nf])./strue[3:3+Nf])
+mean((s2mean[3:3+Nf] - strue[3:3+Nf])./strue[3:3+Nf])
+heatmap(reshape(log.(strue[3+Nf:end]), (Nf, Nf)), title="true S2")
+heatmap(reshape(log.(sres[3+Nf:end]), (Nf, Nf)), title="result S2")
+heatmap(reshape(log.(abs.((sres[3+Nf:end] - strue[3+Nf:end])./strue[3+Nf:end])), (Nf, Nf)), title="Log Abs (S2res - S2true) / S2true")
+
+
 
 #Plotting: Scatter
 trace1 = Plotly.scatter(;x=reshape(img, (Nx^2)), y=reshape(myfoogens20_500itn, (Nx^2)), mode="markers", name="S20 Reconstruction")
