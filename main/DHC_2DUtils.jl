@@ -47,22 +47,16 @@ module DHC_2DUtils
         # -------- compute the filter bank
         filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on)
 
+        flist = fink_filter_list(filt)
+        # -------- pack everything you need into the info structure
+        hash["filt_index"] = flist[1]
+        hash["filt_value"] = flist[2]
+
         if threeD
-            #CFP this is a hack, probably it doesn't matter because we don't care about filter making speeds?
-            flist = fink_filter_list(filt)
-            hash["filt_index"] = flist[1]
-            hash["filt_value"] = flist[2]
-            S1_iso_mat = S1_iso_matrix(hash)
-            hash["S1_iso_mat"] = S1_iso_mat
-            S2_iso_mat = S2_iso_matrix(hash)
-            hash["S2_iso_mat"] = S2_iso_mat
-
-            hash=fink_filter_bank_3dizer(hash, cz=cz,nz=nz,box=true)
-            mms,vals = fink_filter_box(filt)
-
-        else
-            mms,vals = fink_filter_box(filt)
+            hash=fink_filter_bank_3dizer(hash, cz=cz,nz=nz)
         end
+
+        hash=list_to_box(hash,dim=threeD? 3:2)
 
         # -------- pack everything you need into the info structure
         hash["filt_mms"] = mms
@@ -596,8 +590,7 @@ module DHC_2DUtils
         return out_coeff
     end
 
-    function fink_filter_bank_3dizer(hash, cz; nz=256,box=false)
-        @assert !box "Not implemented"
+    function fink_filter_bank_3dizer(hash, cz; nz=256)
         # -------- set parameters
         nx = convert(Int64,hash["npix"])
         n2d = size(hash["filt_value"])[1]
@@ -648,16 +641,12 @@ module DHC_2DUtils
                 #temp_ind = findall((F_p .> 1E-13) .& (F_z .> 1E-13))
                 #@views filt_tmp = F_p[temp_ind].*F_z[temp_ind]
                 ind = findall(filt_tmp .> 1E-13)
-                if box
-                    print("NI")
-                else
+                @views filtind[f_ind] = map(x->CartesianIndex(p_ind[x[1]][1],p_ind[x[1]][2],k_vals[x[2]]),ind)
+                #filtind[f_ind] = temp_ind[ind]
+                @views filtval[f_ind] = filt_tmp[ind]
+                @views J_L_K[f_ind,:] = [hash["J_L"][index,1],hash["J_L"][index,2],k_ind-1]
+                psi_index[hash["J_L"][index,1]+1,hash["J_L"][index,2]+1,k_ind] = f_ind
 
-                    @views filtind[f_ind] = map(x->CartesianIndex(p_ind[x[1]][1],p_ind[x[1]][2],k_vals[x[2]]),ind)
-                    #filtind[f_ind] = temp_ind[ind]
-                    @views filtval[f_ind] = filt_tmp[ind]
-                    @views J_L_K[f_ind,:] = [hash["J_L"][index,1],hash["J_L"][index,2],k_ind-1]
-                    psi_index[hash["J_L"][index,1]+1,hash["J_L"][index,2]+1,k_ind] = f_ind
-                end
             end
         end
 
@@ -680,15 +669,8 @@ module DHC_2DUtils
         info["J_L_K"]           = psi_index
         info["psi_index"]       = psi_index
         info["k_value"]         = k_value
-        if box
-            hash["filt_index"]=nothing
-            hash["filt_value"]=nothing
-            hash["filt_mms"]=filtmms
-            hash["filt_vals"]=filtvals
-        else
-            info["filt_index"]      = filtind
-            info["filt_value"]      = filtval
-        end
+        info["filt_index"]      = filtind
+        info["filt_value"]      = filtval
 
         # -------- compute matrix that projects iso coeffs, add to hash
         S1_iso_mat = S1_iso_matrix3d(info)
@@ -697,10 +679,6 @@ module DHC_2DUtils
         info["S2_iso_mat"] = S2_iso_mat
 
         #
-        if box
-            info["S1_iso_mat"]=nothing
-            info["S2_iso_mat"] =nothing
-        end
 
         return info
     end
@@ -1160,5 +1138,34 @@ module DHC_2DUtils
         return [filtmms, filtvals]
     end
 
+    function list_to_box(hash,dim=2)#this modifies the hash
+        (Nf,) = size(filter_hash["filt_index"])
+
+        # Allocate output arrays
+        filtmms = Array{Int64}(undef,dim,2,Nf)
+        filtvals = Array{Any}(undef,Nf)#is this a terrible way to allocate memory?
+
+        # Loop over filters and record non-zero values
+        for l=1:Nf
+            f = FFTW.fftshift(filt[:,:,l])
+            ind = findall(f .> 1E-13)
+            ind=getindex.(ind,[1 2])
+            mins=minimum(ind,dims=1)
+            maxs=maximum(ind,dims=1)
+
+            #val = f[ind]
+            #filtind[l] = ind
+            filtmms[:,1,l] = mins
+            filtmms[:,2,l] = maxs
+            filtvals[l]=f[mins[1]:maxs[1],mins[2]:maxs[2]]
+        end
+
+        hash["filt_index"] = nothing
+        hash["filt_value"] = nothing
+
+        hash["filt_mms"] = mmsfiltmms
+        hash["filt_vals"]=filtvals
+        return hash
+    end
 
 end # of module
