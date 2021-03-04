@@ -43,7 +43,7 @@ module DHC_2DUtils
     end
 
     function fink_filter_hash_gpu(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
-        #@assert !threeD "Not implemented"
+
         # -------- compute the filter bank
         filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on)
 

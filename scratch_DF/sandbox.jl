@@ -11,11 +11,13 @@ using Images, FileIO
 
 using LinearAlgebra
 using SparseArrays
+using FITSIO
+using Distributions
 
 # put the cwd on the path so Julia can find the module
 push!(LOAD_PATH, pwd()*"/main")
 using DHC_2DUtils
-
+using DHC_tests
 
 @time fhash = fink_filter_hash(1, 8, nx=64, pc=1, wd=1)
 
@@ -481,6 +483,23 @@ function readdust()
 end
 
 
+function readphoto(N)
+
+    flist = ["IMG_2320.png",  # flower 1
+             "IMG_3995.png",  # flower 2
+             "IMG_4058.png",  # butterfly
+             "IMG_4971.png",  # crab
+             "IMG_5939.png",  # canyon
+             "IMG_6764.png"]  # eclipse
+
+    RGBA_img = load(pwd()*"/../WSTphotos/"*flist[N])
+    #RGBA_img = load("/n/home08/dfink/DHC/scratch_DF/t115_clean_small.png")
+    img = reinterpret(UInt8,rawview(channelview(RGBA_img)))
+    temp = Float64.(sum(img,dims=1)[1,:,:])
+    return temp[end:-1:1,:]
+end
+
+
 function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
     # fixmask -  0=float in fit   1=fixed
 
@@ -606,13 +625,16 @@ end
 dust = Float64.(readdust())
 dust = dust[1:256,1:256]
 
-Nx     = 256
+Nx     = 32
 doiso  = true
+initimg = imresize(readphoto(2),Nx,Nx)
+initimg = 250 .* (initimg./maximum(initimg))
+
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
 i0 = 3+(doiso ? N1iso : Nf)
 im    = imresize(dust,(Nx,Nx))
-fixmask = rand(Nx,Nx) .< 0.001
+fixmask = rand(Nx,Nx) .< 0.01
 
 
 S_targ = DHC_compute(im, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
@@ -620,8 +642,14 @@ S_targ = S_targ[i0:end]
 
 init = copy(im)
 floatind = findall(fixmask .==0)
-init[floatind] .+= rand(length(floatind)).*50 .-25
+fixind = findall(fixmask .==1)
+#init[floatind] .+= rand(length(floatind)).*50 .-25
+#init[floatind] = (fftshift(im))[floatind]
 
+init = copy(initimg)
+init .*= (std(dust)/std(init))
+init .+= (mean(dust)-mean(init))
+init[fixind] .= im[fixind]
 S20sig = S20_weights(im, fhash, 100, iso=doiso)
 S20sig = S20sig[i0:end]
 foo = wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
@@ -644,6 +672,17 @@ function writestuff(im, init, im_out, fhash)
     close(f)
 end
 
+
+function scramble(im)
+
+    fim = fft(im)
+    (Nx,Ny) = size(fim)
+    ϕ = 2π .* rand(Nx,Ny) .* 0.5
+    ϕ[1,1] = 0.0
+    i = complex(0,1)
+    return real.(ifft(fim .* exp.(i*ϕ)))
+
+end
 
 
 
@@ -779,3 +818,152 @@ end
 # 128x128           221     116
 # 256x256                   712           3.5 GB
 # 512x512
+# laptop 4800 sec
+
+
+function GP_constrained_2D(im, mask, covar; seed=false)
+    # Compute a Gaussian Process mean or draw from covariance
+    # im    - input image.  Condition on mask==0 pixels
+    # mask  - 0=good, 1=pixels to predict
+    # covar - covariance matrix
+    # seed  - set seed to return random draw; seed=false returns mean
+    # follows notation from Rasmussan & Williams Chap. 2
+    # http://www.gaussianprocess.org
+
+    k      = findall(mask .== 0)
+    nk     = length(k)
+    kstar  = findall(mask .!= 0)
+    nkstar = length(kstar)
+
+    cov_kk         = (covar[:, k])[k, :]
+    cov_kkstar     = (covar[:, kstar])[k, :]  # dim [nk, nkstar]
+    cov_kstark     = (covar[:, k])[kstar, :]
+    cov_kstarkstar = (covar[:, kstar])[kstar, :]
+
+    # could do a smarter inverse here for positive definite matrix!
+    icov_kk = inv(cov_kk)  # slow step
+
+    # mean prediction: condition on k pixels and predict kstar pixels
+    kstarpred = cov_kkstar' * (icov_kk * im[k])
+
+    if (seed != false)
+        # -------- get the prediction covariance
+        predcovar = cov_kstarkstar - (cov_kstark*icov_kk*cov_kkstar)
+        println("Cholesky")
+        chol = cholesky(Hermitian(predcovar))
+        noise = chol.L*rand(Normal(), nkstar)
+        draw = copy(im)
+        draw[kstar] = kstarpred+noise    # a draw from the distribution
+        return draw
+    else
+        pred = copy(im)
+        pred[kstar] = kstarpred
+        return pred         # mean image
+    end
+end
+
+
+function dust_covar_matrix(im)
+    # derive covariance matrix from [Nx,Nx,Nimage] array
+
+    (nx,__,Nslice) = size(im)
+    eps=1E-6
+
+    # make it mean zero with eps noise, otherwise covar is singular
+    println("Mean zero")
+    for i=1:Nslice  im[:, :, i] .-= (mean(im[:, :, i])+(rand()-0.5)*eps) end
+
+    #println("Unit variance")
+    #for i=1:Nslice  im[:, :, i] ./= std(im[:, :, i]) end
+
+    dat = reshape(im, nx*nx, Nslice)
+
+    # covariance matrix
+    println("covariance")
+    covar = (dat * dat') ./ Nslice
+
+    # Check condition number
+    println("Condition number  ", cond(covar))
+    return covar
+
+end
+
+
+
+function mldust()
+
+    # read FITS file with images
+    # file in /n/fink2/dfink/mldust/dust10000.fits
+    #     OR  /n/fink2/dfink/mldust/dust100000.fits
+
+    fname = "dust10000.fits"
+    f = FITS(fname, "r")
+    big = read(f[1])
+
+    (_,__,Nslice) = size(big)
+    println(Nslice, " slices")
+
+    #nx = 96
+    #im = Float64.(big[11:11+nx-1, 11:11+nx-1, :])
+    #nx = 48
+
+    # rebin it to something smaller and take the log
+    nx = 64
+    im = log.(imresize(Float64.(big), nx, nx, Nslice))
+
+    covar = dust_covar_matrix(im)
+
+    #writefits, 'covar48_new.fits', covar
+
+    # Cholesky factorization; chol.U and chol.L will be upper,lower triangular matrix
+    println("Cholesky")
+    chol = cholesky(covar)
+
+    # generate some mock maps
+    Nmock = 800
+    ran = rand(Normal(), nx*nx, Nmock)
+
+    recon = reshape(chol.L*ran, nx, nx, Nmock)
+
+    return im, covar
+end
+
+# run these lines to play with GP prediction
+images, covar = mldust()
+Nx   = size(images,1)
+mask = rand(Nx*Nx) .> 0.1
+im   = images[:,:,5]
+mnpred = GP_constrained_2D(im, mask, covar)
+draw   = GP_constrained_2D(im, mask, covar, seed=1)
+
+heatmap(im,clim=(-0.6,0.6))
+heatmap(draw,clim=(-0.6,0.6))
+heatmap(mnpred,clim=(-0.6,0.6))
+
+
+doiso  = true
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(N1iso, Nf)    = size(fhash["S1_iso_mat"])
+i0 = 3+(doiso ? N1iso : Nf)
+fixmask = reshape(mask .==0, Nx,Nx)
+
+S_targ = DHC_compute(im, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
+S_targ = S_targ[i0:end]
+
+floatind = findall(fixmask .==0)
+fixind = findall(fixmask .==1)
+
+# use GP draw as initial guess
+init = copy(draw)
+init[fixind] .= im[fixind]
+S20sig = S20_weights(im, fhash, 100, iso=doiso)
+S20sig = S20sig[i0:end]
+foo = wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
+S_foo = DHC_compute(foo, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
+
+heatmap(foo,clim=(-0.6,0.6))
+heatmap(init,clim=(-0.6,0.6))
+
+heatmap(exp.(im),clim=(0.5,1.8))
+heatmap(exp.(foo),clim=(0.5,1.8))
+heatmap(exp.(init),clim=(0.5,1.8))
