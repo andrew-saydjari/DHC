@@ -43,7 +43,7 @@ module DHC_2DUtils
     end
 
     function fink_filter_hash_gpu(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
-        @assert !threeD "Not implemented"
+
         # -------- compute the filter bank
         filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on)
 
@@ -53,16 +53,15 @@ module DHC_2DUtils
         hash["filt_value"] = flist[2]
 
         if threeD
-            hash=fink_filter_bank_3dizer(hash, cz=cz,nz=nz)
-            hash=list_to_box(hash,dim=threeD ? 3 : 2)
-        else
-            mms,vals=fink_filter_box(filt)
+            hash=fink_filter_bank_3dizer(hash,cz,nz=nz)
         end
 
+        hash=list_to_box(hash,dim=threeD ? 3 : 2)
 
-        # -------- pack everything you need into the info structure
-        hash["filt_mms"] = mms
-        hash["filt_vals"] = [CUDA.CuArray(val) for val in vals]
+        # send to gpu
+        CUDA.reclaim()
+        hash["filt_vals"] = [CUDA.CuArray(val) for val in hash["filt_vals"]]
+        CUDA.reclaim()
 
         #Not implemented
         # -------- compute matrix that projects iso coeffs, add to hash
@@ -779,6 +778,90 @@ module DHC_2DUtils
         return out_coeff
     end
 
+    function DHC_compute_3d_gpu(image::Array{Float64,3}, filter_hash)
+        CUDA.reclaim()
+        # array sizes
+        (Nx, Ny, Nz)  = size(image)
+        (Nf, )    = size(filter_hash["filt_vals"])
+
+        # allocate coeff arrays
+        out_coeff = []
+        S0  = zeros(Float64, 2)
+        S1  = zeros(Float64, Nf)
+        S20 = zeros(Float64, Nf, Nf)
+        S12 = zeros(Float64, Nf, Nf)
+        S2  = zeros(Float64, Nf, Nf)  # traditional 2nd order
+
+        # allocate image arrays for internal use
+        im_fdf_0_1 = CUDA.CuArray(Array{Float64, 3}(undef, Nx, Ny, Nz))
+        im_rd_0_1  = CUDA.CuArray(Array{Float64, 3}(undef, Nx, Ny, Nz))
+
+        image=CUDA.CuArray(image)
+
+        ## 0th Order
+        S0[1]   = mean(image)
+        norm_im = image.-S0[1]
+        S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny*Nz)
+        norm_im ./= sqrt(Nx*Ny*Nz*S0[2])
+
+        append!(out_coeff,S0[:])
+
+        ## 1st Order
+        im_fd_0 = CUDA.CUFFT.fftshift(CUDA.CUFFT.fft(norm_im))  # total power=1.0
+
+        # unpack filter_hash
+        f_mms   = filter_hash["filt_mms"]  # (J, L) array of filters represented as index value pairs
+        f_vals   = filter_hash["filt_vals"]
+
+        #f_ind2   = filter_hash2["filt_index"]  # (J, L) array of filters represented as index value pairs
+        #f_val2   = filter_hash2["filt_value"]
+
+        zarr = CUDA.zeros(ComplexF64, Nx, Ny, Nz)  # temporary array to fill with zvals
+
+        # make a FFTW "plan" for an array of the given size and type
+        P   = CUDA.CUFFT.plan_ifft(im_fd_0)   # P is an operator, P*im is ifft(im)
+
+        #depth first search
+        for f1 = 1:Nf
+            im_fdf_0_1.=0.
+            f_mm = f_mms[:,:,f1]  # CartesianIndex list for filter
+            f_val = f_vals[f1]  # Values for f_i
+            # for (ind, val) in zip(f_i, f_v)   # this is slower!
+
+            zv=f_val.*im_fd_0[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2],f_mm[3,1]:f_mm[3,2]]
+            S1[f1] = sum(abs2.(zv))/(Nx*Ny*Nz)
+
+            zarr[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2],f_mm[3,1]:f_mm[3,2]]=zv
+
+            im_fdf_0_1[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2],f_mm[3,1]:f_mm[3,2]] .= abs.(zv)
+
+
+            im_rd_0_1=abs2.(P*CUDA.CUFFT.ifftshift(zarr))
+
+            zarr[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2],f_mm[3,1]:f_mm[3,2]] .= 0.
+
+            im_rd_0_1 .= sqrt.(im_rd_0_1)
+            im_fdf_1_1 = CUDA.CUFFT.fftshift(CUDA.CUFFT.fft(im_rd_0_1))
+            for f2 = 1:Nf
+                f_mm = f_mms[:,:,f2]
+                f_val = f_vals[f2]
+
+                S2[f1,f2] = sum(abs2.(f_val .* im_fdf_1_1[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2],f_mm[3,1]:f_mm[3,2]]))/(Nx*Ny*Nz)
+            end
+            CUDA.reclaim()
+
+        end
+        append!(out_coeff, S1[:])
+        ## 2nd Order
+        #Amat = reshape(im_fdf_0_1, Nx*Ny, Nf)
+        #S12  = Amat' * Amat
+        #Amat = reshape(im_rd_0_1, Nx*Ny, Nf)
+        #S20  = Amat' * Amat
+        #append!(out_coeff, S20)
+        #append!(out_coeff, S12)
+        append!(out_coeff, S2)
+        return out_coeff
+    end
 
     function S1_iso_matrix3d(fhash)
         # fhash is the filter hash output by fink_filter_hash
@@ -1140,32 +1223,52 @@ module DHC_2DUtils
         return [filtmms, filtvals]
     end
 
-    function list_to_box(hash,dim=2)#this modifies the hash
-        (Nf,) = size(filter_hash["filt_index"])
+    function list_to_box(hash;dim=2)#this modifies the hash
+        (Nf,) = size(hash["filt_index"])
+        nx=hash["npix"]
+        if dim==3 nz=hash["nz"] end
 
         # Allocate output arrays
         filtmms = Array{Int64}(undef,dim,2,Nf)
         filtvals = Array{Any}(undef,Nf)#is this a terrible way to allocate memory?
-
+        if dim==2
+            filt=zeros(Float64,nx,nx)
+        else
+            filt=zeros(Float64,nx,nx,nz)
+        end
         # Loop over filters and record non-zero values
         for l=1:Nf
-            f = FFTW.fftshift(filt[:,:,l])
-            ind = findall(f .> 1E-13)
-            ind=getindex.(ind,[1 2])
+            filt.=0.
+            f_i = hash["filt_index"][l]
+            v_i=hash["filt_value"][l]
+            for i = 1:length(f_i)
+                filt[f_i[i]]= v_i[i]
+            end
+            filt = FFTW.fftshift(filt)
+
+            ind = findall(filt .> 1E-13)
+            if dim==2
+                ind=getindex.(ind,[1 2])
+            else
+                ind=getindex.(ind,[1 2 3])
+            end
             mins=minimum(ind,dims=1)
             maxs=maximum(ind,dims=1)
 
-            #val = f[ind]
-            #filtind[l] = ind
+
             filtmms[:,1,l] = mins
             filtmms[:,2,l] = maxs
-            filtvals[l]=f[mins[1]:maxs[1],mins[2]:maxs[2]]
+            if dim==2
+                filtvals[l]=filt[mins[1]:maxs[1],mins[2]:maxs[2]]
+            else
+                filtvals[l]=filt[mins[1]:maxs[1],mins[2]:maxs[2],mins[3]:maxs[3]]
+            end
         end
 
         hash["filt_index"] = nothing
         hash["filt_value"] = nothing
 
-        hash["filt_mms"] = mmsfiltmms
+        hash["filt_mms"] = filtmms
         hash["filt_vals"]=filtvals
         return hash
     end
