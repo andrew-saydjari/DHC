@@ -65,7 +65,10 @@ end
 
 function img_reconfuncS2(input, filter_hash, s_targ_mean, s_targ_invcov, pixmask, optim_settings; coeff_mask=nothing)
     #=
-    input: same as the initial image. When trues in pixmask, assumed to contain the correct value in those pixels.
+    input: Initial image. When trues in pixmask, assumed to contain the correct value in those pixels.
+    coeff_mask: Allows you to only optimize wrt a subset of coefficients (eg: j1<=j2)
+    pixmask: Which pixels are floating (false) vs fixed (true)
+
     =#
     println("Coeff mask:", (coeff_mask!=nothing))
     (Nx, Ny)  = size(input)
@@ -145,7 +148,7 @@ function img_reconfuncS2(input, filter_hash, s_targ_mean, s_targ_invcov, pixmask
     return reshape(result_img, (Nx, Nx))
 end
 
-function img_reconfunc_old(input, s_targ_mean, s_targ_invcov, mask, coeff_choice, optim_settings; coeff_subset=nothing)
+function img_reconfuncS20(input, filter_hash, s_targ_mean, s_targ_invcov, pixmask, optim_settings)
     #=
     input: Square.
     s_targ_mean, s_targ_invcov should have the same format as the raw output of the appropriate DHC call. i.e. you need to exclude S0/S1 from s_targ_mean below.
@@ -165,7 +168,7 @@ function img_reconfunc_old(input, s_targ_mean, s_targ_invcov, mask, coeff_choice
     #Handle optimizer settings
     #storage_beta = Array{Float64, 2}(undef, 1, Nx^2)
     #Handle reshaping -- make less flexi and change to asserts to make less messy
-    if coeff_choice=="S2"
+    #=if coeff_choice=="S2"
         #Doesn't work currently.
         println("S2")
         if size(s_targ_mean)[1]!=(Nf+Nf^2)
@@ -216,58 +219,65 @@ function img_reconfunc_old(input, s_targ_mean, s_targ_invcov, mask, coeff_choice
         result_img = Optim.minimizer(res)
 
     else #Currently S20
+    =#
         #DO NOT RENAME THESE FUNCS TO loss_func and dloss_func: otherwise Julia calls the s20 version of the loss in the S2 case.
-        println("S20")
-        if size(s_targ_mean)[1]!=Nf^2
-            s_targ_mean = s_targ_mean[3+Nf:end]
-        end
-        if (s_targ_invcov!=I) & (size(s_targ_invcov)!=(Nf^2, Nf^2))
-            s_targ_invcov = s_targ_invcov[3+Nf:end, 3+Nf:end]
-        end
+    println("S20")
+    pixmask = pixmask[:] #flattened: Nx^2s
+    cpvals = copy(input[:])[pixmask] #constrained pix values
+    if size(s_targ_mean)[1]== (2+Nf+Nf^2)
+        s_targ_mean = s_targ_mean[3+Nf:end]
+    else
+        error("s_targ_mean of wrong size")
+    end
+    if (s_targ_invcov!=I) & (size(s_targ_invcov)==(2+Nf+Nf^2, 2+Nf+Nf^2))
+        s_targ_invcov = s_targ_invcov[3+Nf:end, 3+Nf:end]
+    else
+        error("s_targ_invcov of wrong size")
+    end
+    #Subsequently s_targ_invcov and s_targ_mean have * only * the S20 coeffs
 
-        #println("Shapes:s_targ_mean, s_targ_invcov", size(s_targ_mean), size(s_targ_invcov))
-        function loss_func20(img_curr)
-            s_curr = Deriv_Utils.DHC(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=false, doS12=false, doS20=true)[3+Nf:end]
-            neglogloss = 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean)
-            #println("s_curr",size(s_curr))
-            return neglogloss[1]
-        end
+    #println("Shapes:s_targ_mean, s_targ_invcov", size(s_targ_mean), size(s_targ_invcov))
+    function loss_func20(img_curr)
+        s_curr = Deriv_Utils.DHC(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=false, doS12=false, doS20=true)[3+Nf:end] #not counting S1 twice
+        neglogloss = 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean)
+        #println("s_curr",size(s_curr))
+        return neglogloss[1]
+    end
 
-        function dloss20(storage_grad, img_curr)
-            #Diagonal covar: This works!
-            #=
-            s_curr = Deriv_Utils.DHC(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=false, doS12=false, doS20=true)[3+Nf:end]
-            diff = (s_curr - s_targ_mean).* Array(s_targ_invcov[diagind(s_targ_invcov)])
-            dS20 = reshape(Deriv_Utils.wst_S20_deriv(reshape(img_curr, (Nx, Nx)), filter_hash), (Nx^2, Nf^2)) #Check (Nx, Nx, Nf, Nf) -> (Nx^2, Nf^2)
-            mul!(storage_grad, dS20, diff) #term1: 1x (Nf+Nf^2) | term2: #(Nf+Nf^2) x Nx^2
-            =#
-            #More general:
-            s_curr = Deriv_Utils.DHC(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=false, doS12=false, doS20=true)[3+Nf:end]
-            diff = s_curr - s_targ_mean
-            dS20 = reshape(Deriv_Utils.wst_S20_deriv(reshape(img_curr, (Nx, Nx)), filter_hash), (Nx^2, Nf^2)) #Check (Nx, Nx, Nf, Nf) -> (Nx^2, Nf^2)
-            term1 = s_targ_invcov * diff #Nf^2 x1
-            mul!(storage_grad, dS20, term1) #term1: 1x (Nf+Nf^2) | term2: #(Nf+Nf^2) x Nx^2
-
-        end
-        #
-        println("Chisq derivative check")
-        eps = zeros(size(input))
-        eps[1, 2] = 1e-4
-        chisq1 = loss_func20(input+eps./2)
-        chisq0 = loss_func20(input-eps./2)
-        brute  = (chisq1-chisq0)/1e-4
-
-        clever = reshape(zeros(size(input)), (Nx*Nx, 1))
-        _bar = dloss20(clever, reshape(input, (Nx^2)))
-        println("Brute:  ",brute)
-        println("Clever: ",clever[Nx*(1)+1])
-
-
-        res = optimize(loss_func20, dloss20, reshape(input, (Nx^2, 1)), ConjugateGradient(), Optim.Options(iterations = get(optim_settings, "iterations", 100), store_trace = true, show_trace = true))
-        result_img = zeros(Float64, Nx, Nx)
-        result_img = Optim.minimizer(res)
+    function dloss20(storage_grad, img_curr)
+        #Diagonal covar: This works!
+        #=
+        s_curr = Deriv_Utils.DHC(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=false, doS12=false, doS20=true)[3+Nf:end]
+        diff = (s_curr - s_targ_mean).* Array(s_targ_invcov[diagind(s_targ_invcov)])
+        dS20 = reshape(Deriv_Utils.wst_S20_deriv(reshape(img_curr, (Nx, Nx)), filter_hash), (Nx^2, Nf^2)) #Check (Nx, Nx, Nf, Nf) -> (Nx^2, Nf^2)
+        mul!(storage_grad, dS20, diff) #term1: 1x (Nf+Nf^2) | term2: #(Nf+Nf^2) x Nx^2
+        =#
+        #More general:
+        s_curr = Deriv_Utils.DHC(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=false, doS12=false, doS20=true)[3+Nf:end]
+        diff = s_curr - s_targ_mean
+        dS20 = reshape(Deriv_Utils.wst_S20_deriv(reshape(img_curr, (Nx, Nx)), filter_hash), (Nx^2, Nf^2)) #Check (Nx, Nx, Nf, Nf) -> (Nx^2, Nf^2)
+        dS20[pixmask, :] .= 0
+        term1 = s_targ_invcov * diff #Nf^2 x1
+        mul!(storage_grad, dS20, term1) #term1: 1x (Nf+Nf^2) | term2: #(Nf+Nf^2) x Nx^2
 
     end
+    #
+    println("Chisq derivative check")
+    eps = zeros(size(input))
+    eps[1, 2] = 1e-4
+    chisq1 = loss_func20(input+eps./2)
+    chisq0 = loss_func20(input-eps./2)
+    brute  = (chisq1-chisq0)/1e-4
+
+    clever = reshape(zeros(size(input)), (Nx*Nx, 1))
+    _bar = dloss20(clever, reshape(input, (Nx^2, 1)))
+    println("Brute:  ",brute)
+    println("Clever: ",clever[Nx*(1)+1])
+
+
+    res = optimize(loss_func20, dloss20, reshape(input, (Nx^2, 1)), ConjugateGradient(), Optim.Options(iterations = get(optim_settings, "iterations", 100), store_trace = true, show_trace = true))
+    result_img = zeros(Float64, Nx, Nx)
+    result_img = Optim.minimizer(res)
 
     return reshape(result_img, (Nx, Ny))
 
@@ -501,7 +511,7 @@ denoised_img = wst_synthS20(noisyimg, falses(Nx,Nx), s_targ, mean(img)/20.0)
 dust = Float64.(readdust())
 dust = dust[1:256,1:256]
 
-Nx     = 64
+Nx     = 16
 doiso  = false
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
@@ -526,8 +536,8 @@ S20sig, cov = S20_weights(img, fhash, 100, iso=doiso)
 s20w, covs20 = S20_weights(img, fhash, 100, iso=doiso)
 invcovar = Diagonal(s20w.^(-2))
 s20targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
-myfoogens20_100itn = img_reconfunc_old(init, s20targ,  invcovar, fixmask, "S20", Dict([("iterations", 100)]))
-
+#myfoogens20_100itn = img_reconfunc_old(init, s20targ,  invcovar, fixmask, "S20", Dict([("iterations", 100)]))
+S20recon = img_reconfuncS20
 
 #Need a new invcovar (S2weights) for doing S2
 s2w, covs2 = S2_weights(img, fhash, 100, iso=doiso)

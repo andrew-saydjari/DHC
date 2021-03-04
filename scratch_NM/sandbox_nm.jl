@@ -17,6 +17,7 @@ push!(LOAD_PATH, pwd()*"/main")
 using DHC_2DUtils
 
 
+
 @time fhash = fink_filter_hash(1, 8, nx=16, pc=1, wd=1)
 
 sum(a2, dims=1)
@@ -631,36 +632,58 @@ function wst_S1S2_deriv_fdsparse(image::Array{Float64,2}, filter_hash::Dict)
     # array sizes
     (Nx, Ny)  = size(image)
     (Nf, )    = size(filter_hash["filt_index"])
+    # unpack filter_hash
+    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+    f_val   = filter_hash["filt_value"]
 
     # allocate output array
     dS1dp  = zeros(Float64, Nx, Nx, Nf)
     dS2dp  = zeros(Float64, Nx, Nx, Nf, Nf)
 
+    zarr = zeros(ComplexF64, Nf, Nx, Nx)  # temporary array to fill with zvals
+    ## 1st Order
+    im_fd_0 = fft(image)  # total power=1.0
+    # make a FFTW "plan" for an array of the given size and type
+    P = plan_ifft(im_fd_0)  # P is an operator, P*im is ifft(im)
+    for f1 = 1:Nf
+        f_i1 = f_ind[f1]  # CartesianIndex list for filter1
+        f_v1 = f_val[f1]  # Values for f_i1
+        zarr[f1, f_i1] = im_fd_0[f_i1] .* f_v1 #check if this notation is fine
+    end
+    im_fdc = conj.(im_fd_0)
+    fim_fac = im_fd_0 ./ im_fdc
 
-    # unpack filter_hash
-    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
-    f_indflat = [(tup-> (Nx*(tup[2]-1) + tup[1])).(Tuple.(fh)) for fh in filter_hash["filt_index"]]
-    nf_nz = vcat(fill.(collect(1:1:Nf), length.(f_indflat))) #Filter id repeated as many times as nz elemes
-    f_indsparse = vcat(hcat.(nf_nz, f_indflat)...) #Array of [filter_id, flattened_nz_idx]
-    f_val   = filter_hash["filt_value"]
 
+    #Implemented in the more memory intensive / parallelized ops way
+    #fhash_indsarr = [hcat((x->[x[1], x[2]]).(fh)...)' for fh in fhash["filt_index"]] #Each elem gives you fhash["filt_index"] in non-CartesianIndices
+    #dabsz = #Mem Req: Nf*Nx^2*sp*Nx^2 and sp~2%
 
-    im_fd_0 = reshape(fft(image), (Nx^2))
-    f_ind_comb = (x->CartesianIndex(x)).(f_indsparse[:, 2]) #k_nz for all filters concat
-    fzfψ = sparse(f_indsparse[:, 1], f_indsparse[:, 2], im_fd_0[f_ind_comb].*vcat(f_val...).^2) #Nf * Nx^2 sparse
-    #Phi values
-    knz_vals = hcat((p->[p[1], p[2]]).(vcat(filter_hash["filt_index"]...))...)' #|k_nz| x 2
+    #Less Mem Route
+    dS2dp = zeros(Float64, Nf, Nf, Nx, Nx)  # Lookup arrays for dS12 terms
     xigrid = reshape(CartesianIndices((1:Nx, 1:Nx)), (1, Nx^2))
-    xigrid = hcat((x->[x[1], x[2]]).(xigrid)...)   #2*Nx^2
-    spvals = exp.((-2π*im)/Nx .* reshape((knz_vals*xigrid), (size(knz_vals)[1]*Nx^2))) #BUG: Fix shape issue here
-    spvals_idz = findnz(spvals)
-    Φmat = sparse(spvals_idz[1], spvals_idz[2], spvals) #sparse(repeat(f_indsparse[:, 2], Nx.^2), vcat(fill.(collect(1:1:Nx^2), size(f_indsparse)[1])...), spvals) #Nx^2 * Nx^2 sparse k_nz should vary faster
-    dS1_term = Array(fzfψ*Φmat)
-    dS1dp = reshape((2/Nx^2) .* real.(dS1_term), (Nf, Nx, Nx)) #Divide by Nx^2!!!
-    #Check the math and dS1 first
-    #fzfψ_ψ2sq = sparse(f_indsparse[:, 1], f_indsparse[:, 2], im_fd_0[f_ind_comb].*vcat(f_val...).^2) #basically want something Nf^2 * Nx^2 analogous to fzfψ
+    xigrid = hcat((x->[x[1], x[2]]).(xigrid)...) #2*Nx^2
 
-    return dS1dp
+    for f1 = 1:Nf
+        f_i1 = f_ind[f1]  # CartesianIndex list for filter1
+        f_v1 = f_val[f1]  # Values for f_i1
+
+        for f2 = 1:Nf
+            f_i2 = f_ind[f2]  # CartesianIndex list for filter1
+            f_v2 = f_val[f2]  # Values for f_i1
+            pnz = intersect(f_i1, f_i2) #Fd indices where both filters are nonzero
+            if length(pnz)!=0
+                pnz_arr = vcat((x->[x[1], x[2]]').(pnz)...) #pnz*2: Assumption that the correct p to use in the phase are the indices!!! THIS IS WRONG instead create a kgrid and use pnz to index from that
+                Φmat =  exp.((-2π*im)/Nx .* ((pnz_arr .- 1) * (xigrid .- 1))) #pnz*Nx^2
+                f_v1pnz = f_v1[findall(in(pnz), f_i1)]
+                f_v2pnz = f_v2[findall(in(pnz), f_i2)]
+                t2 = real.(zarr[f1, pnz] .* Φmat)
+                #println(size(f_v1pnz), size(t2), size(absz[f2, pnz]))
+                term = 2*real.(sum((f_v2pnz.^2 .* f_v1pnz .*fim_fac[pnz]) .* t2, dims=1)) #p*Nx^2 -> 1*Nx^2
+                dS2dp[f1, f2, :, :] = reshape(term/(Nx^2), (Nx, Nx))
+            end
+        end
+    end
+    return dS2dp
 end
 
 #=
@@ -729,6 +752,64 @@ function wst_S12_deriv(image::Array{Float64,2}, filter_hash::Dict)
 
 end
 
+
+
+function wst_S2_deriv_sum(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64})
+    FFTW.set_num_threads(2)
+
+    # array sizes
+    (Nx, Ny)  = size(image)
+    (Nf, )    = size(filter_hash["filt_index"])
+
+    if size(wt)!=(Nf, Nf) error("Wt has wrong shape") end
+
+    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+    f_val   = filter_hash["filt_value"]
+    f_ind_rev = [[CartesianIndex(mod1(Nx+2 - ci[1],Nx), mod1(Nx+2 - ci[2],Nx)) for ci in f_Nf] for f_Nf in f_ind]
+
+
+    im_fd_0 = fft(image)
+    P = plan_fft(im_fd_0)
+    Pi = plan_ifft(im_fd_0)
+    zarr1 = zeros(ComplexF64, Nx, Nx)
+    Ilam1 = zeros(ComplexF64, Nx, Nx)
+    fterm_bt1 = zeros(ComplexF64, Nx, Nx)
+    fterm_bt2 = zeros(ComplexF64, Nx, Nx)
+    ifterm = zeros(ComplexF64, Nx, Nx)
+    dLossdα = zeros(Float64, Nx, Nx)
+    for f1=1:Nf
+        vlam1 = zeros(ComplexF64, Nx, Nx) #defined for each lambda1, computed by summing over lambda2
+        f_i1 = f_ind[f1]
+        f_v1 = f_val[f1]
+        f_i1rev = f_ind_rev[f1]
+
+        zarr1[f_i1] = im_fd_0[f_i1] .* f_v1
+        zarr1_rd = Pi*(zarr1)
+        Ilam1 = abs.(zarr1_rd)
+        fIlam1 = P*Ilam1
+
+        for f2=1:Nf
+            f_i2 = f_ind[f2]
+            f_v2 = f_val[f2]
+            vlam1[f_i2] += wt[f1, f2] .* f_v2.^2
+        end
+        #vlam1= sum_λ2 w.ψl1,l2^2
+        vlam1 = (Pi*(fIlam1 .* vlam1))./Ilam1 #sum over f2 -> (Nx, Nx) -> real space Vλ1/Iλ1
+        fterm_bt1 = P*(vlam1 .* zarr1_rd)
+        fterm_bt2 = P*(vlam1 .* conj.(zarr1_rd))
+        ifterm[f_i1] = fterm_bt1[f_i1] .* f_v1
+        ifterm[f_i1rev] += fterm_bt2[f_i1rev] .* f_v1
+        dLossdα += real.(Pi*ifterm)
+
+        #zero out alloc
+        zarr1[f_i1] .= 0
+        ifterm[f_i1] .=0
+        ifterm[f_i1rev] .=0
+
+    end
+    return dLossdα
+
+end
 ##Derivative test functions
 # wst_S1_deriv agrees with brute force at 1e-10 level.
 function derivtestS12(Nx)
@@ -762,10 +843,34 @@ function derivtestS12(Nx)
     #plot(dS[3:end])
     #plot!(blarg[2,3,:])
     #plot(diff)
+    return reshape(dS12dp[:, :, 2, 3], (Nf, Nf)), reshape(dS[i0:end], (Nf, Nf))
+end
+
+
+
+function dS2sum_test(fhash)
+    (Nf, )    = size(fhash["filt_index"])
+    Nx        = fhash["npix"]
+    im = rand(Nx,Nx)
+    mywts = rand(Nf*Nf)
+
+    wtvec  = reshape(mywts, (Nf, Nf))
+
+    # Use new faster code
+    sum1 = wst_S2_deriv_sum(im, fhash, wtvec)
+
+    # Compare to established code
+    dS1dp, dS2dp = wst_S1S2_derivfast(im, fhash)
+    dS2dp = reshape(dS2dp, (Nx, Nx, Nf^2))
+    sum2 = zeros(Float64, Nx, Nx)
+    for i=1:Nf*Nf sum2 += (dS2dp[:,:,i].*mywts[i]) end
+    println("abs mean", mean(abs.(sum2 -sum1)))
+    println("Stdev: ",std(sum1-sum2))
+
     return
 end
 
-derivtestS12(16)
+dS12code, dS12lim = derivtestS12(16)
 
  function derivtest(Nx)
     eps = 1e-4
@@ -801,7 +906,6 @@ derivtestS12(16)
     return
 end
 
-# wst_S1_deriv agrees with brute force at 1e-10 level.
  function derivtestfast(Nx, mode="fourier")
     eps = 1e-4
     fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
@@ -847,8 +951,10 @@ end
     return
 end
 
-derivtestfast(16, "fourier")
+dS2code, dS2lim = derivtestS1S2(16, mode="fourier")
+fhash= fink_filter_hash(1, 8, nx=16, pc=1, wd=1)
 
+dS2sum_test(fhash)
 
 function derivtestS1S2(Nx; mode="slow")
     eps = 1e-4
@@ -862,6 +968,10 @@ function derivtestS1S2(Nx; mode="slow")
     dS1dp_existing = wst_S1_deriv(im, fhash)
     if mode=="slow"
         dS1dp, dS2dp = wst_S1S2_deriv(im, fhash)
+    elseif mode=="fourier"
+        dS2dp = wst_S1S2_deriv_fdsparse(im, fhash)
+    elseif mode=="faster"
+        dS2dp = wst_S1S2_deriv_fdsparse(im, fhash)
     else
         dS1dp, dS2dp = wst_S1S2_derivfast(im, fhash)
     end
@@ -874,8 +984,10 @@ function derivtestS1S2(Nx; mode="slow")
 
     dS1lim23 = dSlim[3:lasts1ind]
     dS2lim23 = dSlim[lasts1ind+1:end]
-    dS1dp_23 = dS1dp[2, 3, :]
-    dS2dp_23 = dS2dp[2, 3, :, :]
+    if mode!="fourier"
+        dS1dp_23 = dS1dp[2, 3, :]
+    end
+    dS2dp_23 = dS2dp[:, :, 2, 3]
     #=
     println("Checking dS1dp using existing deriv")
     Nf = length(fhash["filt_index"])
@@ -886,18 +998,20 @@ function derivtestS1S2(Nx; mode="slow")
     println(dS1dp_existing[2, 3, :])
     println("stdev: ",std(diff))
     println("--------------------------")=#
-    println("Checking dS1dp using dS1S2")
-    derdiff = dS1dp_23 - dS1lim23
-    #println(dS1lim23)
-    #println("and")
-    #println(dS1dp_23)
-    txt= @sprintf("Range of S1 der0, der1: Max= %.3E, %.3E Min=%.3E, %.3E ",maximum(der0[3:lasts1ind]),maximum(der1[3:lasts1ind]),minimum(der0[3:lasts1ind]),minimum(der1[3:lasts1ind]))
-    print(txt)
-    txt = @sprintf("Checking dS1dp using S1S2 deriv, mean(abs(diff/dS1lim)): %.3E", mean(abs.(derdiff./dS1lim23)))
-    print(txt)
-    println("stdev: ",std(derdiff))
-    txt= @sprintf("Range of dS1lim: Max= %.3E Min= %.3E",maximum(abs.(dS1lim23)),minimum(abs.(dS1lim23)))
-    print(txt)
+    if mode!="fourier"
+        println("Checking dS1dp using dS1S2")
+        derdiff = dS1dp_23 - dS1lim23
+        #println(dS1lim23)
+        #println("and")
+        #println(dS1dp_23)
+        txt= @sprintf("Range of S1 der0, der1: Max= %.3E, %.3E Min=%.3E, %.3E ",maximum(der0[3:lasts1ind]),maximum(der1[3:lasts1ind]),minimum(der0[3:lasts1ind]),minimum(der1[3:lasts1ind]))
+        print(txt)
+        txt = @sprintf("Checking dS1dp using S1S2 deriv, mean(abs(diff/dS1lim)): %.3E", mean(abs.(derdiff./dS1lim23)))
+        print(txt)
+        println("stdev: ",std(derdiff))
+        txt= @sprintf("Range of dS1lim: Max= %.3E Min= %.3E",maximum(abs.(dS1lim23)),minimum(abs.(dS1lim23)))
+        print(txt)
+    end
     println("--------------------------")
     println("Checking dS2dp using S1S2 deriv")
     Nf = length(fhash["filt_index"])
@@ -923,12 +1037,20 @@ function derivtestS1S2(Nx; mode="slow")
     print(txt)
     txt = @sprintf("Mean: %.3E stdev: %.3E mean(abs(derdiff/dS2lim)): %.3E \n",mean(derdiff_good),std(derdiff_good), mean(abs.(derdiff_good ./dSlim_s2good)))
     print(txt)
+    println("Derivative Values")
+    println("Using Newton lim")
+    println(dS2lim23)
+    println("Using dS2")
+    println(dS2dp_23)
+    println(size(dS2dp_23), Nf^2)
 
     #plot(dS[3:end])
     #plot!(blarg[2,3,:])
     #plot(diff)
-    return
+    return reshape(dS2dp_23, (Nf, Nf)), reshape(dS2lim23, (Nf, Nf))
 end
+
+dS2code, dS2lim = derivtestS1S2(16, mode="fast")
 
 #=OLD
 function derivtestS1S2(Nx)
