@@ -59,7 +59,9 @@ module DHC_2DUtils
         hash=list_to_box(hash,dim=threeD ? 3 : 2)
 
         # send to gpu
+        CUDA.reclaim()
         hash["filt_vals"] = [CUDA.CuArray(val) for val in hash["filt_vals"]]
+        CUDA.reclaim()
 
         #Not implemented
         # -------- compute matrix that projects iso coeffs, add to hash
@@ -777,6 +779,7 @@ module DHC_2DUtils
     end
 
     function DHC_compute_3d_gpu(image::Array{Float64,3}, filter_hash)
+        CUDA.reclaim()
         # array sizes
         (Nx, Ny, Nz)  = size(image)
         (Nf, )    = size(filter_hash["filt_vals"])
@@ -845,6 +848,7 @@ module DHC_2DUtils
 
                 S2[f1,f2] = sum(abs2.(f_val .* im_fdf_1_1[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2],f_mm[3,1]:f_mm[3,2]]))/(Nx*Ny*Nz)
             end
+            CUDA.reclaim()
 
         end
         append!(out_coeff, S1[:])
