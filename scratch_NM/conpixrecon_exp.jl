@@ -63,6 +63,7 @@ end
 
 #function optim_subroutine()
 
+##In PROGRESS: Rewriting to use deriv_sums
 function img_reconfuncS2(input, filter_hash, s_targ_mean, s_targ_invcov, pixmask, optim_settings; coeff_mask=nothing)
     #=
     input: Initial image. When trues in pixmask, assumed to contain the correct value in those pixels.
@@ -152,9 +153,8 @@ function img_reconfuncS20(input, filter_hash, s_targ_mean, s_targ_invcov, pixmas
     #=
     input: Square.
     s_targ_mean, s_targ_invcov should have the same format as the raw output of the appropriate DHC call. i.e. you need to exclude S0/S1 from s_targ_mean below.
-
+    pixmask: Which pixels are floating (false) vs fixed (true)
     =#
-    #Only for denoising rn. Need to adapt to use mask and coeff_choice
     #Consider making this the wrapper for a subroutine that is constant irrespective of the choice of coeffs, mask etc. SO ths wrapper handles
     #all the choices of S2 vs S20 or only S1 etc--nope probably messier because would need to pass wrapper for appropriate type of DHC
     #
@@ -517,8 +517,8 @@ fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
 i0 = 3+(doiso ? N1iso : Nf)
 img    = imresize(dust,(Nx,Nx))
-#fixmask = rand(Nx,Nx) .< 0.1
-fixmask = falses((Nx, Nx))
+fixmask = rand(Nx,Nx) .< 0.5
+#fixmask = falses((Nx, Nx))
 
 
 init = copy(img)
@@ -537,7 +537,8 @@ s20w, covs20 = S20_weights(img, fhash, 100, iso=doiso)
 invcovar = Diagonal(s20w.^(-2))
 s20targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
 #myfoogens20_100itn = img_reconfunc_old(init, s20targ,  invcovar, fixmask, "S20", Dict([("iterations", 100)]))
-S20recon = img_reconfuncS20
+
+S20recon = img_reconfuncS20(init, fhash, s20targ, invcovar, fixmask, Dict([("iterations", 10)]))
 
 #Need a new invcovar (S2weights) for doing S2
 s2w, covs2 = S2_weights(img, fhash, 100, iso=doiso)
