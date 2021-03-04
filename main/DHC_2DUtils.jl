@@ -560,7 +560,13 @@ module DHC_2DUtils
                     continue
                 end
 
+                if f2>f1
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
                 if f_mm1[1,1]>f_mm2[1,2] || f_mm2[1,1]>f_mm1[1,2] || f_mm1[2,1]>f_mm2[2,2] || f_mm2[2,1]>f_mm1[2,2]
+                    S12[f1,f2]=NaN
                     continue
                 end
 
@@ -848,7 +854,13 @@ module DHC_2DUtils
                     continue
                 end
 
+                if f2>f1
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
                 if f_mm1[1,1]>f_mm2[1,2] || f_mm2[1,1]>f_mm1[1,2] || f_mm1[2,1]>f_mm2[2,2] || f_mm2[2,1]>f_mm1[2,2] || f_mm1[3,1]>f_mm2[3,2] || f_mm2[3,1]>f_mm1[3,2]
+                    S12[f1,f2]=NaN
                     continue
                 end
 
