@@ -586,8 +586,8 @@ module DHC_2DUtils
         end
         append!(out_coeff,S0)
         append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
-        append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S2 : S2)
-        append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S12 : S12)
+        if doS2 append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S2 : S2) end
+        if doS12 append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S12 : S12) end
         return out_coeff
     end
 
@@ -887,8 +887,8 @@ module DHC_2DUtils
         end
         append!(out_coeff,S0)
         append!(out_coeff, S1)
-        append!(out_coeff, S2)
-        append!(out_coeff, S12)
+        if doS2 append!(out_coeff, S2) end
+        if doS12 append!(out_coeff, S12) end
         return out_coeff
     end
 
