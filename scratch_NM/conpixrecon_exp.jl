@@ -66,59 +66,64 @@ end
 ##In PROGRESS: Rewriting to use deriv_sums
 function img_reconfuncS2(input, filter_hash, s_targ_mean, s_targ_invcov, pixmask, optim_settings; coeff_mask=nothing)
     #=
-    input: Initial image. When trues in pixmask, assumed to contain the correct value in those pixels.
-    coeff_mask: Allows you to only optimize wrt a subset of coefficients (eg: j1<=j2)
-    pixmask: Which pixels are floating (false) vs fixed (true)
-
+    input: Initial image. When trues in pixmask, assumed to contain the correct value in those pixels. (Nx, Nx)
+    coeff_mask: Allows you to only optimize wrt a subset of coefficients (eg: j1<=j2) length = 2 + Nf + Nf^2
+    pixmask: Which pixels are floating (false) vs fixed (true): (Nx, Nx)
+    s_targ_mean, s_targ_invcov: Should only contain teh coefficients you're optimizing wrt.
     =#
     println("Coeff mask:", (coeff_mask!=nothing))
+
     (Nx, Ny)  = size(input)
     if Nx != Ny error("Input image must be square") end
-    #filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 
     (Nf, )    = size(filter_hash["filt_index"])
     if Nf == 0 error("filter hash corrupted") end
+
     println("S2")
     pixmask = pixmask[:] #flattened: Nx^2s
-    cpvals = copy(input[:])[pixmask] #constrained pix values
+    #cpvals = copy(input[:])[pixmask] #constrained pix values
 
     if coeff_mask!=nothing
-        if length(coeff_mask)!= 2+Nf + Nf^2 error("Wrong dim mask") end
+        if length(coeff_mask)!= (2+Nf + Nf^2) error("Wrong dim mask") end
         if size(s_targ_mean)[1]!=count((i->(i==true)), coeff_mask) error("s_targ_mean should only contain coeffs to be optimized") end
-        #if ((s_targ_invcov!=I) & size(s_targ_invcov)[1]!=count((i->(i==true)), coeff_mask)) error("s_targ_invcov should only contain coeffs to be optimized") end
-        #if (s_targ_invcov!=I)  error("E1") end
-        if size(s_targ_invcov)[1]!=count((i->(i==true)), coeff_mask) error("E2") end
-    else #No mask: all coeffs (default: All S1 and S2 coeffs will be optim wrt)
+        if size(s_targ_invcov)[1]!=count((i->(i==true)), coeff_mask) error("s_targ_invcov should only have coeffs to be optimized") end
+    else #No mask: all coeffs (default: All S1 and S2 coeffs will be optim wrt. Mean, var not incl)
         #Currently assuming inputs have mean, var params in case that's something we wanna optimize at some point
-        if size(s_targ_mean)[1]== (2+Nf+Nf^2)
-            s_targ_mean = s_targ_mean[3:end]
-        else
-            error("s_targ_mean of wrong size")
-        end
-        if (s_targ_invcov!=I) & (size(s_targ_invcov)==(2+Nf+Nf^2, 2+Nf+Nf^2))
-            s_targ_invcov = s_targ_invcov[3:end, 3:end]
-        else
-            error("s_targ_invcov of wrong size")
-        end
-        #At this point both have dims S1+S2
-        #3:end
+        if size(s_targ_mean)[1]!=(Nf+Nf^2) error("s_targ_mean should only contain coeffs to be optimized") end
+        if (size(s_targ_invcov)!=(Nf+Nf^2, Nf+Nf^2))  error("s_targ_invcov of wrong size") end #(s_targ_invcov!=I) &
+        #At this point both have dims |S1+S2|
+        #Create coeff_mask subsetting 3:end
         coeff_mask = fill(true, 2+Nf+Nf^2)
         coeff_mask[1] = false
         coeff_mask[2] = false
     end
-    #After this all cases have a coeffmask
+    num_freecoeff = count((i->(i==true)), coeff_mask) #Nf+Nf^2 if argument coeff_mask was empty
+    num_freecoeffS1 = count((i->(i==true)), coeff_mask[3:Nf+2])
+    num_freecoeffS2 = count((i->(i==true)), coeff_mask[Nf+3:end])
+
+    #After this all cases have a coeffmask, and s_targ_mean and s_targ_invcov have the shapes of the coefficients that we want to select.
+    #Does alloc mem here help?
+    wtall = zeros(Float64, Nf+Nf^2)
+    wts1 = zeros(Float64, Nf)
+    wts2 = zeros(Float64, Nf^2)
     function loss_func(img_curr)
-        #println("Img",size(img_curr))
-        s_curr = Deriv_Utils.DHC(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=true, doS12=false, doS20=false)[coeff_mask]
+        #size(img_curr) must be (Nx^2, 1)
+        s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=true, doS12=false, doS20=false)[coeff_mask] #BUG: discrepancy in mean, var I think
         neglogloss = 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean)
-        #println("In Loss:",size(s_curr))
-        #println("NegLogLoss",neglogloss[1])
         return neglogloss[1]
     end
 
     function dloss(storage_grad, img_curr)
-        s_curr = Deriv_Utils.DHC(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false)[coeff_mask]
+        #storage_grad, img_curr must be (Nx^2, 1)
+        s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false)[coeff_mask]
         diff = s_curr - s_targ_mean
+        wtall = reshape(reshape(diff, (1, num_freecoeff)) * s_targ_invcov, (Nf+Nf^2))
+        wts1[coeff_mask[3:Nf+2]] .= wtall[1:num_freecoeffS1] #WARNING: Assumes that mean, var not being optimized
+        wts2[coeff_mask[3+Nf:end]] .= wtall[num_freecoeffS1+1:end] #Len= Nz(coeff_mask). #Selection func for only S2 coeffs
+        #Works because coeff_mask is a boolean mask
+        #Since wst_S2_deriv_sum works with the full set of S2 weights, need to go back to Nf+Nf^2 length
+
+        #=
         #diff = diff
         dS1S2 = Transpose(reshape(Deriv_Utils.wst_S1S2_derivfast(reshape(img_curr, (Nx, Nx)), filter_hash), (:, Nx^2))) #(Nf+Nf^2, Nx, Nx)->(Nx^2, Nf+Nf^2) Cant directly do this without handling S1 coeffs
         dS1S2 = dS1S2[:, coeff_mask[3:end]] #Nx^2 * |SelCoeff|
@@ -127,8 +132,16 @@ function img_reconfuncS2(input, filter_hash, s_targ_mean, s_targ_invcov, pixmask
         #WARNING: Uses the Deriv_Utils version of dS1S2. Need to rewrite if you want to use the DHC_2DUtils one.
         #println("In dLoss:",size(diff), size(term1), size(term2))
         #println(size(term1),size(term2),size(storage_grad))
-        mul!(storage_grad, dS1S2, term1) #Nx^2x1
+        mul!(storage_grad, dS1S2, term1) #Nx^2x1=#
+        #TODO: Move into one line
+        S1contrib = reshape(wst_S1_deriv(reshape(img_curr, (Nx, Nx)), filter_hash), (Nx^2, Nf)) * reshape(wts1, (Nf, 1))
+        S2contrib = reshape(Deriv_Utils.wst_S2_deriv_sum(reshape(img_curr, (Nx, Nx)), filter_hash, reshape(wts2, (Nf, Nf))), (Nx^2, 1))
+        storage_grad = S1contrib + S2contrib
+        storage_grad[pixmask] .= 0 #better way to do this by taking pixmask as an argument wst_s2_deriv_sum
     end
+
+
+
     #Debugging stuff
     println("Chisq derivative check")
     eps = zeros(size(input))
@@ -474,6 +487,138 @@ function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test2.png")
     myplot = plot(ps..., layout=(3,2), size=(1400,2000))
     savefig(myplot, fname)
 end
+############################################
+#Experiment 3: Constrained Pixels: Code Checks
+epsilon=1e-5
+dust = Float64.(readdust())
+dust = dust[1:256,1:256]
+
+Nx     = 32
+doiso  = false
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(N1iso, Nf)    = size(fhash["S1_iso_mat"])
+i0 = 3+(doiso ? N1iso : Nf)
+img    = imresize(dust,(Nx,Nx))
+fixmask = rand(Nx,Nx) .< 0.1
+fixmask = falses(Nx, Nx)
+#Sanity check: fixmask = trues(Nx, Nx). Was 0.
+init = copy(img)
+floatind = findall(fixmask .==0)
+init[floatind] .+= rand(length(floatind)).*50 .-25
+
+s2targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=true, doS20=false, norm=false, iso=doiso)
+s2w, cov = S2_weights(img, fhash, 100, iso=doiso)
+s2w[findall(s2w .< epsilon)] .= s2w[findall(s2w .< epsilon)] .+ 1e-5
+
+invcovarS2 = Diagonal(s2w.^(-2))
+#Profile.clear()
+reconS2cgeps_check = img_reconfuncS2(init, fhash, s2targ[3:end],  invcovarS2[3:end, 3:end], fixmask, Dict([("iterations", 10)]))
+
+#Inner function code
+input=init
+filter_hash=fhash
+s_targ_mean=s2targ[3:end]
+s_targ_invcov=invcovarS2[3:end, 3:end]
+pixmask= fixmask
+optim_settings=Dict([("iterations", 10)])
+coeff_mask = nothing
+println("Coeff mask:", (coeff_mask!=nothing))
+
+(Nx, Ny)  = size(input)
+if Nx != Ny error("Input image must be square") end
+
+(Nf, )    = size(filter_hash["filt_index"])
+if Nf == 0 error("filter hash corrupted") end
+
+println("S2")
+pixmask = pixmask[:] #flattened: Nx^2s
+#cpvals = copy(input[:])[pixmask] #constrained pix values
+
+if coeff_mask!=nothing
+    if length(coeff_mask)!= (2+Nf + Nf^2) error("Wrong dim mask") end
+    if size(s_targ_mean)[1]!=count((i->(i==true)), coeff_mask) error("s_targ_mean should only contain coeffs to be optimized") end
+    if size(s_targ_invcov)[1]!=count((i->(i==true)), coeff_mask) error("s_targ_invcov should only have coeffs to be optimized") end
+else #No mask: all coeffs (default: All S1 and S2 coeffs will be optim wrt. Mean, var not incl)
+    #Currently assuming inputs have mean, var params in case that's something we wanna optimize at some point
+    if size(s_targ_mean)[1]!=(Nf+Nf^2) error("s_targ_mean should only contain coeffs to be optimized") end
+    if (size(s_targ_invcov)!=(Nf+Nf^2, Nf+Nf^2))  error("s_targ_invcov of wrong size") end #(s_targ_invcov!=I) &
+    #At this point both have dims |S1+S2|
+    #Create coeff_mask subsetting 3:end
+    coeff_mask = fill(true, 2+Nf+Nf^2)
+    coeff_mask[1] = false
+    coeff_mask[2] = false
+end
+num_freecoeff = count((i->(i==true)), coeff_mask) #Nf+Nf^2 if argument coeff_mask was empty
+num_freecoeffS1 = count((i->(i==true)), coeff_mask[3:Nf+2])
+num_freecoeffS2 = count((i->(i==true)), coeff_mask[Nf+3:end])
+
+#After this all cases have a coeffmask, and s_targ_mean and s_targ_invcov have the shapes of the coefficients that we want to select.
+#Does alloc mem here help?
+#wtall = zeros(Float64, Nf+Nf^2)
+
+function loss_func(img_curr)
+    #size(img_curr) must be (Nx^2, 1)
+    s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=true, doS12=false, doS20=false)[coeff_mask]
+    neglogloss = 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean)
+    return neglogloss[1]
+end
+
+function dloss(storage_grad, img_curr)
+    #storage_grad, img_curr must be (Nx^2, 1)
+    s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false)[coeff_mask]
+    diff = s_curr - s_targ_mean
+    wts1 = zeros(Float64, Nf)
+    wts2 = zeros(Float64, Nf^2)
+    wtall = reshape(reshape(diff, (1, num_freecoeff)) * s_targ_invcov, num_freecoeff) #DEBUG: This isnt eval to zero when you test it outside
+    wts1[coeff_mask[3:Nf+2]] .= wtall[1:num_freecoeffS1] #WARNING: Assumes that mean, var not being optimized
+    wts2[coeff_mask[3+Nf:end]] .= wtall[num_freecoeffS1+1:end] #Len= Nz(coeff_mask). #Selection func for only S2 coeffs
+    #Works because coeff_mask is a boolean mask
+    #Since wst_S2_deriv_sum works with the full set of S2 weights, need to go back to Nf+Nf^2 length
+
+    #=
+    #diff = diff
+    dS1S2 = Transpose(reshape(Deriv_Utils.wst_S1S2_derivfast(reshape(img_curr, (Nx, Nx)), filter_hash), (:, Nx^2))) #(Nf+Nf^2, Nx, Nx)->(Nx^2, Nf+Nf^2) Cant directly do this without handling S1 coeffs
+    dS1S2 = dS1S2[:, coeff_mask[3:end]] #Nx^2 * |SelCoeff|
+    dS1S2[pixmask, :] .= 0 #Zeroing out wrt fixed params
+    term1 = s_targ_invcov * diff #(Nf+Nf^2) or |SelCoeff| x 1
+    #WARNING: Uses the Deriv_Utils version of dS1S2. Need to rewrite if you want to use the DHC_2DUtils one.
+    #println("In dLoss:",size(diff), size(term1), size(term2))
+    #println(size(term1),size(term2),size(storage_grad))
+    mul!(storage_grad, dS1S2, term1) #Nx^2x1=#
+    #TODO: Move into one line
+    S1contrib = reshape(wst_S1_deriv(reshape(img_curr, (Nx, Nx)), filter_hash), (Nx^2, Nf)) * reshape(wts1, (Nf, 1))
+    S2contrib = reshape(Deriv_Utils.wst_S2_deriv_sum(reshape(img_curr, (Nx, Nx)), filter_hash, reshape(wts2, (Nf, Nf))), (Nx^2, 1))
+    storage_grad .=( S1contrib + S2contrib) #
+    storage_grad[pixmask] .= 0 # better way to do this by taking pixmask as an argument wst_s2_deriv_sum
+    return meansub, wtall, wts1, wts2, S1contrib, S2contrib, storage_grad
+end
+
+
+
+#Debugging stuff
+println("Chisq derivative check")
+eps = zeros(size(input))
+eps[1, 2] = 1e-4
+chisq1 = loss_func(input+eps./2)
+chisq0 = loss_func(input-eps./2)
+brute  = (chisq1-chisq0)/1e-4
+
+clever = reshape(zeros(size(input)), (Nx*Nx, 1))
+meansub, wtall, wts1, wts2, S1contrib, S2contrib, storage_grad = dloss(clever, reshape(input, (Nx^2, 1)))
+println("Brute:  ",brute)
+println("Clever: ",clever[Nx*(1)+1])
+
+
+res = optimize(loss_func, dloss, reshape(input, (Nx^2, 1)), ConjugateGradient(), Optim.Options(iterations = get(optim_settings, "iterations", 100), store_trace = true, show_trace = true))
+result_img = zeros(Float64, Nx, Nx)
+result_img = Optim.minimizer(res)
+return reshape(result_img, (Nx, Nx))
+
+
+
+
+
+
 ####Testing Examples#############
 #Experiment 1: all pixels floating,
 #Sec1: Don't use this--this was before I fixed the plotting / function bugs--skip to Sec2!!!
@@ -674,31 +819,6 @@ myfoogens20 = img_reconfunc(fill(mean(img), (Nx, Nx)), s20targ,  invcovar, fixma
 #mean(s2w), median(s2w), mean(s2w./s2targ), median(s2w./s2targ)
 #(13.192017376387687, 0.6169549962485834, 0.019359754705979722, 0.009315575046683549)
 
-#Experiment 3: Constrained Pixels: Code Checks
-epsilon=1e-5
-dust = Float64.(readdust())
-dust = dust[1:256,1:256]
-
-Nx     = 64
-doiso  = false
-fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
-(N1iso, Nf)    = size(fhash["S1_iso_mat"])
-i0 = 3+(doiso ? N1iso : Nf)
-img    = imresize(dust,(Nx,Nx))
-fixmask = rand(Nx,Nx) .< 0.1
-#fixmask = falses(Nx, Nx)
-#Sanity check: fixmask = trues(Nx, Nx). Was 0.
-init = copy(img)
-floatind = findall(fixmask .==0)
-init[floatind] .+= rand(length(floatind)).*50 .-25
-
-s2targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=true, doS20=false, norm=false, iso=doiso)
-s2w, cov = S2_weights(img, fhash, 100, iso=doiso)
-s2w[findall(s2w .< epsilon)] .= s2w[findall(s2w .< epsilon)] .+ 1e-5
-
-invcovarS2 = Diagonal(s2w.^(-2))
-#Profile.clear()
-reconS2cgeps_check = img_reconfuncS2(init, fhash, s2targ,  invcovarS2, fixmask, Dict([("iterations", 100)]))
 #Juno.profiler()
 #Profile.print(format=:tree, sortedby=:count)
 

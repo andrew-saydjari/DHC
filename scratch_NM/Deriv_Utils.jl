@@ -348,7 +348,62 @@ module Deriv_Utils
         return dS20dα
     end
 
+    function wst_S2_deriv_sum(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64})
+        FFTW.set_num_threads(2)
 
+        # array sizes
+        (Nx, Ny)  = size(image)
+        (Nf, )    = size(filter_hash["filt_index"])
+
+        if size(wt)!=(Nf, Nf) error("Wt has wrong shape") end
+
+        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val   = filter_hash["filt_value"]
+        f_ind_rev = [[CartesianIndex(mod1(Nx+2 - ci[1],Nx), mod1(Nx+2 - ci[2],Nx)) for ci in f_Nf] for f_Nf in f_ind]
+
+
+        im_fd_0 = fft(image)
+        P = plan_fft(im_fd_0)
+        Pi = plan_ifft(im_fd_0)
+        zarr1 = zeros(ComplexF64, Nx, Nx)
+        Ilam1 = zeros(ComplexF64, Nx, Nx)
+        fterm_bt1 = zeros(ComplexF64, Nx, Nx)
+        fterm_bt2 = zeros(ComplexF64, Nx, Nx)
+        ifterm = zeros(ComplexF64, Nx, Nx)
+        dLossdα = zeros(Float64, Nx, Nx)
+        for f1=1:Nf
+            vlam1 = zeros(ComplexF64, Nx, Nx) #defined for each lambda1, computed by summing over lambda2
+            f_i1 = f_ind[f1]
+            f_v1 = f_val[f1]
+            f_i1rev = f_ind_rev[f1]
+
+            zarr1[f_i1] = im_fd_0[f_i1] .* f_v1
+            zarr1_rd = Pi*(zarr1)
+            Ilam1 = abs.(zarr1_rd)
+            fIlam1 = P*Ilam1
+
+            for f2=1:Nf
+                f_i2 = f_ind[f2]
+                f_v2 = f_val[f2]
+                vlam1[f_i2] += wt[f1, f2] .* f_v2.^2
+            end
+            #vlam1= sum_λ2 w.ψl1,l2^2
+            vlam1 = (Pi*(fIlam1 .* vlam1))./Ilam1 #sum over f2 -> (Nx, Nx) -> real space Vλ1/Iλ1
+            fterm_bt1 = P*(vlam1 .* zarr1_rd)
+            fterm_bt2 = P*(vlam1 .* conj.(zarr1_rd))
+            ifterm[f_i1] = fterm_bt1[f_i1] .* f_v1
+            ifterm[f_i1rev] += fterm_bt2[f_i1rev] .* f_v1
+            dLossdα += real.(Pi*ifterm)
+
+            #zero out alloc
+            zarr1[f_i1] .= 0
+            ifterm[f_i1] .=0
+            ifterm[f_i1rev] .=0
+
+        end
+        return dLossdα
+
+    end
 
     #######Testing Utilities Begin Here##################
     function derivtestfast(Nx)
