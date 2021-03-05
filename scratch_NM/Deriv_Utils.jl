@@ -246,7 +246,7 @@ module Deriv_Utils
             f_v1 = f_val[f1]  # Values for f_i1
             f_i1rev = f_ind_rev[f1]
 
-            zarr1[f_i1] = f_v1 .* im_fd_0[f_i1] #F[z]
+            zarr1[f_i1] = f_v1 .* im_fd_0[f_i1] #F[z] #BUG: here????
             zarr1_rd = P*zarr1 #for frzi
             fz_fψ1[f_i1] = f_v1 .* zarr1[f_i1]
             fz_fψ1_rd = P*fz_fψ1
@@ -348,6 +348,66 @@ module Deriv_Utils
         return dS20dα
     end
 
+
+    function wst_S12_deriv(image::Array{Float64,2}, filter_hash::Dict)
+        FFTW.set_num_threads(2)
+
+        # array sizes
+        (Nx, Ny)  = size(image)
+        (Nf, )    = size(filter_hash["filt_index"])
+
+
+        # unpack filter_hash
+        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val   = filter_hash["filt_value"]
+
+        zarr = zeros(ComplexF64, Nf, Nx, Nx)  # temporary array to fill with zvals
+        ## 1st Order
+        im_fd_0 = fft(image)  # total power=1.0
+        # make a FFTW "plan" for an array of the given size and type
+        P = plan_ifft(im_fd_0)  # P is an operator, P*im is ifft(im)
+        for f1 = 1:Nf
+            f_i1 = f_ind[f1]  # CartesianIndex list for filter1
+            f_v1 = f_val[f1]  # Values for f_i1
+            zarr[f1, f_i1] = im_fd_0[f_i1] .* f_v1 #check if this notation is fine
+        end
+        zarrc =conj.(zarr)
+        absz = abs.(zarr)
+
+
+        #Implemented in the more memory intensive / parallelized ops way
+        #fhash_indsarr = [hcat((x->[x[1], x[2]]).(fh)...)' for fh in fhash["filt_index"]] #Each elem gives you fhash["filt_index"] in non-CartesianIndices
+        #dabsz = #Mem Req: Nf*Nx^2*sp*Nx^2 and sp~2%
+
+        #Less Mem Route
+        dabsz_absz = zeros(Float64, Nf, Nf, Nx, Nx)  # Lookup arrays for dS12 terms
+        xigrid = reshape(CartesianIndices((1:Nx, 1:Nx)), (1, Nx^2))
+        xigrid = hcat((x->[x[1], x[2]]).(xigrid)...) #2*Nx^2
+
+        for f1 = 1:Nf
+            f_i1 = f_ind[f1]  # CartesianIndex list for filter1
+            f_v1 = f_val[f1]  # Values for f_i1
+
+            for f2 = 1:Nf
+                f_i2 = f_ind[f2]  # CartesianIndex list for filter1
+                f_v2 = f_val[f2]  # Values for f_i1
+                pnz = intersect(f_i1, f_i2) #Fd indices where both filters are nonzero
+                if length(pnz)!=0
+                    pnz_arr = vcat((x->[x[1], x[2]]').(pnz)...) #pnz*2: Assumption that the correct p to use in the phase are the indices!!! THIS IS WRONG instead create a kgrid and use pnz to index from that
+                    Φmat =  exp.((-2π*im)/Nx .* ((pnz_arr .- 1) * (xigrid .- 1))) #pnz*Nx^2
+                    f_v1pnz = f_v1[findall(in(pnz), f_i1)]
+                    t2 = real.(zarrc[f1, pnz] .* Φmat) #Check
+                    #println(size(f_v1pnz), size(t2), size(absz[f2, pnz]))
+                    term = sum(((absz[f2, pnz] ./ absz[f1, pnz]) .* f_v1pnz) .* t2, dims=1) #p*Nx^2 -> 1*Nx^2
+                    dabsz_absz[f1, f2, :, :] = reshape(term, (Nx, Nx))
+                end
+            end
+        end
+        dS12 = dabsz_absz + permutedims(dabsz_absz, [2, 1, 3, 4])
+
+    end
+
+
     function wst_S2_deriv_sum(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64})
         FFTW.set_num_threads(2)
 
@@ -402,6 +462,22 @@ module Deriv_Utils
 
         end
         return dLossdα
+
+    end
+
+    function wst_S1S2_derivsum_comb(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64})
+        # array sizes
+        (Nx, Ny)  = size(image)
+        (Nf, )    = size(filter_hash["filt_index"])
+
+        if size(wt)!=(Nf + (Nf*Nf),) error("Wt has wrong shape: the argument should contain both S1 and S2 weights") end
+        wts1 = reshape(wt[1:Nf], (Nf, 1))
+        wts2 = reshape(wt[Nf+1:end], (Nf, Nf))
+
+        dwS1 = reshape(DHC_2DUtils.wst_S1_deriv(image, filter_hash), (Nx^2, Nf)) * wts1 #NOTE: Replace this with DHC_2DUtils.wst_S1_deriv
+        dwS2 = reshape(wst_S2_deriv_sum(image, filter_hash, wts2), (Nx^2, 1))
+        #println(size(dwS1), size(dwS2))
+        return reshape(dwS1 + dwS2, Nx^2)
 
     end
 
