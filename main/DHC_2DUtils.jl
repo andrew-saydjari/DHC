@@ -73,6 +73,33 @@ module DHC_2DUtils
         return hash
     end
 
+    function fink_filter_hash_gpu_fake(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
+
+        # -------- compute the filter bank
+        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on)
+
+        flist = fink_filter_list(filt)
+        # -------- pack everything you need into the info structure
+        hash["filt_index"] = flist[1]
+        hash["filt_value"] = flist[2]
+
+        if threeD
+            hash=fink_filter_bank_3dizer(hash,cz,nz=nz)
+        end
+
+        hash=list_to_box(hash,dim=threeD ? 3 : 2)
+
+
+        #Not implemented
+        # -------- compute matrix that projects iso coeffs, add to hash
+        #S1_iso_mat = S1_iso_matrix(hash)
+        hash["S1_iso_mat"] = nothing
+        #S2_iso_mat = S2_iso_matrix(hash)
+        hash["S2_iso_mat"] = nothing
+
+        return hash
+    end
+
     function S1_iso_matrix(fhash)
         # fhash is the filter hash output by fink_filter_hash
         # The output matrix converts an S1 coeff vector to S1iso by
@@ -469,6 +496,126 @@ module DHC_2DUtils
         return out_coeff
     end
 
+    function DHC_compute_gpu_fake(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
+        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false,batch_mode::Bool=false,opt_memory::Bool=false,max_memory::Int64=0)
+
+        @assert !iso "Isotropic is not implemented on GPU"
+        @assert !doS20 "S20 is not supported on GPU"
+        # image        - input for WST
+        # filter_hash  - filter hash from fink_filter_hash
+        # filter_hash2 - filters for second order.  Default to same as first order.
+        # doS2         - compute S2 coeffs Similar to Mallat(2014), Abs in real space
+        # doS12        - compute S2 coeffs Abs in Fourier space
+        # doS20        - compute S2 coeffs Square in real space
+        # norm         - scale to mean zero, unit variance
+        # iso          - sum over angles to obtain isotropic coeffs
+
+
+        # array sizes
+        (Nx, Ny)  = size(image)
+        if Nx != Ny error("Input image must be square") end
+        (Nf, )    = size(filter_hash["filt_vals"])
+        if Nf == 0  error("filter hash corrupted") end
+        @assert Nx==filter_hash["npix"] "Filter size should match npix"
+        @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
+
+        # allocate coeff arrays
+        out_coeff = []
+        S0  = zeros(Float64, 2)
+        S1  = zeros(Float64, Nf)
+        if doS2  S2  = zeros(Float64, Nf, Nf) end  # traditional 2nd order
+        if doS12 S12 = zeros(Float64, Nf, Nf) end  # Fourier correlation
+        if doS20 S20 = zeros(Float64, Nf, Nf) end  # real space correlation
+        anyM2 = doS2 | doS12 | doS20
+        anyrd = doS2 | doS20             # compute real domain with iFFT
+
+        # allocate image arrays for internal use
+        if doS12 im_fdf_0_1 = zeros(Float64,           Nx, Ny) end   # this must be zeroed!
+        if anyrd im_rd_0_1  = Array{Float64, 2}(undef, Nx, Ny) end
+
+        image= image
+        ## 0th Order
+        S0[1]   = mean(image)
+        norm_im = image.-S0[1]
+        S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
+        if norm
+            norm_im./= sqrt(Nx*Ny*S0[2])
+        else
+            norm_im = image
+        end
+
+
+        ## 1st Order
+        #REview: We fft shift!
+        im_fd_0 = FFTW.fftshift(FFTW.fft(norm_im))  # total power=1.0
+
+        # unpack filter_hash
+        f_mms   = filter_hash["filt_mms"]  # (J, L) array of filters represented as index value pairs
+        f_vals   = filter_hash["filt_vals"]
+
+        zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
+
+        # make a FFTW "plan" for an array of the given size and type
+        if anyrd
+            P = FFTW.plan_ifft(im_fd_0) end  # P is an operator, P*im is ifft(im)
+
+        ## Main 1st Order and Precompute 2nd Order
+        for f1 = 1:Nf
+            f_mm1 = f_mms[:,:,f1]  # Min,Max
+            f_val1 = f_vals[f1]  # values
+
+            #Review: Removes length check-> empty filter case???, I think this should be prevented beforehands
+            zv=f_val1.*im_fd_0[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2]] #dense multiplication for the filter region
+            zarr[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2]]=zv
+
+            if doS12 im_fdf_0_1[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2]] .= abs.(zv) end
+
+            S1[f1] = sum(abs2.(zv))/(Nx*Ny)  # image power
+            if anyrd im_rd_0_1.= abs2.(P*FFTW.ifftshift(zarr)) end
+            zarr[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2]] .= 0
+
+
+            im_rd_0_1 .= sqrt.(im_rd_0_1)
+            im_fdf_1_1 = FFTW.fftshift(FFTW.fft(im_rd_0_1))
+            for f2 = 1:Nf
+                f_mm2 = f_mms[:,:,f2]
+                f_val2 = f_vals[f2]
+
+                S2[f1,f2] = sum(abs2.(f_val2 .* im_fdf_1_1[f_mm2[1,1]:f_mm2[1,2],f_mm2[2,1]:f_mm2[2,2]]))/(Nx*Ny)
+                if !doS12
+                    continue
+                end
+
+                if f2>f1
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
+                if f_mm1[1,1]>f_mm2[1,2] || f_mm2[1,1]>f_mm1[1,2] || f_mm1[2,1]>f_mm2[2,2] || f_mm2[2,1]>f_mm1[2,2]
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
+                mx=max(f_mm1[1,1],f_mm2[1,1])
+                my=max(f_mm1[2,1],f_mm2[2,1])
+                Mx=min(f_mm1[1,2],f_mm2[1,2])
+                My=min(f_mm1[2,2],f_mm2[2,2])
+                sfx=Mx-mx
+                sfy=My-my
+                st1x=mx-f_mm1[1,1]+1
+                st1y=my-f_mm1[2,1]+1
+                st2x=mx-f_mm2[1,1]+1
+                st2y=my-f_mm2[2,1]+1
+
+                S12[f1,f2]=sum(f_val1[st1x:st1x+sfx,st1y:st1y+sfy].*f_val2[st2x:st2x+sfx,st2y:st2y+sfy].*abs2.(im_fd_0[mx:Mx,my:My]))
+            end
+        end
+        append!(out_coeff,S0)
+        append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
+        if doS2 append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S2 : S2) end
+        if doS12 append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S12 : S12) end
+        return out_coeff
+    end
 
     function DHC_compute_gpu(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
         doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false,batch_mode::Bool=false,opt_memory::Bool=false,max_memory::Int64=0)
@@ -884,6 +1031,116 @@ module DHC_2DUtils
                 CUDA.reclaim()
             end
             CUDA.reclaim()
+        end
+        append!(out_coeff,S0)
+        append!(out_coeff, S1)
+        if doS2 append!(out_coeff, S2) end
+        if doS12 append!(out_coeff, S12) end
+        return out_coeff
+    end
+
+    function DHC_compute_3d_gpu_fake(image::Array{Float64,3}, filter_hash;doS2::Bool=true, doS12::Bool=false, norm=true)
+        # array sizes
+        (Nx, Ny, Nz)  = size(image)
+        (Nf, )    = size(filter_hash["filt_vals"])
+
+        # allocate coeff arrays
+        out_coeff = []
+        S0  = zeros(Float64, 2)
+        S1  = zeros(Float64, Nf)
+        #S20 = zeros(Float64, Nf, Nf)
+        if doS12 S12 = zeros(Float64, Nf, Nf) end
+        if doS2 S2  = zeros(Float64, Nf, Nf)  end # traditional 2nd order
+
+        # allocate image arrays for internal use
+        im_fdf_0_1 = Array{Float64, 3}(undef, Nx, Ny, Nz)
+        im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nz)
+
+
+        ## 0th Order
+        S0[1]   = mean(image)
+        norm_im = image.-S0[1]
+        S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny*Nz)
+        if norm
+            norm_im ./= sqrt(Nx*Ny*Nz*S0[2])
+        else
+            norm_im=image
+        end
+
+        ## 1st Order
+        im_fd_0 = FFTW.fftshift(FFTW.fft(norm_im))  # total power=1.0
+
+        # unpack filter_hash
+        f_mms   = filter_hash["filt_mms"]  # (J, L) array of filters represented as index value pairs
+        f_vals   = filter_hash["filt_vals"]
+
+        #f_ind2   = filter_hash2["filt_index"]  # (J, L) array of filters represented as index value pairs
+        #f_val2   = filter_hash2["filt_value"]
+
+        zarr = zeros(ComplexF64, Nx, Ny, Nz)  # temporary array to fill with zvals
+
+        # make a FFTW "plan" for an array of the given size and type
+        P   = FFTW.plan_ifft(im_fd_0)   # P is an operator, P*im is ifft(im)
+
+        #depth first search
+        for f1 = 1:Nf
+            im_fdf_0_1.=0.
+            f_mm1 = f_mms[:,:,f1]  # CartesianIndex list for filter
+            f_val1 = f_vals[f1]  # Values for f_i
+            # for (ind, val) in zip(f_i, f_v)   # this is slower!
+
+            zv=f_val1.*im_fd_0[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2],f_mm1[3,1]:f_mm1[3,2]]
+            S1[f1] = sum(abs2.(zv))/(Nx*Ny*Nz)
+
+            zarr[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2],f_mm1[3,1]:f_mm1[3,2]]=zv
+
+            im_fdf_0_1[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2],f_mm1[3,1]:f_mm1[3,2]] .= abs.(zv)
+
+
+            im_rd_0_1=abs2.(P*FFTW.ifftshift(zarr))
+
+            zarr[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2],f_mm1[3,1]:f_mm1[3,2]] .= 0.
+
+            im_rd_0_1 .= sqrt.(im_rd_0_1)
+            im_fdf_1_1 = FFTW.fftshift(FFTW.fft(im_rd_0_1))
+            for f2 = 1:Nf
+                f_mm2 = f_mms[:,:,f2]
+                f_val2 = f_vals[f2]
+
+                S2[f1,f2] = sum(abs2.(f_val2 .* im_fdf_1_1[f_mm2[1,1]:f_mm2[1,2],f_mm2[2,1]:f_mm2[2,2],f_mm2[3,1]:f_mm2[3,2]] ))/(Nx*Ny*Nz)
+
+                if !doS12
+                    continue
+                end
+
+                if f2>f1
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
+                if f_mm1[1,1]>f_mm2[1,2] || f_mm2[1,1]>f_mm1[1,2] || f_mm1[2,1]>f_mm2[2,2] || f_mm2[2,1]>f_mm1[2,2] || f_mm1[3,1]>f_mm2[3,2] || f_mm2[3,1]>f_mm1[3,2]
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
+                mx=max(f_mm1[1,1],f_mm2[1,1])
+                my=max(f_mm1[2,1],f_mm2[2,1])
+                mz=max(f_mm1[3,1],f_mm2[3,1])
+                Mx=min(f_mm1[1,2],f_mm2[1,2])
+                My=min(f_mm1[2,2],f_mm2[2,2])
+                Mz=min(f_mm1[3,2],f_mm2[3,2])
+                sfx=Mx-mx
+                sfy=My-my
+                sfz=Mz-mz
+                st1x=mx-f_mm1[1,1]+1
+                st1y=my-f_mm1[2,1]+1
+                st1z=mz-f_mm1[3,1]+1
+                st2x=mx-f_mm2[1,1]+1
+                st2y=my-f_mm2[2,1]+1
+                st2z=mz-f_mm2[3,1]+1
+
+                S12[f1,f2]=sum(f_val1[st1x:st1x+sfx,st1y:st1y+sfy,st1z:st1z+sfz].*f_val2[st2x:st2x+sfx,st2y:st2y+sfy,st2z:st2z+sfz].*abs2.(im_fd_0[mx:Mx,my:My,mz:Mz]))
+            end
         end
         append!(out_coeff,S0)
         append!(out_coeff, S1)
