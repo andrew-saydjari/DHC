@@ -1303,10 +1303,10 @@ module DHC_2DUtils
 
 
     function isoMaker(coeff, S1Mat, S2Mat)
-        NS1 = size(S1mat)[2]
-        NS2 = size(S2mat)[2]
-        S1iso = transpose(S1mat*transpose(coeff[:,2+1:2+NS1]))
-        S2iso = transpose(S2mat*transpose(coeff[:,2+NS1+1:2+NS1+NS2]))
+        NS1 = size(S1Mat)[2]
+        NS2 = size(S2Mat)[2]
+        S1iso = transpose(S1Mat*transpose(coeff[:,2+1:2+NS1]))
+        S2iso = transpose(S2Mat*transpose(coeff[:,2+NS1+1:2+NS1+NS2]))
         return hcat(coeff[:,1:2],S1iso,S2iso)
     end
 
