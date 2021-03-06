@@ -864,8 +864,10 @@ function derivtestS1S2(Nx; mode="slow")
         dS1dp, dS2dp = wst_S1S2_derivfast(im, fhash)
     end
 
-    der0=DHC(im0,fhash,doS2=true,doS20=false)
-    der1=DHC(im1,fhash,doS2=true,doS20=false)
+    der0=DHC_compute(im0,fhash,doS2=true,doS20=false, norm=false)
+    der1=DHC_compute(im1,fhash,doS2=true,doS20=false, norm=false)
+    #der0=DHC(im0,fhash,doS2=true,doS20=false)
+    #der1=DHC(im1,fhash,doS2=true,doS20=false)
     dSlim = (der1-der0) ./ eps
     Nf = length(fhash["filt_index"])
     lasts1ind = 2+Nf
@@ -875,7 +877,7 @@ function derivtestS1S2(Nx; mode="slow")
     if mode!="fourier"
         dS1dp_23 = dS1dp[2, 3, :]
     end
-    dS2dp_23 = dS2dp[:, :, 2, 3]
+    dS2dp_23 = dS2dp[2, 3, :, :]
     #=
     println("Checking dS1dp using existing deriv")
     Nf = length(fhash["filt_index"])
@@ -927,18 +929,14 @@ function derivtestS1S2(Nx; mode="slow")
     print(txt)
     println("Derivative Values")
     println("Using Newton lim")
-    println(dS2lim23)
+    println(dS2lim23[:])
     println("Using dS2")
-    println(dS2dp_23)
+    println(dS2dp_23[:])
     println(size(dS2dp_23), Nf^2)
-
-    #plot(dS[3:end])
-    #plot!(blarg[2,3,:])
-    #plot(diff)
     return reshape(dS2dp_23, (Nf, Nf)), reshape(dS2lim23, (Nf, Nf))
 end
 
-dS2code, dS2lim = derivtestS1S2(16, mode="fast")
+dS2code, dS2lim = derivtestS1S2(16, mode="fast") #THIS WORKS with dhc AND NOT WITH dhc compute; FIGURE OUT WHY DERIV UTILS DIDNT
 
 #=OLD
 function derivtestS1S2(Nx)

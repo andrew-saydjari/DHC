@@ -187,6 +187,7 @@ function img_reconfunc_coeffmask(input, filter_hash, s_targ_mean, s_targ_invcov,
             s_curr = Deriv_Utils.DHC(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=false, doS12=true, doS20=false)[coeff_mask]
             diff = s_curr - s_targ_mean
             dS12 = reshape(permutedims(Deriv_Utils.wst_S12_deriv(reshape(img_curr, (Nx, Nx)), filter_hash), [3, 4, 1, 2]), (Nx^2, Nf^2)) #Nf, Nf, Nx, Nx -> (Nx^2, Nf^2)
+            println(size(dS12))
             dS12 = dS12[:, coeff_mask[3+Nf:end]] #Nx^2 * |SelCoeff|
             dS12[pixmask, :] .= 0   #Zeroing out wrt fixed pix
             term1 = s_targ_invcov * diff #CHECK: Same as diff^Cinv? Nf^2 x1
