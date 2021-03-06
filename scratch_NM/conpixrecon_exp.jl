@@ -1050,8 +1050,85 @@ response = Plotly.plot(data, layout)
 
 #plot_url = response["url"]
 #Experiment 4: With S12
+#Code check above
+#Now, with log of image
+dust = Float64.(readdust())
+dust = dust[1:256,1:256]
+Nx=32
+img = dust[1:Nx, 1:Nx]
+oriimg = copy(img)
+img = log.(img)
+
+Omega_bool = true
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=Omega_bool)
+Nf = length(fhash["filt_index"])
+#fixmask = rand(Nx,Nx) .< 0.1
+noise = reshape(rand(Normal(0, std(oriimg)), Nx^2), (Nx, Nx))
+init = oriimg+ noise
+init = imfilter(init, Kernel.gaussian(0.8))
+init = log.(init)
+#Mask cons
+s12w, covs12 = S12_weights(img, fhash, 100, iso=doiso)
+incl= (s12w.!=0)
+invcovar = Diagonal(s12w.^(-2))
+s12targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=false, doS20=false, doS12=true, norm=false, iso=doiso)
+#myfoogens20_100itn = img_reconfunc_old(init, s20targ,  invcovar, fixmask, "S20", Dict([("iterations", 100)]))
+incl[1:Nf+2] .= 0 #removing S0 and redundant S1
+S12recon = img_reconfunc_coeffmask(init, fhash, s12targ[incl], invcovar[incl, incl], fixmask, Dict([("iterations", 100)]), coeff_mask = incl,
+ coeff_type="S12")
+heatmap(img)
+heatmap(init)
+heatmap(S12recon)
+#plot_synth_QA(img, init, S12recon, fhash, fname="scratch_NM/TestPlots/s12_100itns.png")
+pl12 = plot(
+    heatmap(oriimg, title="I_GT: Ground Truth"),
+    heatmap(exp.(init), title="I_GT+N(0, std(I_GT))"),
+    heatmap(exp.(S12recon),title= "Reconstruction w S12"),
+    heatmap(exp.(S12recon) - oriimg, title="Residual");
+    layout=4,
+)
+plot!(size=(1000, 800))
+savefig(pl12, "scratch_NM/TestPlots/s12_100itns_logIgd_smoothgk0-8.png")
+#Without smoothing
+mean(abs.(exp.(S12recon) - oriimg)) #2.54
+mean(abs.((exp.(S12recon) - oriimg)./oriimg)) #0.03
 
 
+####S2#########
+epsilon=1e-5
+dust = Float64.(readdust())
+dust = dust[1:256,1:256]
+img = dust[1:Nx, 1:Nx]
+doiso  = false
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(N1iso, Nf)    = size(fhash["S1_iso_mat"])
+i0 = 3+(doiso ? N1iso : Nf)
+img    = imresize(dust,(Nx,Nx))
+fixmask = rand(Nx,Nx) .< 0.1
+fixmask = falses(Nx, Nx)
+#Sanity check: fixmask = trues(Nx, Nx). Was 0.
+noise = reshape(rand(Normal(0, std(oriimg)), Nx^2), (Nx, Nx))
+init = oriimg+ noise
+
+s2targ = DHC_2DUtils.DHC_compute(img, fhash, doS2=true, doS20=false, norm=false, iso=doiso)
+s2w, cov = S2_weights(img, fhash, 100, iso=doiso)
+s2w[findall(s2w .< epsilon)] .= s2w[findall(s2w .< epsilon)] .+ 1e-5
+
+invcovarS2 = Diagonal(s2w.^(-2))
+#Profile.clear()
+reconS2cgeps_check = img_reconfunc_coeffmask(init, fhash, s2targ,  invcovarS2, fixmask, Dict([("iterations", 100)]))
+pl12 = plot(
+    heatmap(img, title="I_GT: Ground Truth"),
+    heatmap(init, title="I_GT+N(0, std(I_GT))"),
+    heatmap(reconS2cgeps_check,title= "Reconstruction w S12"),
+    heatmap(reconS2cgeps_check - img, title="Residual");
+    layout=4,
+)
+plot!(size=(1000, 800))
+savefig(pl12, "scratch_NM/TestPlots/s2_100itns_logIgd_smoothgk0-8.png")
+#Without smoothing
+mean(abs.(exp.(S12recon) - oriimg)) #2.54
+mean(abs.((exp.(S12recon) - oriimg)./oriimg))
 
 
 ###Old DEBUG SECTION: Isolated funcs for debugging
