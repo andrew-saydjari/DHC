@@ -19,7 +19,7 @@ push!(LOAD_PATH, pwd()*"/scratch_NM")
 using Deriv_Utils_New
 
 
-
+#Jacobian Test Funcs
 function derivtestS1(Nx)
    eps = 1e-4
    fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
@@ -152,6 +152,79 @@ function derivtestS12(Nx)
     return reshape(dS12dp[2, 3, :, :], (Nf, Nf)), reshape(dS[i0:end], (Nf, Nf))
 end
 
-ds1code, ds1lim, ds2code, ds2lim = derivtestS1S2(16)
+#Deriv sum test funcs
+function dS1S2sum_combtest(fhash) #Tested for non-iso
+    (Nf, )    = size(fhash["filt_index"])
+    Nx        = fhash["npix"]
+    im = rand(Nx,Nx)
+    mywts = rand(Nf + (Nf*Nf))
+    println(size(mywts))
 
+    # Use new faster code
+    sum1 = Deriv_Utils_New.wst_S1S2_derivsum_comb(im, fhash, mywts)
+    wts1 = reshape(mywts[1:Nf], (Nf, 1))
+    dwS1 = reshape(Deriv_Utils_New.wst_S1_deriv(im, fhash), (Nx^2, Nf)) * wts1
+
+    # Compare to established code
+    dS1S2dp = Deriv_Utils_New.wst_S1S2_deriv(im, fhash)
+    dS1dp = dS1S2dp[:, :, 1:Nf]
+    dS2dp = dS1S2dp[:, :, Nf+1:end]
+    term1 = reshape(dS1dp, (Nx^2, Nf)) * reshape(mywts[1:Nf], (Nf, 1))
+    sum2 = zeros(Float64, Nx, Nx)
+    for i=1:Nf*Nf sum2 += (dS2dp[:,:,i].*mywts[i+Nf]) end
+    dScomb_brute = term1 + reshape(sum2, (Nx^2, 1))
+
+    println("tot abs mean", mean(abs.(dScomb_brute -sum1)))
+    println("tot Stdev: ",std(dScomb_brute-sum1))
+    println("Ratio: ", mean(dScomb_brute./sum1))
+    println("S1")
+    println("Abs mean", mean(abs.(term1 - dwS1)))
+    println("Abs mean", std(term1 - dwS1))
+    println("Ratio: ", mean(term1./dwS1))
+    println("S2 separate")
+    sum1 = Deriv_Utils_New.wst_S2_deriv_sum(im, fhash, reshape(mywts[Nf+1:end], (Nf, Nf)))
+    sum2 = zeros(Float64, Nx, Nx)
+    for i=1:Nf*Nf sum2 += (dS2dp[:,:,i].*mywts[Nf+i]) end
+    sum2 = reshape(sum2, (Nx^2, 1))
+    println("abs mean", mean(abs.(sum2 -sum1)))
+    println("Stdev: ",std(sum1-sum2))
+    println("Ratio: ", mean(sum2./sum1))
+    return
+end
+
+function dS20sum_test(fhash) #Adapted from sandbox.jl
+    (Nf, )    = size(fhash["filt_index"])
+    Nx        = fhash["npix"]
+    im = rand(Nx,Nx)
+    mywts = rand(Nf*Nf)
+
+    # this is symmetrical, but not because S20 is symmetrical!
+    wtgrid = reshape(mywts, Nf, Nf) + reshape(mywts, Nf, Nf)'
+    wtvec  = reshape(wtgrid, Nf*Nf)
+
+    # Use new faster code
+    sum1 = Deriv_Utils_New.wst_S20_deriv_sum(im, fhash, wtgrid, 1)
+
+    # Compare to established code
+    dS20 = reshape(Deriv_Utils_New.wst_S20_deriv(im, fhash, 1),Nx,Nx,Nf*Nf)
+    sum2 = zeros(Float64, Nx, Nx)
+    for i=1:Nf*Nf sum2 += (dS20[:,:,i].*mywts[i]) end
+    sum2 = reshape(sum2, (Nx^2, 1))
+    println("Abs mean", mean(abs.(sum2 - sum1)))
+    println("Abs mean", std(sum2 - sum1))
+    println("Ratio: ", mean(sum2./sum1))
+    return
+end
+
+
+
+
+#Calling functions############################################
+ds1code, ds1lim, ds2code, ds2lim = derivtestS1S2(16)
 ds12code, ds12lim = derivtestS12(16)
+
+Nx=16
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+dS1S2sum_combtest(fhash)
+
+dS20sum_test(fhash)

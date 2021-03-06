@@ -1027,7 +1027,27 @@ function derivtestS20(Nx)
     return
 end
 
+function dS2sum_test(fhash) #DerivsumS2 works here
+    (Nf, )    = size(fhash["filt_index"])
+    Nx        = fhash["npix"]
+    im = rand(Nx,Nx)
+    mywts = rand(Nf*Nf)
 
+    wtvec  = reshape(mywts, (Nf, Nf))
+
+    # Use new faster code
+    sum1 = wst_S2_deriv_sum(im, fhash, wtvec)
+
+    # Compare to established code
+    dS1dp, dS2dp = wst_S1S2_derivfast(im, fhash)
+    dS2dp = reshape(dS2dp, (Nx, Nx, Nf^2))
+    sum2 = zeros(Float64, Nx, Nx)
+    for i=1:Nf*Nf sum2 += (dS2dp[:,:,i].*mywts[i]) end
+    println("abs mean", mean(abs.(sum2 -sum1)))
+    println("Stdev: ",std(sum1-sum2))
+
+    return
+end
 
 
 derivtestS1S2(16, mode="fast")

@@ -38,6 +38,14 @@ end
 fjac = Zygote.pullback(proxy, [3, 4])
 
 
+arr = rand(256, 256)
+@time foo1 = arr[:]
+@time foo2 = reshape(arr, (256*256)) #100x faster
+
+#0.000214 seconds (2 allocations: 512.078 KiB)
+#0.000004 seconds (2 allocations: 80 bytes)
+
+
 #DIFFERENT REVERSEDIFF CONFIGS: Which is the fastest reversediff?
 #Zyg.forward_jacobian doesnt work: No method matching DHC.FwdDiff
 #Zyg.gradient only works if the output is scalar. Can try to benchmark with the chisq function.

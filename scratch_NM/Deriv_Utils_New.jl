@@ -148,11 +148,11 @@ module Deriv_Utils_New
         return dS20dα
     end
 
-    function wst_S12_deriv(image::Array{Float64,2}, filter_hash::Dict)
+    function wst_S12_deriv(image::Array{Float64,2}, filter_hash::Dict, FFTthreads::Int=1)
         #=
         output: Nx, Nx, Nf, Nf
         =#
-        FFTW.set_num_threads(2)
+        FFTW.set_num_threads(FFTthreads)
 
         # array sizes
         (Nx, Ny)  = size(image)
@@ -209,12 +209,12 @@ module Deriv_Utils_New
         return permutedims(dS12, [3, 4, 1, 2]) #MODIFIED
     end
 
-    function wst_S1S2_deriv(image::Array{Float64,2}, filter_hash::Dict)
+    function wst_S1S2_deriv(image::Array{Float64,2}, filter_hash::Dict, FFTthreads::Int=1)
         #=
         output: Nx, Nx, Nf+Nf^2
         =#
         # Use 2 threads for FFT
-        FFTW.set_num_threads(2)
+        FFTW.set_num_threads(FFTthreads)
 
         # array sizes
         (Nx, Ny)  = size(image)
@@ -305,4 +305,132 @@ module Deriv_Utils_New
         return permutedims(vcat(dS1dp, reshape(dS2dp, (Nf^2, Nx, Nx))), [2, 3, 1]) #Mod #MODIFIED
     end
 
+    #Chi-Square Derivatives#####################################################
+    function wst_S2_deriv_sum(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64}, FFTthreads::Int=1)
+        #=
+        output:
+        =#
+        FFTW.set_num_threads(FFTthreads)
+
+        # array sizes
+        (Nx, Ny)  = size(image)
+        (Nf, )    = size(filter_hash["filt_index"])
+
+        if size(wt)!=(Nf, Nf) error("Wt has wrong shape") end
+
+        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val   = filter_hash["filt_value"]
+        f_ind_rev = [[CartesianIndex(mod1(Nx+2 - ci[1],Nx), mod1(Nx+2 - ci[2],Nx)) for ci in f_Nf] for f_Nf in f_ind]
+
+
+        im_fd_0 = fft(image)
+        P = plan_fft(im_fd_0)
+        Pi = plan_ifft(im_fd_0)
+        zarr1 = zeros(ComplexF64, Nx, Nx)
+        Ilam1 = zeros(ComplexF64, Nx, Nx)
+        fterm_bt1 = zeros(ComplexF64, Nx, Nx)
+        fterm_bt2 = zeros(ComplexF64, Nx, Nx)
+        ifterm = zeros(ComplexF64, Nx, Nx)
+        dLossdα = zeros(Float64, Nx, Nx)
+        for f1=1:Nf
+            vlam1 = zeros(ComplexF64, Nx, Nx) #defined for each lambda1, computed by summing over lambda2
+            f_i1 = f_ind[f1]
+            f_v1 = f_val[f1]
+            f_i1rev = f_ind_rev[f1]
+
+            zarr1[f_i1] = im_fd_0[f_i1] .* f_v1
+            zarr1_rd = Pi*(zarr1)
+            Ilam1 = abs.(zarr1_rd)
+            fIlam1 = P*Ilam1
+
+            for f2=1:Nf
+                f_i2 = f_ind[f2]
+                f_v2 = f_val[f2]
+                vlam1[f_i2] += wt[f1, f2] .* f_v2.^2
+            end
+            #vlam1= sum_λ2 w.ψl1,l2^2
+            vlam1 = (Pi*(fIlam1 .* vlam1))./Ilam1 #sum over f2 -> (Nx, Nx) -> real space Vλ1/Iλ1
+            fterm_bt1 = P*(vlam1 .* zarr1_rd)
+            fterm_bt2 = P*(vlam1 .* conj.(zarr1_rd))
+            ifterm[f_i1] = fterm_bt1[f_i1] .* f_v1
+            ifterm[f_i1rev] += fterm_bt2[f_i1rev] .* f_v1
+            dLossdα += real.(Pi*ifterm)
+
+            #zero out alloc
+            zarr1[f_i1] .= 0
+            ifterm[f_i1] .=0
+            ifterm[f_i1rev] .=0
+
+        end
+        return reshape(dLossdα, (Nx^2, 1))
+
+    end
+
+    function wst_S1S2_derivsum_comb(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64}, FFTthreads::Int=1)
+        FFTW.set_num_threads(FFTthreads)
+        # array sizes
+        (Nx, Ny)  = size(image)
+        (Nf, )    = size(filter_hash["filt_index"])
+
+        if size(wt)!=(Nf + (Nf*Nf),) error("Wt has wrong shape: the argument should contain both S1 and S2 weights") end
+        wts1 = reshape(wt[1:Nf], (Nf, 1))
+        wts2 = reshape(wt[Nf+1:end], (Nf, Nf))
+
+        dwS1 = reshape(wst_S1_deriv(image, filter_hash), (Nx^2, Nf)) * wts1 #NOTE: Replace this with DHC_2DUtils.wst_S1_deriv
+        dwS2 = reshape(wst_S2_deriv_sum(image, filter_hash, wts2), (Nx^2, 1))
+        #println(size(dwS1), size(dwS2))
+        return dwS1 + dwS2 #Why was another reshape needed here?
+
+    end
+
+    function wst_S20_deriv_sum(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64}, FFTthreads::Int=1)
+        # Sum over (f1,f2) filter pairs for S20 derivative.  This is much faster
+        #   than calling wst_S20_deriv() because the sum can be moved inside the FFT.
+        # Use FFTthreads threads for FFT -- but for Nx<512 FFTthreads=1 is fastest.  Overhead?
+        # On Cascade Lake box, 4 is good for 2D, 8 or 16 for 3D FFTs
+        FFTW.set_num_threads(FFTthreads)
+
+        # array sizes
+        (Nx, Ny)  = size(image)
+        (Nf, )    = size(filter_hash["filt_index"])
+
+        # allocate image arrays for internal use
+        Uvec   = Array{ComplexF64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+        im_rd  = Array{Float64, 3}(undef, Nx, Ny, Nf)  # real domain, complex
+        im_fd  = fft(image)
+
+        # unpack filter_hash
+        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val   = filter_hash["filt_value"]
+        zarr    = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
+
+        # make a FFTW "plan" a complex array, both forward and inverse transform
+        P_fft  = plan_fft(im_fd)   # P_fft is an operator,  P_fft*im is fft(im)
+        P_ifft = plan_ifft(im_fd)  # P_ifft is an operator, P_ifft*im is ifft(im)
+
+        # Loop over filters
+        for f = 1:Nf
+            f_i = f_ind[f]  # CartesianIndex list for filter
+            f_v = f_val[f]  # Values for f_i
+
+            zarr[f_i] = f_v .* im_fd[f_i]
+            Z_λ = P_ifft*zarr  # complex valued ifft of zarr
+            zarr[f_i] .= 0     # reset zarr for next loop
+            im_rd[:,:,f] = abs.(Z_λ)
+            Uvec[:,:,f]  = Z_λ ./ im_rd[:,:,f]
+        end
+
+        zarr = zeros(ComplexF64, Nx, Nx)  # temporary array to fill with zvals
+        for f2 = 1:Nf
+            f_i = f_ind[f2]  # CartesianIndex list for filter
+            f_v = f_val[f2]  # Values for f_i
+
+            Wtot = reshape( reshape(im_rd,Nx*Nx,Nf)*wt[:,f2], Nx, Nx)
+            temp = P_fft*(Wtot.*Uvec[:,:,f2])
+            zarr[f_i] .+= f_v .* temp[f_i]
+        end
+        ΣdS20dα = real.(P_ifft*zarr)
+
+        return reshape(ΣdS20dα, (Nx^2, 1))
+    end
 end

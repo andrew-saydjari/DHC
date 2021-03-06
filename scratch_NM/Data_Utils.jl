@@ -16,8 +16,6 @@ using LinearAlgebra
 push!(LOAD_PATH, pwd()*"/main")
 using DHC_2DUtils
 
-
-
 function readdust(Nx)
 
     RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
