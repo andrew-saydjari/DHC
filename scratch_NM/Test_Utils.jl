@@ -255,7 +255,8 @@ end
 function imgreconS2test(Nx, pixmask)
     img = readdust(Nx)
     fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-    noise = reshape(rand(Normal(0.0, std(img)), Nx^2), (Nx, Nx))
+    #noise = reshape(rand(Normal(0.0, std(img)), Nx^2), (Nx, Nx))
+    noise = rand(Nx, Nx).*50 .- 25
     init = img+noise
     init = imfilter(init, Kernel.gaussian(1.0))
 
@@ -264,7 +265,14 @@ function imgreconS2test(Nx, pixmask)
     mask[1]=false
     mask[2]=false
     println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask))
-    recon_img = Deriv_Utils_New.image_recon_S2derivsum(init, fhash, s2w[mask], s2icov[mask, mask], pixmask, coeff_mask=mask)
+    recon_img = Deriv_Utils_New.image_recon_S2derivsum(init, fhash, s2w[mask], s2icov[mask, mask], pixmask, coeff_mask=mask, optim_settings=Dict([("iterations", 1000)]))
+    pl12 = plot(
+        heatmap(img, title="Ground Truth"),
+        heatmap(init, title="GT+N(0, std(I))"),
+        heatmap(recon_img,title= "Reconstruction w S12"),
+        heatmap(recon_img - img, title="Residual");
+        layout=4,
+    )
 end
 
 
@@ -282,3 +290,5 @@ dS20sum_test(fhash)
 #Image Recon tests############################################
 #S2 with no pixmask, coeff_mask for large selection
 imgreconS2test(16, falses((16, 16)))
+
+#Check if there's a normalization difference between the deriv sum and the old prescription
