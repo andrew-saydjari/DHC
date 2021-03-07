@@ -10,6 +10,7 @@ using Printf
 using Revise
 using Profile
 using LinearAlgebra
+using Distributions
 
 push!(LOAD_PATH, pwd()*"/main")
 using DHC_2DUtils
@@ -17,7 +18,42 @@ using DHC_2DUtils
 #import Deriv_Utils_New
 push!(LOAD_PATH, pwd()*"/scratch_NM")
 using Deriv_Utils_New
+using Data_Utils
 
+#Remove later
+function readdust(Nx)
+
+    RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
+    img = reinterpret(UInt8,rawview(channelview(RGBA_img)))
+
+    return convert.(Float64, img[1,:,:][1:Nx, 1:Nx])
+end
+
+function S2_weights(im, fhash, Nsam=10; iso=false)
+
+    (Nx, Ny)  = size(im)
+    if Nx != Ny error("Input image must be square") end
+    (N1iso, Nf)    = size(fhash["S1_iso_mat"])
+
+    # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+
+    S2   = DHC_compute(im, fhash, doS2=true, doS20=false, norm=false, iso=iso)
+    Ns    = length(S2)
+    S2arr = zeros(Float64, Ns, Nsam)
+    println("Ns", Ns)
+    for j=1:Nsam
+        noise = rand(Nx,Nx)
+        S2arr[:,j] = DHC_compute(im+noise, fhash, doS2=true, doS20=false, norm=false, iso=iso)
+    end
+    wt = zeros(Float64, Ns)
+    for i=1:Ns
+        wt[i] = std(S2arr[i,:])
+    end
+    msub = S2arr .- mean(S2arr, dims=2)
+    cov = (msub * msub')./(Nsam-1)
+
+    return wt, cov
+end
 
 #Jacobian Test Funcs
 function derivtestS1(Nx)
@@ -30,8 +66,8 @@ function derivtestS1(Nx)
    im1[2,3] += eps/2
    im0[2,3] -= eps/2
    blarg = Deriv_Utils_New.wst_S1_deriv(im, fhash)
-   der0=DHC_compute(im0,fhash,doS2=false)
-   der1=DHC_compute(im1,fhash,doS2=false)
+   der0=DHC_compute(im0,fhash,doS2=false,norm=false)
+   der1=DHC_compute(im1,fhash,doS2=false,norm=false)
    dS = (der1-der0) ./ eps
 
    diff_old = dS[3:end]-blarg[2,3,:]
@@ -39,9 +75,9 @@ function derivtestS1(Nx)
    println(dS[3:end])
    println("and")
    println(blarg[2,3,:])
-   println("Mean abs | Mean abs frac", mean(abs.(diff_old)), mean(abs.(diff_old./dS)))
+   println("Mean abs | Mean abs frac", mean(abs.(diff_old)), mean(abs.(diff_old./dS[3:end])))
    println("stdev: ",std(diff_old))
-   return
+   return blarg[2, 3, :], dS[3:end]
 end
 
 function derivtestS1S2(Nx) #MUST RUN DHC_COMPUTE WITH NORM=FALSE.
@@ -216,10 +252,24 @@ function dS20sum_test(fhash) #Adapted from sandbox.jl
     return
 end
 
+function imgreconS2test(Nx, pixmask)
+    img = readdust(Nx)
+    fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+    noise = reshape(rand(Normal(0.0, std(img)), Nx^2), (Nx, Nx))
+    init = img+noise
+    init = imfilter(init, Kernel.gaussian(1.0))
 
+    s2w, s2icov = S2_weights(img, fhash, 10, iso=false)
+    mask = s2w .>= 1e-5
+    mask[1]=false
+    mask[2]=false
+    println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask))
+    recon_img = Deriv_Utils_New.image_recon_S2derivsum(init, fhash, s2w[mask], s2icov[mask, mask], pixmask, coeff_mask=mask)
+end
 
 
 #Calling functions############################################
+ds1code, ds1lim = derivtestS1(16)
 ds1code, ds1lim, ds2code, ds2lim = derivtestS1S2(16)
 ds12code, ds12lim = derivtestS12(16)
 
@@ -228,3 +278,7 @@ fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 dS1S2sum_combtest(fhash)
 
 dS20sum_test(fhash)
+
+#Image Recon tests############################################
+#S2 with no pixmask, coeff_mask for large selection
+imgreconS2test(16, falses((16, 16)))
