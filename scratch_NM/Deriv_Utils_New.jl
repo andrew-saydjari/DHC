@@ -447,7 +447,6 @@ module Deriv_Utils_New
 
         println("S2")
         pixmask = pixmask[:] #flattened: Nx^2s
-        #cpvals = copy(input[:])[pixmask] #constrained pix values
 
         if coeff_mask!=nothing
             #if iso error("Can't have both coeff_mask and iso currently") end
@@ -488,32 +487,12 @@ module Deriv_Utils_New
             s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=tonorm)[coeff_mask]
             diff = s_curr - s_targ_mean
             wts1s2 = zeros(Nf+Nf^2)
-            wtall = reshape(diff' * s_targ_invcov, num_freecoeff) #DEBUG: This isnt eval to zero when you test it outside
-            #=wts1[coeff_mask[3:Nf+2]] .= wtall[1:num_freecoeffS1] #WARNING: Assumes that mean, var not being optimized
-            wts2[coeff_mask[3+Nf:end]] .= wtall[num_freecoeffS1+1:end] #Len= Nz(coeff_mask). #Selection func for only S2 coeffs
-            #Works because coeff_mask is a boolean mask
-            #Since wst_S2_deriv_sum works with the full set of S2 weights, need to go back to Nf+Nf^2 length
-            =#
-            #println("Size",size(wts1s2[coeff_mask[3:end]]), "Size diff", size(diff), num_freecoeff, num_freecoeffS1, num_freecoeffS2)
+            wtall = reshape(diff' * s_targ_invcov, num_freecoeff)
             wts1s2[coeff_mask[3:end]] .= wtall
             dterm = wst_S1S2_derivsum_comb(reshape(img_curr, (Nx, Nx)), filter_hash, wts1s2, FFTthreads=FFTthreads)
             storage_grad .= reshape(dterm, (Nx^2, 1))
-            #=
-            #diff = diff
-            dS1S2 = Transpose(reshape(Deriv_Utils.wst_S1S2_derivfast(reshape(img_curr, (Nx, Nx)), filter_hash), (:, Nx^2))) #(Nf+Nf^2, Nx, Nx)->(Nx^2, Nf+Nf^2) Cant directly do this without handling S1 coeffs
-            dS1S2 = dS1S2[:, coeff_mask[3:end]] #Nx^2 * |SelCoeff|
-            dS1S2[pixmask, :] .= 0 #Zeroing out wrt fixed params
-            term1 = s_targ_invcov * diff #(Nf+Nf^2) or |SelCoeff| x 1
-            #WARNING: Uses the Deriv_Utils version of dS1S2. Need to rewrite if you want to use the DHC_2DUtils one.
-            #println("In dLoss:",size(diff), size(term1), size(term2))
-            #println(size(term1),size(term2),size(storage_grad))
-            mul!(storage_grad, dS1S2, term1) #Nx^2x1=#
-            #TODO: Move into one line
-            #S1contrib = reshape(wst_S1_deriv(reshape(img_curr, (Nx, Nx)), filter_hash), (Nx^2, Nf)) * reshape(wts1, (Nf, 1))
-            #S2contrib = reshape(Deriv_Utils.wst_S2_deriv_sum(reshape(img_curr, (Nx, Nx)), filter_hash, reshape(wts2, (Nf, Nf))), (Nx^2, 1))
-            #storage_grad .=( S1contrib + S2contrib) #
-            storage_grad[pixmask, 1] .= 0 # better way to do this by taking pixmask as an argument wst_s2_deriv_sum
-            return# meansub, wtall, wts1, wts2, S1contrib, S2contrib, storage_grad
+            storage_grad[pixmask, 1] .= 0 # better way to do this by taking pixmask as an argument wst_s2_deriv_sum?
+            return
         end
 
         #Debugging stuff
@@ -549,6 +528,7 @@ module Deriv_Utils_New
         return reshape(result_img, (Nx, Nx))
     end
 
+    #=
     function img_reconfunc_coeffmask(input, filter_hash, s_targ_mean, s_targ_invcov, pixmask, optim_settings; coeff_mask=nothing, coeff_type="S2")
         #=
         input: Initial image. When trues in pixmask, assumed to contain the correct value in those pixels.
@@ -697,5 +677,5 @@ module Deriv_Utils_New
         end
         return reshape(result_img, (Nx, Nx))
     end
-
+    =#
 end
