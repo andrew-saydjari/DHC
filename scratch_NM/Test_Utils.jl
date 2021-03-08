@@ -19,6 +19,7 @@ using DHC_2DUtils
 push!(LOAD_PATH, pwd()*"/scratch_NM")
 using Deriv_Utils_New
 using Data_Utils
+using Visualization
 
 #Remove later
 function readdust(Nx)
@@ -26,10 +27,13 @@ function readdust(Nx)
     RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
     img = reinterpret(UInt8,rawview(channelview(RGBA_img)))
 
-    return convert.(Float64, img[1,:,:][1:Nx, 1:Nx])
+    return imresize(Float64.(img[1,:,:])[1:256, 1:256], (Nx, Nx))
 end
 
-function S2_weights(im, fhash, Nsam=10; iso=false)
+function S2_uniweights(im, fhash; high=25, Nsam=10, iso=false, norm=true)
+    #=
+    Noise model: uniform[-high, high]
+    =#
 
     (Nx, Ny)  = size(im)
     if Nx != Ny error("Input image must be square") end
@@ -37,13 +41,13 @@ function S2_weights(im, fhash, Nsam=10; iso=false)
 
     # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 
-    S2   = DHC_compute(im, fhash, doS2=true, doS20=false, norm=false, iso=iso)
+    S2   = DHC_compute(im, fhash, doS2=true, doS20=false, norm=norm, iso=iso)
     Ns    = length(S2)
     S2arr = zeros(Float64, Ns, Nsam)
     println("Ns", Ns)
     for j=1:Nsam
-        noise = rand(Nx,Nx)
-        S2arr[:,j] = DHC_compute(im+noise, fhash, doS2=true, doS20=false, norm=false, iso=iso)
+        noise = rand(Nx,Nx).*(2*high) .- high
+        S2arr[:,j] = DHC_compute(im+noise, fhash, doS2=true, doS20=false, norm=norm, iso=iso)
     end
     wt = zeros(Float64, Ns)
     for i=1:Ns
@@ -54,6 +58,156 @@ function S2_weights(im, fhash, Nsam=10; iso=false)
 
     return wt, cov
 end
+
+function DHC_old(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
+        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false)
+        # image        - input for WST
+        # filter_hash  - filter hash from fink_filter_hash
+        # filter_hash2 - filters for second order.  Default to same as first order.
+        # doS2         - compute S2 coeffs
+        # doS12        - compute S2 coeffs
+        # doS20        - compute S2 coeffs
+
+        # Use 2 threads for FFT
+        FFTW.set_num_threads(2)
+
+        # array sizes
+        (Nx, Ny)  = size(image)
+        if Nx != Ny error("Input image must be square") end
+        (Nf, )    = size(filter_hash["filt_index"])
+        if Nf == 0 error("filter hash corrupted") end
+
+        # allocate coeff arrays
+        out_coeff = []
+        S0  = zeros(Float64, 2)
+        S1  = zeros(Float64, Nf)
+        if doS2  S2  = zeros(Float64, Nf, Nf) end  # traditional 2nd order
+        if doS12 S12 = zeros(Float64, Nf, Nf) end  # Fourier correlation
+        if doS20 S20 = zeros(Float64, Nf, Nf) end  # real space correlation
+        anyM2 = doS2 | doS12 | doS20
+        anyrd = doS2 | doS20             # compute real domain with iFFT
+
+        # allocate image arrays for internal use
+        if doS12 im_fdf_0_1 = zeros(Float64,           Nx, Ny, Nf) end   # this must be zeroed!
+        if anyrd im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf) end
+
+        ## 0th Order
+        S0[1]   = mean(image)
+        norm_im = image.-S0[1]
+        S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
+        # norm_im ./= sqrt(Nx*Ny*S0[2])
+        # println("norm off")
+        norm_im = copy(image)
+
+        append!(out_coeff,S0[:])
+
+        ## 1st Order
+        im_fd_0 = fft(norm_im)  # total power=1.0
+
+        # unpack filter_hash
+        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val   = filter_hash["filt_value"]
+
+        zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
+
+        # make a FFTW "plan" for an array of the given size and type
+        if anyrd
+            P = plan_ifft(im_fd_0) end  # P is an operator, P*im is ifft(im)
+
+        ## Main 1st Order and Precompute 2nd Order
+        for f = 1:Nf
+            S1tot = 0.0
+            f_i = f_ind[f]  # CartesianIndex list for filter
+            f_v = f_val[f]  # Values for f_i
+            # for (ind, val) in zip(f_i, f_v)   # this is slower!
+            if length(f_i) > 0
+                for i = 1:length(f_i)
+                    ind       = f_i[i]
+                    zval      = f_v[i] * im_fd_0[ind]
+                    S1tot    += abs2(zval)
+                    zarr[ind] = zval        # filter*image in Fourier domain
+                    if doS12 im_fdf_0_1[ind,f] = abs(zval) end
+                end
+                S1[f] = S1tot/(Nx*Ny)  # image power
+                if anyrd
+                    im_rd_0_1[:,:,f] .= abs2.(P*zarr) end
+                zarr[f_i] .= 0
+            end
+        end
+        append!(out_coeff, S1[:]) #Why need the :?
+
+        # we stored the abs()^2, so take sqrt (this is faster to do all at once)
+        if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
+
+
+        if doS2
+            f_ind2   = filter_hash2["filt_index"]  # (J, L) array of filters represented as index value pairs
+            f_val2   = filter_hash2["filt_value"]
+
+            ## Traditional second order
+            for f1 = 1:Nf
+                thisim = fft(im_rd_0_1[:,:,f1])  # Could try rfft here
+                # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
+                # Loop over f2 and do second-order convolution
+                for f2 = 1:Nf
+                    f_i = f_ind2[f2]  # CartesianIndex list for filter
+                    f_v = f_val2[f2]  # Values for f_i
+                    # sum im^2 = sum(|fft|^2/npix)
+                    S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)
+                end
+            end
+            append!(out_coeff, S2) #Does this force S2 to flatten st f1 varies faster than f2?
+        end
+
+
+        # Fourier domain 2nd order
+        if doS12
+            Amat = reshape(im_fdf_0_1, Nx*Nx, Nf)
+            S12  = Amat' * Amat
+            append!(out_coeff, S12)
+        end
+
+
+        # Real domain 2nd order
+        if doS20
+            Amat = reshape(im_rd_0_1, Nx*Nx, Nf)
+            S20  = Amat' * Amat
+            append!(out_coeff, S20)
+        end
+
+
+        return out_coeff
+end
+
+function S2_whitenoiseweights(im, fhash; loc=0.0, sig=1.0, Nsam=10, iso=false, norm=true)
+    #=
+    Noise model: uniform[-high, high]
+    =#
+
+    (Nx, Ny)  = size(im)
+    if Nx != Ny error("Input image must be square") end
+    (N1iso, Nf)    = size(fhash["S1_iso_mat"])
+
+    # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+
+    S2   = DHC_compute(im, fhash, doS2=true, doS20=false, norm=norm, iso=iso)
+    Ns    = length(S2)
+    S2arr = zeros(Float64, Ns, Nsam)
+    println("Ns", Ns)
+    for j=1:Nsam
+        noise = reshape(rand(Normal(loc, sig),Nx^2), (Nx, Nx))
+        S2arr[:,j] = DHC_compute(im+noise, fhash, doS2=true, doS20=false, norm=norm, iso=iso)
+    end
+    wt = zeros(Float64, Ns)
+    for i=1:Ns
+        wt[i] = std(S2arr[i,:])
+    end
+    msub = S2arr .- mean(S2arr, dims=2)
+    cov = (msub * msub')./(Nsam-1)
+
+    return wt, cov
+end
+
 
 #Jacobian Test Funcs
 function derivtestS1(Nx)
@@ -239,10 +393,10 @@ function dS20sum_test(fhash) #Adapted from sandbox.jl
     wtvec  = reshape(wtgrid, Nf*Nf)
 
     # Use new faster code
-    sum1 = Deriv_Utils_New.wst_S20_deriv_sum(im, fhash, wtgrid, 1)
+    sum1 = Deriv_Utils_New.wst_S20_deriv_sum(im, fhash, wtgrid, FFTthreads=1)
 
     # Compare to established code
-    dS20 = reshape(Deriv_Utils_New.wst_S20_deriv(im, fhash, 1),Nx,Nx,Nf*Nf)
+    dS20 = reshape(Deriv_Utils_New.wst_S20_deriv(im, fhash, FFTthreads=1),Nx,Nx,Nf*Nf)
     sum2 = zeros(Float64, Nx, Nx)
     for i=1:Nf*Nf sum2 += (dS20[:,:,i].*mywts[i]) end
     sum2 = reshape(sum2, (Nx^2, 1))
@@ -252,27 +406,41 @@ function dS20sum_test(fhash) #Adapted from sandbox.jl
     return
 end
 
-function imgreconS2test(Nx, pixmask)
+function imgreconS2test(Nx, pixmask; norm=norm)
+    epsilon=1e-5
     img = readdust(Nx)
-    fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-    #noise = reshape(rand(Normal(0.0, std(img)), Nx^2), (Nx, Nx))
-    noise = rand(Nx, Nx).*50 .- 25
+    fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+    #img = (img .- mean(img))./std(img) #normalized
+    high = quantile(img[:], 0.75) - quantile(img[:], 0.5)
+    println("Added noise scale ", high)
+    #Std Normal
+    std_10pct = std(img)
+    noise = reshape(rand(Normal(0.0, std_10pct), Nx^2), (Nx, Nx))
     init = img+noise
-    init = imfilter(init, Kernel.gaussian(1.0))
+    #Uniform Added Noise
+    #noise = rand(Nx, Nx).*(2*high) .- high
+    #init = copy(img)#+noise
+    #init[1, 2] += 10.0
+    #init[23, 5] -= 25.0
+    init = imfilter(init, Kernel.gaussian(0.8))
 
-    s2w, s2icov = S2_weights(img, fhash, 10, iso=false)
-    mask = s2w .>= 1e-5
+    s2w, s2icov = S2_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_10pct) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+    s2targ = DHC_compute(img, fhash, doS2=true, norm=norm, iso=false)
+    mask = s2targ .>= epsilon
+
     mask[1]=false
     mask[2]=false
-    println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask))
-    recon_img = Deriv_Utils_New.image_recon_S2derivsum(init, fhash, s2w[mask], s2icov[mask, mask], pixmask, coeff_mask=mask, optim_settings=Dict([("iterations", 1000)]))
+    println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask), " Size s2targ, type ", typeof(s2targ[mask]), " Size s2w ", typeof(s2w[mask]))
+    #recon_img = Deriv_Utils_New.image_recon_S2derivsum(init, fhash, Float64.(s2targ[mask]), s2icov[mask, mask], pixmask, coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
+    recon_img = Deriv_Utils_New.img_reconfunc_coeffmask(init, fhash, s2targ[mask], s2icov[mask, mask], pixmask, Dict([("iterations", 500)]), coeff_mask=mask)
     pl12 = plot(
         heatmap(img, title="Ground Truth"),
         heatmap(init, title="GT+N(0, std(I))"),
-        heatmap(recon_img,title= "Reconstruction w S12"),
+        heatmap(recon_img,title= "Reconstruction w S2"),
         heatmap(recon_img - img, title="Residual");
         layout=4,
     )
+    return img, init, recon_img
 end
 
 
@@ -280,6 +448,7 @@ end
 ds1code, ds1lim = derivtestS1(16)
 ds1code, ds1lim, ds2code, ds2lim = derivtestS1S2(16)
 ds12code, ds12lim = derivtestS12(16)
+#All above work correctly for norm=false
 
 Nx=16
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
@@ -289,6 +458,27 @@ dS20sum_test(fhash)
 
 #Image Recon tests############################################
 #S2 with no pixmask, coeff_mask for large selection
-imgreconS2test(16, falses((16, 16)))
+img, init, recon = imgreconS2test(32, falses((32, 32)), norm=false)
+Visualization.plot_synth_QA(img, init, recon, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), fname="scratch_NM/TestPlots/WhiteNoiseS2tests/100pct_smooth.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+#Not working
+#Compare all quantities with the equivalentimgrecon code that didnt use derivsum and only uses coeff_mask
+#That fails with DHC_compute too. Try DHC_compute_old
 
-#Check if there's a normalization difference between the deriv sum and the old prescription
+
+#Examining S2w with new dhc-compute
+Nx=32
+img = readdust(Nx)
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(Nf,) = size(fhash["filt_index"])
+s2w, s2icov = S2_weights(img, fhash, 10, iso=false, norm=true)
+mask = s2w .>= 1e-5
+mask[1]=false
+mask[2]=false
+println("Max/Min coeffmasked S2w", maximum(s2w[mask]), minimum(s2w[mask]))
+println("Max/Min coeffmasked S2icov", maximum(s2icov[mask, mask]), minimum(s2icov[mask, mask]))
+
+
+#imggt = readdust(32)
+##starg = DHC_compute(imggt, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), doS2=true, iso=false, norm=false)
+#s2w, s2icov = S2_weights(imggt, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), 10, iso=false, norm=false)

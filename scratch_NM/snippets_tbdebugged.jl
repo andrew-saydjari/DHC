@@ -170,7 +170,4 @@ function realconv_test(Nx, ar1, ar2)
 #=#Inner function code
 #Code for img_reconfunc using wst_S2_deriv_sum: doesn't pass chi-square check even though inner machinery (derivsumcombtest, S1 and S2 separate, adding) all verified??
 
-
-
-
 =#
