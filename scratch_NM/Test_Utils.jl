@@ -414,16 +414,16 @@ function imgreconS2test(Nx, pixmask; norm=norm)
     high = quantile(img[:], 0.75) - quantile(img[:], 0.5)
     println("Added noise scale ", high)
     #Std Normal
-    std_10pct = std(img)
-    noise = reshape(rand(Normal(0.0, std_10pct), Nx^2), (Nx, Nx))
-    init = img+noise
+    #std_10pct = std(img)
+    #noise = reshape(rand(Normal(0.0, std_10pct), Nx^2), (Nx, Nx))
+    #init = img+noise
     #Uniform Added Noise
-    #noise = rand(Nx, Nx).*(2*high) .- high
-    #init = copy(img)#+noise
+    noise = rand(Nx, Nx).*(2*high) .- high
+    init = copy(img)+noise
     #init[1, 2] += 10.0
     #init[23, 5] -= 25.0
-    init = imfilter(init, Kernel.gaussian(0.8))
-
+    #init = imfilter(init, Kernel.gaussian(0.8))
+    std_10pct = std(img)
     s2w, s2icov = S2_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_10pct) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
     s2targ = DHC_compute(img, fhash, doS2=true, norm=norm, iso=false)
     mask = s2targ .>= epsilon
@@ -431,8 +431,8 @@ function imgreconS2test(Nx, pixmask; norm=norm)
     mask[1]=false
     mask[2]=false
     println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask), " Size s2targ, type ", typeof(s2targ[mask]), " Size s2w ", typeof(s2w[mask]))
-    #recon_img = Deriv_Utils_New.image_recon_S2derivsum(init, fhash, Float64.(s2targ[mask]), s2icov[mask, mask], pixmask, coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
-    recon_img = Deriv_Utils_New.img_reconfunc_coeffmask(init, fhash, s2targ[mask], s2icov[mask, mask], pixmask, Dict([("iterations", 500)]), coeff_mask=mask)
+    recon_img = Deriv_Utils_New.image_recon_S2derivsum(init, fhash, Float64.(s2targ[mask]), s2icov[mask, mask], pixmask, coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
+    #recon_img = Deriv_Utils_New.img_reconfunc_coeffmask(init, fhash, s2targ[mask], s2icov[mask, mask], pixmask, Dict([("iterations", 500)]), coeff_mask=mask)
     pl12 = plot(
         heatmap(img, title="Ground Truth"),
         heatmap(init, title="GT+N(0, std(I))"),
@@ -459,7 +459,7 @@ dS20sum_test(fhash)
 #Image Recon tests############################################
 #S2 with no pixmask, coeff_mask for large selection
 img, init, recon = imgreconS2test(32, falses((32, 32)), norm=false)
-Visualization.plot_synth_QA(img, init, recon, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), fname="scratch_NM/TestPlots/WhiteNoiseS2tests/100pct_smooth.png")
+Visualization.plot_synth_QA(img, init, recon, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), fname="scratch_NM/TestPlots/WhiteNoiseS2tests/100pct_simwhitenoise_addedunirand_nosmooth.png")
 mean(abs.(init - img)), mean(abs.(recon - img))
 #Not working
 #Compare all quantities with the equivalentimgrecon code that didnt use derivsum and only uses coeff_mask
