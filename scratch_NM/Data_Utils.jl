@@ -88,7 +88,7 @@ module Data_Utils
     end
 
 
-    function S20_whitenoiseweights(im, fhash; loc=0.0, sig=1.0, Nsam=10, iso=false, norm=true, smooth=false, smoothval=0.8)
+    function S20_whitenoiseweights(im, fhash; loc=0.0, sig=1.0, Nsam=10, iso=false, norm=true, smooth=false, smoothval=0.8, coeff_choice="S20")
         #=
         Noise model: N(0, std(I))
         =#
@@ -98,8 +98,11 @@ module Data_Utils
         (N1iso, Nf)    = size(fhash["S1_iso_mat"])
 
         # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-
-        S20   = DHC_compute(im, fhash, doS2=false, doS20=true, norm=norm, iso=iso)
+        if coeff_choice=="S12"
+            S20   = DHC_compute(im, fhash, doS2=false, doS20=false, doS12=true, norm=norm, iso=iso)
+        else
+            S20   = DHC_compute(im, fhash, doS2=false, doS20=true, norm=norm, iso=iso)
+        end
         Ns    = length(S20)
         S2arr = zeros(Float64, Ns, Nsam)
         println("Ns", Ns)
@@ -107,7 +110,11 @@ module Data_Utils
             noise = reshape(rand(Normal(loc, sig),Nx^2), (Nx, Nx))
             init = im+noise
             if smooth init = imfilter(init, Kernel.gaussian(smoothval)) end
-            S2arr[:,j] = DHC_2DUtils.DHC_compute(init, fhash, doS2=false, doS20=true, norm=norm, iso=iso)
+            if coeff_choice=="S12"
+                S2arr[:,j] = DHC_2DUtils.DHC_compute(init, fhash, doS2=false, doS20=false, doS12=true, norm=norm, iso=iso)
+            else
+                S2arr[:,j] = DHC_2DUtils.DHC_compute(init, fhash, doS2=false, doS20=true, norm=norm, iso=iso)
+            end
         end
         wt = zeros(Float64, Ns)
         for i=1:Ns

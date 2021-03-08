@@ -248,8 +248,7 @@ function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothed
         println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask), " Size s2targ, type ", typeof(s2targ[mask]), " Size s2w ", typeof(s2w[mask]))
         recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov[mask, mask], pixmask, "S2", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
         #recon_img = Deriv_Utils_New.img_reconfunc_coeffmask(init, fhash, s2targ[mask], s2icov[mask, mask], pixmask, Dict([("iterations", 500)]), coeff_mask=mask)
-    else
-        if coeff_choice!="S20" error("Not Implemented") end
+    elseif coeff_choice=="S20"
         img = readdust(Nx)
         fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
         (Nf,) = size(fhash["filt_index"])
@@ -273,6 +272,32 @@ function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothed
         s2targ = DHC_compute(img, fhash, doS2=false, doS20=true, norm=norm, iso=false)
         println("NF=", size(fhash["filt_index"]))
         recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov[mask, mask], pixmask, "S20", coeff_mask=nothing, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
+    else
+        if coeff_choice!="S12" error("Not implemented") end
+        img = readdust(Nx)
+        fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+        (Nf,) = size(fhash["filt_index"])
+        #img = (img .- mean(img))./std(img) #normalized
+        #high = quantile(img[:], 0.75) - quantile(img[:], 0.5)
+        #println("Added noise scale ", high)
+        #Std Normal
+        std_added = std(img)
+        noise = reshape(rand(Normal(0.0, std_added), Nx^2), (Nx, Nx))
+        init = img+noise
+        #Uniform Added Noise
+        #noise = rand(Nx, Nx).*(2*high) .- high
+        #init = copy(img)+noise
+        #init[1, 2] += 10.0
+        #init[23, 5] -= 25.0
+        if input_smoothed init = imfilter(init, Kernel.gaussian(0.8)) end
+        std_sim = std(img)
+        s2w, s2icov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=sim_smoothed, smoothval = sim_smoothedval, coeff_choice="S12") #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+        s2targ = DHC_compute(img, fhash, doS2=false, doS20=false, doS12=true, norm=norm, iso=false)
+        mask = s2targ .>= 1e-5
+        mask[1:Nf+2] .= false
+        println("Nf=", size(fhash["filt_index"]))
+        println("NumSelCoeffs=", count((i->(i==1)), mask))
+        recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov[mask, mask], pixmask, "S12", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
 
     end
     return img, init, recon_img
@@ -293,8 +318,8 @@ dS20sum_test(fhash)
 
 #Image Recon tests############################################
 #S2 with no pixmask, coeff_mask for large selection
-img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S20")
-Visualization.plot_synth_QA(img, init, recon, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), fname="scratch_NM/TestPlots/WhiteNoiseS2tests/S20_didnt_pass_chisq.png")
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S12")
+Visualization.plot_synth_QA(img, init, recon, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), fname="scratch_NM/TestPlots/WhiteNoiseS2tests/S20_passed_chisq.png")
 mean(abs.(init - img)), mean(abs.(recon - img))
 #Not working
 #Compare all quantities with the equivalentimgrecon code that didnt use derivsum and only uses coeff_mask
@@ -306,14 +331,21 @@ Nx=32
 img = readdust(Nx)
 fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (Nf,) = size(fhash["filt_index"])
-s2w, s2icov = S2_weights(img, fhash, 10, iso=false, norm=true)
+s2w, s2cov = S2_weights(img, fhash, 10, iso=false, norm=true)
 mask = s2w .>= 1e-5
 mask[1]=false
 mask[2]=false
 println("Max/Min coeffmasked S2w", maximum(s2w[mask]), minimum(s2w[mask]))
 println("Max/Min coeffmasked S2icov", maximum(s2icov[mask, mask]), minimum(s2icov[mask, mask]))
 
-
-#imggt = readdust(32)
-##starg = DHC_compute(imggt, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), doS2=true, iso=false, norm=false)
-#s2w, s2icov = S2_weights(imggt, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), 10, iso=false, norm=false)
+Nx=64
+img = readdust(Nx)
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(Nf,) = size(fhash["filt_index"])
+s2targ = DHC_compute(img, fhash, doS2=false, doS20=false, doS12=true, norm=false, iso=false)
+std_sim=std(img)
+s2w, s2icov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=false, smoothval =0.8, coeff_choice="S12") #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+mask = s2targ .>= 1e-5
+mask[1:Nf+2] .= false
+println("Nf=", size(fhash["filt_index"]))
+println("NumSelCoeffs=", count((i->(i==1)), mask))
