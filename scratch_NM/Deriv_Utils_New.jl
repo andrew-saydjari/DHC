@@ -429,7 +429,7 @@ module Deriv_Utils_New
             temp = P_fft*(Wtot.*Uvec[:,:,f2])
             zarr[f_i] .+= f_v .* temp[f_i]
         end
-        ΣdS20dα = real.(P_ifft*zarr)
+        ΣdS20dα = 2 .* real.(P_ifft*zarr) #added here
 
         return reshape(ΣdS20dα, (Nx^2, 1))
     end
@@ -576,7 +576,7 @@ module Deriv_Utils_New
             function dloss20(storage_grad, img_curr)
                 #storage_grad, img_curr must be (Nx^2, 1)
                 s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=false, doS12=false, doS20=true, norm=tonorm)[coeff_mask]
-                diff = 0.5 .* (s_curr - s_targ_mean)
+                diff = s_curr - s_targ_mean
                 wt = reshape(convert(Array{Float64, 2}, transpose(diff) * s_targ_invcov), (Nf, Nf))
                 dterm = wst_S20_deriv_sum(reshape(img_curr, (Nx, Nx)), filter_hash, wt, FFTthreads=FFTthreads)
                 storage_grad .= reshape(dterm, (Nx^2, 1))

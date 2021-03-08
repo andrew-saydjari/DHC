@@ -293,7 +293,7 @@ dS20sum_test(fhash)
 
 #Image Recon tests############################################
 #S2 with no pixmask, coeff_mask for large selection
-img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S2")
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S20")
 Visualization.plot_synth_QA(img, init, recon, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), fname="scratch_NM/TestPlots/WhiteNoiseS2tests/S20_didnt_pass_chisq.png")
 mean(abs.(init - img)), mean(abs.(recon - img))
 #Not working
