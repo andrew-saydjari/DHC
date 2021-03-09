@@ -435,7 +435,7 @@ module Deriv_Utils_New
     end
 
     #Image Reconstruction Funcs##########################################################
-    function image_recon_derivsum(input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov::Array{Float64, 2}, pixmask::BitArray{2}, coeff_choice;
+    function image_recon_derivsum(input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, pixmask::BitArray{2}, coeff_choice;
         FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), coeff_mask=nothing) #add iso here and a check that returns error if both coeffmask is not nothing and iso is present.
         #=
         Cases to be handled by this function:

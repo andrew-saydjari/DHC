@@ -220,7 +220,7 @@ function dS20sum_test(fhash) #Adapted from sandbox.jl
     return
 end
 
-function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothedval=0.8, input_smoothed=false, coeff_choice="S2")
+function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothedval=0.8, input_smoothed=false, coeff_choice="S2", invcov="Diagonal")
     if coeff_choice=="S2"
         epsilon=1e-5
         img = readdust(Nx)
@@ -239,14 +239,25 @@ function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothed
         #init[23, 5] -= 25.0
         if input_smoothed init = imfilter(init, Kernel.gaussian(0.8)) end
         std_sim = std(img)
-        s2w, s2icov = Data_Utils.S2_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=sim_smoothed, smoothval = sim_smoothedval) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
         s2targ = DHC_compute(img, fhash, doS2=true, norm=norm, iso=false)
+        #Mask
         mask = s2targ .>= epsilon
-
         mask[1]=false
         mask[2]=false
-        println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask), " Size s2targ, type ", typeof(s2targ[mask]), " Size s2w ", typeof(s2w[mask]))
-        recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov[mask, mask], pixmask, "S2", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
+        sig2, s2cov = Data_Utils.S2_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=sim_smoothed, smoothval = sim_smoothedval, coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+        sig2 = sig2[:]
+        println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask), " Size s2targ, type ", typeof(s2targ[mask]), " Size s2w ", typeof(sig2))
+
+        if invcov=="Diagonal"
+            s2icov = invert_covmat(sig2)
+        elseif invcov=="Diagonal+Eps"
+            s2icov = invert_covmat(sig2, 1e-10)
+        elseif invcov=="Full+Eps"
+            s2icov = invert_covmat(s2cov, 1e-10)
+        else#s2icov
+            s2icov = invert_covmat(s2cov)
+        end
+        recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov, pixmask, "S2", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
         #recon_img = Deriv_Utils_New.img_reconfunc_coeffmask(init, fhash, s2targ[mask], s2icov[mask, mask], pixmask, Dict([("iterations", 500)]), coeff_mask=mask)
     elseif coeff_choice=="S20"
         img = readdust(Nx)
@@ -266,20 +277,31 @@ function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothed
         #init[23, 5] -= 25.0
         if input_smoothed init = imfilter(init, Kernel.gaussian(0.8)) end
         std_sim = std(img)
-        s2w, s2icov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=sim_smoothed, smoothval = sim_smoothedval) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+        #Mask
         mask = trues(2+Nf+Nf^2)
         mask[1:2+Nf] .= false
         s2targ = DHC_compute(img, fhash, doS2=false, doS20=true, norm=norm, iso=false)
         println("NF=", size(fhash["filt_index"]))
-        recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov[mask, mask], pixmask, "S20", coeff_mask=nothing, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
+
+        sig2, s2cov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=sim_smoothed, smoothval = sim_smoothedval, coeff_mask=mask, coeff_choice="S20") #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+        sig2 = sig2[:]
+        println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask), " Size s2targ, type ", typeof(s2targ[mask]), " Size s2w ", typeof(sig2))
+
+        if invcov=="Diagonal"
+            s2icov = invert_covmat(sig2)
+        elseif invcov=="Diagonal+Eps"
+            s2icov = invert_covmat(sig2, 1e-10)
+        elseif invcov=="Full+Eps"
+            s2icov = invert_covmat(s2cov, 1e-10)
+        else#s2icov
+            s2icov = invert_covmat(s2cov)
+        end
+        recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov, pixmask, "S20", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
     else
         if coeff_choice!="S12" error("Not implemented") end
         img = readdust(Nx)
         fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
         (Nf,) = size(fhash["filt_index"])
-        #img = (img .- mean(img))./std(img) #normalized
-        #high = quantile(img[:], 0.75) - quantile(img[:], 0.5)
-        #println("Added noise scale ", high)
         #Std Normal
         std_added = std(img)
         noise = reshape(rand(Normal(0.0, std_added), Nx^2), (Nx, Nx))
@@ -291,13 +313,24 @@ function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothed
         #init[23, 5] -= 25.0
         if input_smoothed init = imfilter(init, Kernel.gaussian(0.8)) end
         std_sim = std(img)
-        s2w, s2icov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=sim_smoothed, smoothval = sim_smoothedval, coeff_choice="S12") #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
         s2targ = DHC_compute(img, fhash, doS2=false, doS20=false, doS12=true, norm=norm, iso=false)
+        #Mask
         mask = s2targ .>= 1e-5
         mask[1:Nf+2] .= false
-        println("Nf=", size(fhash["filt_index"]))
-        println("NumSelCoeffs=", count((i->(i==1)), mask))
-        recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov[mask, mask], pixmask, "S12", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
+        sig2, s2cov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=sim_smoothed, smoothval = sim_smoothedval, coeff_choice="S12", coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+        sig2 = sig2[:]
+        println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask), " Size s2targ, type ", typeof(s2targ[mask]), " Size s2w ", typeof(sig2))
+
+        if invcov=="Diagonal"
+            s2icov = invert_covmat(sig2)
+        elseif invcov=="Diagonal+Eps"
+            s2icov = invert_covmat(sig2, 1e-10)
+        elseif invcov=="Full+Eps"
+            s2icov = invert_covmat(s2cov, 1e-10)
+        else#s2icov
+            s2icov = invert_covmat(s2cov)
+        end
+        recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov, pixmask, "S12", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
 
     end
     return img, init, recon_img
@@ -318,7 +351,7 @@ dS20sum_test(fhash)
 
 #Image Recon tests############################################
 #S2 with no pixmask, coeff_mask for large selection
-img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S12")
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S2", invcov="Diagonal")
 Visualization.plot_synth_QA(img, init, recon, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), fname="scratch_NM/TestPlots/WhiteNoiseS2tests/S20_passed_chisq.png")
 mean(abs.(init - img)), mean(abs.(recon - img))
 #Not working
@@ -349,3 +382,98 @@ mask = s2targ .>= 1e-5
 mask[1:Nf+2] .= false
 println("Nf=", size(fhash["filt_index"]))
 println("NumSelCoeffs=", count((i->(i==1)), mask))
+
+
+#NOTE: #1 Choosing what the covariance matrix should be for different coefficients
+#S2
+Nx=64
+img = readdust(Nx)
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(Nf,) = size(fhash["filt_index"])
+s2targ = DHC_compute(img, fhash, doS2=true, doS20=false, doS12=false, norm=false, iso=false)
+#Incl only S1, S2 that are larger than 1e-5
+mask = s2targ .>= 1e-5
+mask[1:2] .= false
+std_sim=std(img)
+s2w, s2cov = Data_Utils.S2_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=false, smoothval =0.8, coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+Data_Utils.invert_covmat(s2w) #1.41E18, #1.26E-20
+Data_Utils.invert_covmat(s2w, 1e-10) #39k, #1.26E-20
+Data_Utils.invert_covmat(s2w, 1e-5) #4.92, #1.26E-20 Try this!
+
+Data_Utils.invert_covmat(s2cov) #2e33, #1e6 CAN'T DO THIS!
+Data_Utils.invert_covmat(s2cov, 1e-10) #800k
+Data_Utils.invert_covmat(s2cov, 1e-5) #9.24, 1e-19 Try this!
+
+#Incl all S1, S2
+mask = trues(2+Nf+Nf^2)
+mask[1:2] .= false
+std_sim=std(img)
+s2w, s2cov = Data_Utils.S2_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=false, smoothval =0.8, coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+Data_Utils.invert_covmat(s2w) #1.41E28, #1.26E-20
+Data_Utils.invert_covmat(s2w, 1e-5) #6.2, 1-20
+Data_Utils.invert_covmat(s2cov) #2e43, 1e11 CAN'T DO THIS!
+Data_Utils.invert_covmat(s2cov, 1e-5) #12, 1e-19 Try this!
+
+
+
+
+#S20
+Nx=64
+img = readdust(Nx)
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(Nf,) = size(fhash["filt_index"])
+s2targ = DHC_compute(img, fhash, doS2=false, doS20=true, doS12=false, norm=false, iso=false)
+#Including all S20
+mask=trues(2+Nf+Nf^2)
+mask[1:Nf+2] .= false
+std_sim=std(img)
+s2w, s2cov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=false, smoothval =0.8, coeff_choice="S20", coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+Data_Utils.invert_covmat(s2w) #513, #1.26E-20
+Data_Utils.invert_covmat(s2w, 1e-5) #6.7, #1.26E-20
+
+Data_Utils.invert_covmat(s2cov) #Breaks
+Data_Utils.invert_covmat(s2cov, 1e-10) #5e6, 1e-10
+Data_Utils.invert_covmat(s2cov, 1e-5) #55, 1e-17 Choosing this!
+
+#Incl only S20 that are larger than 1e-5
+mask = s2targ .>= 1e-5
+mask[1:Nf+2] .= false
+std_sim=std(img)
+s2w, s2cov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=false, smoothval =0.8, coeff_choice="S20", coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+Data_Utils.invert_covmat(s2w) #361
+Data_Utils.invert_covmat(s2w, 1e-5) #6
+Data_Utils.invert_covmat(s2cov) #e7, Breaks
+Data_Utils.invert_covmat(s2cov, 1e-5) #51
+
+
+#S12
+Nx=64
+img = readdust(Nx)
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(Nf,) = size(fhash["filt_index"])
+s2targ = DHC_compute(img, fhash, doS2=false, doS20=false, doS12=true, norm=false, iso=false)
+#Including all S12:
+mask=trues(2+Nf+Nf^2)
+mask[1:Nf+2] .= false
+std_sim=std(img)
+s2w, s2cov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=false, smoothval =0.8, coeff_choice="S12", coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+Data_Utils.invert_covmat(s2w, 1e-5) #e7
+Data_Utils.invert_covmat(s2cov, 1e-5) #e8
+
+#Including only S12 larger than some eps
+mask = s2targ .>=1e-5
+mask[1:Nf+2] .= false
+std_sim=std(img)
+s2w, s2cov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=false, smoothval =0.8, coeff_choice="S12", coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+Data_Utils.invert_covmat(s2w, 1e-5) #e7
+Data_Utils.invert_covmat(s2cov, 1e-5) #e8
+#appear to be some coefficients which aren't too small O(0.6) but still have 0 std
+findall(s2w .<1e-5)
+s2targ[mask][findall(s2w .<1e-5)]
+#Exclude all below 1e0
+mask = s2targ .>=1 #This does not exclude any of the diagonal elements (S1)
+mask[1:Nf+2] .= false
+std_sim=std(img)
+s2w, s2cov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=false, smoothval =0.8, coeff_choice="S12", coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+Data_Utils.invert_covmat(s2w, 1e-5) #100k Try this!
+Data_Utils.invert_covmat(s2cov, 1e-5) #e8, Num Err=1e-8
