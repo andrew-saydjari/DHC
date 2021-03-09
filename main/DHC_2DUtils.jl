@@ -73,6 +73,33 @@ module DHC_2DUtils
         return hash
     end
 
+    function fink_filter_hash_gpu_fake(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
+
+        # -------- compute the filter bank
+        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on)
+
+        flist = fink_filter_list(filt)
+        # -------- pack everything you need into the info structure
+        hash["filt_index"] = flist[1]
+        hash["filt_value"] = flist[2]
+
+        if threeD
+            hash=fink_filter_bank_3dizer(hash,cz,nz=nz)
+        end
+
+        hash=list_to_box(hash,dim=threeD ? 3 : 2)
+
+
+        #Not implemented
+        # -------- compute matrix that projects iso coeffs, add to hash
+        #S1_iso_mat = S1_iso_matrix(hash)
+        hash["S1_iso_mat"] = nothing
+        #S2_iso_mat = S2_iso_matrix(hash)
+        hash["S2_iso_mat"] = nothing
+
+        return hash
+    end
+
     function S1_iso_matrix(fhash)
         # fhash is the filter hash output by fink_filter_hash
         # The output matrix converts an S1 coeff vector to S1iso by
@@ -469,11 +496,11 @@ module DHC_2DUtils
         return out_coeff
     end
 
-
-    function DHC_compute_gpu(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
+    function DHC_compute_gpu_fake(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
         doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false,batch_mode::Bool=false,opt_memory::Bool=false,max_memory::Int64=0)
 
         @assert !iso "Isotropic is not implemented on GPU"
+        @assert !doS20 "S20 is not supported on GPU"
         # image        - input for WST
         # filter_hash  - filter hash from fink_filter_hash
         # filter_hash2 - filters for second order.  Default to same as first order.
@@ -503,20 +530,141 @@ module DHC_2DUtils
         anyrd = doS2 | doS20             # compute real domain with iFFT
 
         # allocate image arrays for internal use
-        if doS12 im_fdf_0_1 = CUDA.zeros(Float64,           Nx, Ny, Nf) end   # this must be zeroed!
-        if anyrd im_rd_0_1  = CUDA.CuArray(Array{Float64, 3}(undef, Nx, Ny, Nf)) end
+        if doS12 im_fdf_0_1 = zeros(Float64,           Nx, Ny) end   # this must be zeroed!
+        if anyrd im_rd_0_1  = Array{Float64, 2}(undef, Nx, Ny) end
 
+        image= image
         ## 0th Order
         S0[1]   = mean(image)
         norm_im = image.-S0[1]
         S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
         if norm
-            norm_im= CUDA.CuArray(norm_im./ sqrt(Nx*Ny*S0[2]))
+            norm_im./= sqrt(Nx*Ny*S0[2])
         else
-            norm_im = CUDA.CuArray(image)
+            norm_im = image
         end
 
-        append!(out_coeff,S0[:])
+
+        ## 1st Order
+        #REview: We fft shift!
+        im_fd_0 = FFTW.fftshift(FFTW.fft(norm_im))  # total power=1.0
+
+        # unpack filter_hash
+        f_mms   = filter_hash["filt_mms"]  # (J, L) array of filters represented as index value pairs
+        f_vals   = filter_hash["filt_vals"]
+
+        zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
+
+        # make a FFTW "plan" for an array of the given size and type
+        if anyrd
+            P = FFTW.plan_ifft(im_fd_0) end  # P is an operator, P*im is ifft(im)
+
+        ## Main 1st Order and Precompute 2nd Order
+        for f1 = 1:Nf
+            f_mm1 = f_mms[:,:,f1]  # Min,Max
+            f_val1 = f_vals[f1]  # values
+
+            #Review: Removes length check-> empty filter case???, I think this should be prevented beforehands
+            zv=f_val1.*im_fd_0[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2]] #dense multiplication for the filter region
+            zarr[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2]]=zv
+
+            if doS12 im_fdf_0_1[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2]] .= abs.(zv) end
+
+            S1[f1] = sum(abs2.(zv))/(Nx*Ny)  # image power
+            if anyrd im_rd_0_1.= abs2.(P*FFTW.ifftshift(zarr)) end
+            zarr[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2]] .= 0
+
+
+            im_rd_0_1 .= sqrt.(im_rd_0_1)
+            im_fdf_1_1 = FFTW.fftshift(FFTW.fft(im_rd_0_1))
+            for f2 = 1:Nf
+                f_mm2 = f_mms[:,:,f2]
+                f_val2 = f_vals[f2]
+
+                S2[f1,f2] = sum(abs2.(f_val2 .* im_fdf_1_1[f_mm2[1,1]:f_mm2[1,2],f_mm2[2,1]:f_mm2[2,2]]))/(Nx*Ny)
+                if !doS12
+                    continue
+                end
+
+                if f2>f1
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
+                if f_mm1[1,1]>f_mm2[1,2] || f_mm2[1,1]>f_mm1[1,2] || f_mm1[2,1]>f_mm2[2,2] || f_mm2[2,1]>f_mm1[2,2]
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
+                mx=max(f_mm1[1,1],f_mm2[1,1])
+                my=max(f_mm1[2,1],f_mm2[2,1])
+                Mx=min(f_mm1[1,2],f_mm2[1,2])
+                My=min(f_mm1[2,2],f_mm2[2,2])
+                sfx=Mx-mx
+                sfy=My-my
+                st1x=mx-f_mm1[1,1]+1
+                st1y=my-f_mm1[2,1]+1
+                st2x=mx-f_mm2[1,1]+1
+                st2y=my-f_mm2[2,1]+1
+
+                S12[f1,f2]=sum(f_val1[st1x:st1x+sfx,st1y:st1y+sfy].*f_val2[st2x:st2x+sfx,st2y:st2y+sfy].*abs2.(im_fd_0[mx:Mx,my:My]))
+            end
+        end
+        append!(out_coeff,S0)
+        append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
+        if doS2 append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S2 : S2) end
+        if doS12 append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S12 : S12) end
+        return out_coeff
+    end
+
+    function DHC_compute_gpu(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
+        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false,batch_mode::Bool=false,opt_memory::Bool=false,max_memory::Int64=0)
+
+        @assert !iso "Isotropic is not implemented on GPU"
+        @assert !doS20 "S20 is not supported on GPU"
+        # image        - input for WST
+        # filter_hash  - filter hash from fink_filter_hash
+        # filter_hash2 - filters for second order.  Default to same as first order.
+        # doS2         - compute S2 coeffs Similar to Mallat(2014), Abs in real space
+        # doS12        - compute S2 coeffs Abs in Fourier space
+        # doS20        - compute S2 coeffs Square in real space
+        # norm         - scale to mean zero, unit variance
+        # iso          - sum over angles to obtain isotropic coeffs
+
+
+        # array sizes
+        (Nx, Ny)  = size(image)
+        if Nx != Ny error("Input image must be square") end
+        (Nf, )    = size(filter_hash["filt_vals"])
+        if Nf == 0  error("filter hash corrupted") end
+        @assert Nx==filter_hash["npix"] "Filter size should match npix"
+        @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
+
+        # allocate coeff arrays
+        out_coeff = []
+        S0  = zeros(Float64, 2)
+        S1  = zeros(Float64, Nf)
+        if doS2  S2  = zeros(Float64, Nf, Nf) end  # traditional 2nd order
+        if doS12 S12 = zeros(Float64, Nf, Nf) end  # Fourier correlation
+        if doS20 S20 = zeros(Float64, Nf, Nf) end  # real space correlation
+        anyM2 = doS2 | doS12 | doS20
+        anyrd = doS2 | doS20             # compute real domain with iFFT
+
+        # allocate image arrays for internal use
+        if doS12 im_fdf_0_1 = CUDA.zeros(Float64,           Nx, Ny) end   # this must be zeroed!
+        if anyrd im_rd_0_1  = CUDA.CuArray(Array{Float64, 2}(undef, Nx, Ny)) end
+
+        image= CUDA.CuArray(image)
+        ## 0th Order
+        S0[1]   = mean(image)
+        norm_im = image.-S0[1]
+        S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
+        if norm
+            norm_im./= sqrt(Nx*Ny*S0[2])
+        else
+            norm_im = image
+        end
+
 
         ## 1st Order
         #REview: We fft shift!
@@ -533,61 +681,60 @@ module DHC_2DUtils
             P = CUDA.CUFFT.plan_ifft(im_fd_0) end  # P is an operator, P*im is ifft(im)
 
         ## Main 1st Order and Precompute 2nd Order
-        for f = 1:Nf
-            f_mm = f_mms[:,:,f]  # Min,Max
-            f_val = f_vals[f]  # values
+        for f1 = 1:Nf
+            f_mm1 = f_mms[:,:,f1]  # Min,Max
+            f_val1 = f_vals[f1]  # values
 
             #Review: Removes length check-> empty filter case???, I think this should be prevented beforehands
-            zv=f_val.*im_fd_0[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2]] #dense multiplication for the filter region
-            zarr[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2]]=zv
+            zv=f_val1.*im_fd_0[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2]] #dense multiplication for the filter region
+            zarr[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2]]=zv
 
-            if doS12 im_fdf_0_1[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2],f] .= abs.(zv) end
+            if doS12 im_fdf_0_1[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2]] .= abs.(zv) end
 
-            S1[f] = sum(abs2.(zv))/(Nx*Ny)  # image power
-            if anyrd im_rd_0_1[:,:,f] .= abs2.(P*CUDA.CUFFT.ifftshift(zarr)) end
-            zarr[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2]] .= 0
+            S1[f1] = sum(abs2.(zv))/(Nx*Ny)  # image power
+            if anyrd im_rd_0_1.= abs2.(P*CUDA.CUFFT.ifftshift(zarr)) end
+            zarr[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2]] .= 0
 
-        end
 
-        append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
+            im_rd_0_1 .= sqrt.(im_rd_0_1)
+            im_fdf_1_1 = CUDA.CUFFT.fftshift(CUDA.CUFFT.fft(im_rd_0_1))
+            for f2 = 1:Nf
+                f_mm2 = f_mms[:,:,f2]
+                f_val2 = f_vals[f2]
 
-        # we stored the abs()^2, so take sqrt (this is faster to do all at once)
-        if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
-
-        Mat2 = filter_hash["S2_iso_mat"]
-        if doS2
-            f_mms2   = filter_hash2["filt_mms"]  # (J, L) array of filters represented as index value pairs
-            f_vals2   = filter_hash2["filt_vals"]
-
-            ## Traditional second order
-            for f1 = 1:Nf
-                thisim = CUDA.CUFFT.fftshift(CUDA.CUFFT.fft(im_rd_0_1[:,:,f1]))  # Could try rfft here
-                # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
-                # Loop over f2 and do second-order convolution
-                for f2 = 1:Nf
-                    f_mm = f_mms2[:,:,f2]  # CartesianIndex list for filter
-                    f_val = f_vals2[f2]  # Values for f_i
-                    # sum im^2 = sum(|fft|^2/npix)
-                    S2[f1,f2] = sum(abs2.(f_val .* thisim[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2]]))/(Nx*Ny)
+                S2[f1,f2] = sum(abs2.(f_val2 .* im_fdf_1_1[f_mm2[1,1]:f_mm2[1,2],f_mm2[2,1]:f_mm2[2,2]]))/(Nx*Ny)
+                if !doS12
+                    continue
                 end
+
+                if f2>f1
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
+                if f_mm1[1,1]>f_mm2[1,2] || f_mm2[1,1]>f_mm1[1,2] || f_mm1[2,1]>f_mm2[2,2] || f_mm2[2,1]>f_mm1[2,2]
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
+                mx=max(f_mm1[1,1],f_mm2[1,1])
+                my=max(f_mm1[2,1],f_mm2[2,1])
+                Mx=min(f_mm1[1,2],f_mm2[1,2])
+                My=min(f_mm1[2,2],f_mm2[2,2])
+                sfx=Mx-mx
+                sfy=My-my
+                st1x=mx-f_mm1[1,1]+1
+                st1y=my-f_mm1[2,1]+1
+                st2x=mx-f_mm2[1,1]+1
+                st2y=my-f_mm2[2,1]+1
+
+                S12[f1,f2]=sum(f_val1[st1x:st1x+sfx,st1y:st1y+sfy].*f_val2[st2x:st2x+sfx,st2y:st2y+sfy].*abs2.(im_fd_0[mx:Mx,my:My]))
             end
-            append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
         end
-
-        # Fourier domain 2nd order
-        if doS12
-            Amat = reshape(im_fdf_0_1, Nx*Ny, Nf)
-            S12  = Amat' * Amat
-            append!(out_coeff, iso ? Mat2*S12[:] : S12[:])
-        end
-
-        # Real domain 2nd order
-        if doS20
-            Amat = reshape(im_rd_0_1, Nx*Ny, Nf)
-            S20  = Amat' * Amat
-            append!(out_coeff, iso ? Mat2*S20[:] : S20[:])
-        end
-
+        append!(out_coeff,S0)
+        append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
+        if doS2 append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S2 : S2) end
+        if doS12 append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S12 : S12) end
         return out_coeff
     end
 
@@ -778,7 +925,7 @@ module DHC_2DUtils
         return out_coeff
     end
 
-    function DHC_compute_3d_gpu(image::Array{Float64,3}, filter_hash)
+    function DHC_compute_3d_gpu(image::Array{Float64,3}, filter_hash;doS2::Bool=true, doS12::Bool=false, norm=true)
         CUDA.reclaim()
         # array sizes
         (Nx, Ny, Nz)  = size(image)
@@ -788,9 +935,9 @@ module DHC_2DUtils
         out_coeff = []
         S0  = zeros(Float64, 2)
         S1  = zeros(Float64, Nf)
-        S20 = zeros(Float64, Nf, Nf)
-        S12 = zeros(Float64, Nf, Nf)
-        S2  = zeros(Float64, Nf, Nf)  # traditional 2nd order
+        #S20 = zeros(Float64, Nf, Nf)
+        if doS12 S12 = zeros(Float64, Nf, Nf) end
+        if doS2 S2  = zeros(Float64, Nf, Nf)  end # traditional 2nd order
 
         # allocate image arrays for internal use
         im_fdf_0_1 = CUDA.CuArray(Array{Float64, 3}(undef, Nx, Ny, Nz))
@@ -802,9 +949,11 @@ module DHC_2DUtils
         S0[1]   = mean(image)
         norm_im = image.-S0[1]
         S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny*Nz)
-        norm_im ./= sqrt(Nx*Ny*Nz*S0[2])
-
-        append!(out_coeff,S0[:])
+        if norm
+            norm_im ./= sqrt(Nx*Ny*Nz*S0[2])
+        else
+            norm_im=image
+        end
 
         ## 1st Order
         im_fd_0 = CUDA.CUFFT.fftshift(CUDA.CUFFT.fft(norm_im))  # total power=1.0
@@ -824,42 +973,179 @@ module DHC_2DUtils
         #depth first search
         for f1 = 1:Nf
             im_fdf_0_1.=0.
-            f_mm = f_mms[:,:,f1]  # CartesianIndex list for filter
-            f_val = f_vals[f1]  # Values for f_i
+            f_mm1 = f_mms[:,:,f1]  # CartesianIndex list for filter
+            f_val1 = f_vals[f1]  # Values for f_i
             # for (ind, val) in zip(f_i, f_v)   # this is slower!
 
-            zv=f_val.*im_fd_0[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2],f_mm[3,1]:f_mm[3,2]]
+            zv=f_val1.*im_fd_0[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2],f_mm1[3,1]:f_mm1[3,2]]
             S1[f1] = sum(abs2.(zv))/(Nx*Ny*Nz)
 
-            zarr[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2],f_mm[3,1]:f_mm[3,2]]=zv
+            zarr[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2],f_mm1[3,1]:f_mm1[3,2]]=zv
 
-            im_fdf_0_1[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2],f_mm[3,1]:f_mm[3,2]] .= abs.(zv)
+            im_fdf_0_1[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2],f_mm1[3,1]:f_mm1[3,2]] .= abs.(zv)
 
 
             im_rd_0_1=abs2.(P*CUDA.CUFFT.ifftshift(zarr))
 
-            zarr[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2],f_mm[3,1]:f_mm[3,2]] .= 0.
+            zarr[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2],f_mm1[3,1]:f_mm1[3,2]] .= 0.
 
             im_rd_0_1 .= sqrt.(im_rd_0_1)
             im_fdf_1_1 = CUDA.CUFFT.fftshift(CUDA.CUFFT.fft(im_rd_0_1))
             for f2 = 1:Nf
-                f_mm = f_mms[:,:,f2]
-                f_val = f_vals[f2]
+                f_mm2 = f_mms[:,:,f2]
+                f_val2 = f_vals[f2]
 
-                S2[f1,f2] = sum(abs2.(f_val .* im_fdf_1_1[f_mm[1,1]:f_mm[1,2],f_mm[2,1]:f_mm[2,2],f_mm[3,1]:f_mm[3,2]]))/(Nx*Ny*Nz)
+                S2[f1,f2] = sum(abs2.(f_val2 .* im_fdf_1_1[f_mm2[1,1]:f_mm2[1,2],f_mm2[2,1]:f_mm2[2,2],f_mm2[3,1]:f_mm2[3,2]] ))/(Nx*Ny*Nz)
+
+                if !doS12
+                    continue
+                end
+
+                if f2>f1
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
+                if f_mm1[1,1]>f_mm2[1,2] || f_mm2[1,1]>f_mm1[1,2] || f_mm1[2,1]>f_mm2[2,2] || f_mm2[2,1]>f_mm1[2,2] || f_mm1[3,1]>f_mm2[3,2] || f_mm2[3,1]>f_mm1[3,2]
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
+                mx=max(f_mm1[1,1],f_mm2[1,1])
+                my=max(f_mm1[2,1],f_mm2[2,1])
+                mz=max(f_mm1[3,1],f_mm2[3,1])
+                Mx=min(f_mm1[1,2],f_mm2[1,2])
+                My=min(f_mm1[2,2],f_mm2[2,2])
+                Mz=min(f_mm1[3,2],f_mm2[3,2])
+                sfx=Mx-mx
+                sfy=My-my
+                sfz=Mz-mz
+                st1x=mx-f_mm1[1,1]+1
+                st1y=my-f_mm1[2,1]+1
+                st1z=mz-f_mm1[3,1]+1
+                st2x=mx-f_mm2[1,1]+1
+                st2y=my-f_mm2[2,1]+1
+                st2z=mz-f_mm2[3,1]+1
+
+                S12[f1,f2]=sum(f_val1[st1x:st1x+sfx,st1y:st1y+sfy,st1z:st1z+sfz].*f_val2[st2x:st2x+sfx,st2y:st2y+sfy,st2z:st2z+sfz].*abs2.(im_fd_0[mx:Mx,my:My,mz:Mz]))
+                CUDA.reclaim()
             end
             CUDA.reclaim()
-
         end
-        append!(out_coeff, S1[:])
-        ## 2nd Order
-        #Amat = reshape(im_fdf_0_1, Nx*Ny, Nf)
-        #S12  = Amat' * Amat
-        #Amat = reshape(im_rd_0_1, Nx*Ny, Nf)
-        #S20  = Amat' * Amat
-        #append!(out_coeff, S20)
-        #append!(out_coeff, S12)
-        append!(out_coeff, S2)
+        append!(out_coeff,S0)
+        append!(out_coeff, S1)
+        if doS2 append!(out_coeff, S2) end
+        if doS12 append!(out_coeff, S12) end
+        return out_coeff
+    end
+
+    function DHC_compute_3d_gpu_fake(image::Array{Float64,3}, filter_hash;doS2::Bool=true, doS12::Bool=false, norm=true)
+        # array sizes
+        (Nx, Ny, Nz)  = size(image)
+        (Nf, )    = size(filter_hash["filt_vals"])
+
+        # allocate coeff arrays
+        out_coeff = []
+        S0  = zeros(Float64, 2)
+        S1  = zeros(Float64, Nf)
+        #S20 = zeros(Float64, Nf, Nf)
+        if doS12 S12 = zeros(Float64, Nf, Nf) end
+        if doS2 S2  = zeros(Float64, Nf, Nf)  end # traditional 2nd order
+
+        # allocate image arrays for internal use
+        im_fdf_0_1 = Array{Float64, 3}(undef, Nx, Ny, Nz)
+        im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nz)
+
+
+        ## 0th Order
+        S0[1]   = mean(image)
+        norm_im = image.-S0[1]
+        S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny*Nz)
+        if norm
+            norm_im ./= sqrt(Nx*Ny*Nz*S0[2])
+        else
+            norm_im=image
+        end
+
+        ## 1st Order
+        im_fd_0 = FFTW.fftshift(FFTW.fft(norm_im))  # total power=1.0
+
+        # unpack filter_hash
+        f_mms   = filter_hash["filt_mms"]  # (J, L) array of filters represented as index value pairs
+        f_vals   = filter_hash["filt_vals"]
+
+        #f_ind2   = filter_hash2["filt_index"]  # (J, L) array of filters represented as index value pairs
+        #f_val2   = filter_hash2["filt_value"]
+
+        zarr = zeros(ComplexF64, Nx, Ny, Nz)  # temporary array to fill with zvals
+
+        # make a FFTW "plan" for an array of the given size and type
+        P   = FFTW.plan_ifft(im_fd_0)   # P is an operator, P*im is ifft(im)
+
+        #depth first search
+        for f1 = 1:Nf
+            im_fdf_0_1.=0.
+            f_mm1 = f_mms[:,:,f1]  # CartesianIndex list for filter
+            f_val1 = f_vals[f1]  # Values for f_i
+            # for (ind, val) in zip(f_i, f_v)   # this is slower!
+
+            zv=f_val1.*im_fd_0[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2],f_mm1[3,1]:f_mm1[3,2]]
+            S1[f1] = sum(abs2.(zv))/(Nx*Ny*Nz)
+
+            zarr[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2],f_mm1[3,1]:f_mm1[3,2]]=zv
+
+            im_fdf_0_1[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2],f_mm1[3,1]:f_mm1[3,2]] .= abs.(zv)
+
+
+            im_rd_0_1=abs2.(P*FFTW.ifftshift(zarr))
+
+            zarr[f_mm1[1,1]:f_mm1[1,2],f_mm1[2,1]:f_mm1[2,2],f_mm1[3,1]:f_mm1[3,2]] .= 0.
+
+            im_rd_0_1 .= sqrt.(im_rd_0_1)
+            im_fdf_1_1 = FFTW.fftshift(FFTW.fft(im_rd_0_1))
+            for f2 = 1:Nf
+                f_mm2 = f_mms[:,:,f2]
+                f_val2 = f_vals[f2]
+
+                S2[f1,f2] = sum(abs2.(f_val2 .* im_fdf_1_1[f_mm2[1,1]:f_mm2[1,2],f_mm2[2,1]:f_mm2[2,2],f_mm2[3,1]:f_mm2[3,2]] ))/(Nx*Ny*Nz)
+
+                if !doS12
+                    continue
+                end
+
+                if f2>f1
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
+                if f_mm1[1,1]>f_mm2[1,2] || f_mm2[1,1]>f_mm1[1,2] || f_mm1[2,1]>f_mm2[2,2] || f_mm2[2,1]>f_mm1[2,2] || f_mm1[3,1]>f_mm2[3,2] || f_mm2[3,1]>f_mm1[3,2]
+                    S12[f1,f2]=NaN
+                    continue
+                end
+
+                mx=max(f_mm1[1,1],f_mm2[1,1])
+                my=max(f_mm1[2,1],f_mm2[2,1])
+                mz=max(f_mm1[3,1],f_mm2[3,1])
+                Mx=min(f_mm1[1,2],f_mm2[1,2])
+                My=min(f_mm1[2,2],f_mm2[2,2])
+                Mz=min(f_mm1[3,2],f_mm2[3,2])
+                sfx=Mx-mx
+                sfy=My-my
+                sfz=Mz-mz
+                st1x=mx-f_mm1[1,1]+1
+                st1y=my-f_mm1[2,1]+1
+                st1z=mz-f_mm1[3,1]+1
+                st2x=mx-f_mm2[1,1]+1
+                st2y=my-f_mm2[2,1]+1
+                st2z=mz-f_mm2[3,1]+1
+
+                S12[f1,f2]=sum(f_val1[st1x:st1x+sfx,st1y:st1y+sfy,st1z:st1z+sfz].*f_val2[st2x:st2x+sfx,st2y:st2y+sfy,st2z:st2z+sfz].*abs2.(im_fd_0[mx:Mx,my:My,mz:Mz]))
+            end
+        end
+        append!(out_coeff,S0)
+        append!(out_coeff, S1)
+        if doS2 append!(out_coeff, S2) end
+        if doS12 append!(out_coeff, S12) end
         return out_coeff
     end
 
@@ -1017,10 +1303,10 @@ module DHC_2DUtils
 
 
     function isoMaker(coeff, S1Mat, S2Mat)
-        NS1 = size(S1mat)[2]
-        NS2 = size(S2mat)[2]
-        S1iso = transpose(S1mat*transpose(coeff[:,2+1:2+NS1]))
-        S2iso = transpose(S2mat*transpose(coeff[:,2+NS1+1:2+NS1+NS2]))
+        NS1 = size(S1Mat)[2]
+        NS2 = size(S2Mat)[2]
+        S1iso = transpose(S1Mat*transpose(coeff[:,2+1:2+NS1]))
+        S2iso = transpose(S2Mat*transpose(coeff[:,2+NS1+1:2+NS1+NS2]))
         return hcat(coeff[:,1:2],S1iso,S2iso)
     end
 
