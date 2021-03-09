@@ -46,4 +46,18 @@ module Visualization
         myplot = plot(ps..., layout=(3,2), size=(1400,2000))
         savefig(myplot, fname)
     end
+
+    function plot_diffscales(images, titles; fname=nothing)
+        pl12 = plot(
+            heatmap(images[1], title=titles[1]),
+            heatmap(images[2], title=titles[2]),
+            heatmap(images[3],title= titles[3]),
+            heatmap(images[4], title=titles[4]);
+            layout=4,
+        )
+        plot!(size=(1000, 800))
+        if fname!=nothing
+            savefig(pl12, fname)
+        end
+    end
 end

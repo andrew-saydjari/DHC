@@ -9,6 +9,7 @@ module Data_Utils
     using Printf
     using SparseArrays
     using LinearAlgebra
+    using FITSIO
     # put the cwd on the path so Julia can find the module
     push!(LOAD_PATH, pwd()*"/main")
     using DHC_2DUtils
@@ -18,6 +19,7 @@ module Data_Utils
     export S2_whitenoiseweights
     export invert_covmat
     export whitenoiseweights_forlog
+    export mldust
 
     function readdust(Nx)
         RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
@@ -25,7 +27,7 @@ module Data_Utils
         return imresize(Float64.(img[1,:,:])[1:256, 1:256], (Nx, Nx))
     end
 
-
+    #Functions that add simulated noise to the true image and return covariance and std^2 for the simulations
     function S2_uniweights(im, fhash; high=25, Nsam=10, iso=false, norm=true, smooth=false, smoothval=0.8, coeff_mask=nothing)
         #=
         Noise model: uniform[-high, high]
@@ -219,5 +221,69 @@ module Data_Utils
 
         return icov
     end
+
+    function mldust(nx)
+
+        # read FITS file with images
+        # file in /n/fink2/dfink/mldust/dust10000.fits
+        #     OR  /n/fink2/dfink/mldust/dust100000.fits
+
+        fname = "scratch_NM/data/dust10000.fits"
+        f = FITS(fname, "r")
+        big = read(f[1])
+
+        (_,__,Nslice) = size(big)
+        println(Nslice, " slices")
+
+        #nx = 96
+        #im = Float64.(big[11:11+nx-1, 11:11+nx-1, :])
+        #nx = 48
+
+        # rebin it to something smaller and take the log
+
+        im = log.(imresize(Float64.(big), nx, nx, Nslice))
+
+        covar = dust_covar_matrix(im)
+
+        #writefits, 'covar48_new.fits', covar
+
+        # Cholesky factorization; chol.U and chol.L will be upper,lower triangular matrix
+        println("Cholesky")
+        chol = cholesky(covar)
+
+        # generate some mock maps
+        Nmock = 800
+        ran = rand(Normal(), nx*nx, Nmock)
+
+        recon = reshape(chol.L*ran, nx, nx, Nmock)
+
+        return im, covar
+    end
+
+    function dust_covar_matrix(im)
+        # derive covariance matrix from [Nx,Nx,Nimage] array
+
+        (nx,__,Nslice) = size(im)
+        eps=1E-6
+
+        # make it mean zero with eps noise, otherwise covar is singular
+        println("Mean zero")
+        for i=1:Nslice  im[:, :, i] .-= (mean(im[:, :, i])+(rand()-0.5)*eps) end
+
+        #println("Unit variance")
+        #for i=1:Nslice  im[:, :, i] ./= std(im[:, :, i]) end
+
+        dat = reshape(im, nx*nx, Nslice)
+
+        # covariance matrix
+        println("covariance")
+        covar = (dat * dat') ./ Nslice
+
+        # Check condition number
+        println("Condition number  ", cond(covar))
+        return covar
+
+    end
+
 
 end
