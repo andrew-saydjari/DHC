@@ -2,7 +2,7 @@ module Visualization
     using Plots
     using Measures
 
-    function plot_synth_QA(ImTrue, ImInit, ImSynth, fhash; fname="test2.png")
+    function plot_synth_QA(ImTrue, ImInit, ImSynth; fname="test2.png")
 
         # -------- define plot1 to append plot to a list
         function plot1(ps, image; clim=nothing, bin=1.0, fsz=16, label=nothing)

@@ -17,6 +17,7 @@ module Data_Utils
     export S2_uniweights
     export S2_whitenoiseweights
     export invert_covmat
+    export whitenoiseweights_forlog
 
     function readdust(Nx)
         RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
@@ -64,7 +65,7 @@ module Data_Utils
 
     function S2_whitenoiseweights(im, fhash; loc=0.0, sig=1.0, Nsam=10, iso=false, norm=true, smooth=false, smoothval=0.8, coeff_mask=nothing)
         #=
-        Noise model: uniform[-high, high]
+        Noise model: N(loc, std(sig))
         =#
 
         (Nx, Ny)  = size(im)
@@ -144,6 +145,54 @@ module Data_Utils
         return wt.^(2), cov
     end
 
+    function whitenoiseweights_forlog(oriim, fhash, coeff_choice; loc=0.0, sig=1.0, Nsam=10, iso=false, norm=true, smooth=false, smoothval=0.8, coeff_mask=nothing) #Complete
+        (Nx, Ny)  = size(oriim)
+        if Nx != Ny error("Input image must be square") end
+        (N1iso, Nf)    = size(fhash["S1_iso_mat"])
+        logim = log.(oriim)
+        if coeff_choice=="S2"
+            S2   = DHC_compute(logim, fhash, doS2=true, doS20=false, norm=norm, iso=iso)
+        elseif coeff_choice=="S20"
+            S2   = DHC_compute(logim, fhash, doS2=false, doS20=true, norm=norm, iso=iso)
+        else
+            if coeff_choice=="S12" S2 = DHC_compute(logim, fhash, doS2=false, doS20=false, doS12=true, norm=norm, iso=iso)
+            else
+                error("Invalid coeff choice")
+            end
+        end
+        Ns    = length(S2)
+        S2arr = zeros(Float64, Ns, Nsam)
+        println("Ns", Ns)
+        for j=1:Nsam
+            noise = reshape(rand(Normal(loc, sig),Nx^2), (Nx, Nx))
+            init = oriim+noise
+            loginit = log.(init)
+            if smooth init = imfilter(init, Kernel.gaussian(smoothval)) end
+            if coeff_choice=="S2"
+                S2arr[:, j]   = DHC_compute(loginit, fhash, doS2=true, doS20=false, norm=norm, iso=iso)
+            elseif coeff_choice=="S20"
+                S2arr[:, j]   = DHC_compute(loginit, fhash, doS2=false, doS20=true, norm=norm, iso=iso)
+            else
+                if coeff_choice=="S12" S2arr[:, j] = DHC_compute(loginit, fhash, doS2=false, doS20=false, doS12=true, norm=norm, iso=iso)
+                else
+                    error("Invalid coeff choice")
+                end
+            end
+        end
+        wt = zeros(Float64, Ns)
+        for i=1:Ns
+            wt[i] = std(S2arr[i,:])
+        end
+        msub = S2arr .- mean(S2arr, dims=2)
+        cov = (msub * msub')./(Nsam-1)
+        if coeff_mask!=nothing
+            cov = cov[coeff_mask, coeff_mask]
+            wt = wt[coeff_mask]
+        end
+        println("Output of S2 weights: Condition number of diag cov", cond(Diagonal(wt.^(2))))
+        println("Condition Number of covariance", cond(cov))
+        return wt.^(2), cov
+    end
 
     function invert_covmat(cov, epsilon=nothing)
         #=

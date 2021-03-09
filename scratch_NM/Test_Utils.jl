@@ -220,16 +220,41 @@ function dS20sum_test(fhash) #Adapted from sandbox.jl
     return
 end
 
-function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothedval=0.8, input_smoothed=false, coeff_choice="S2", invcov="Diagonal")
+function imgreconS2test(Nx, pixmask; norm=norm, std_added=nothing, std_sim=nothing, sim_smoothed=false, sim_smoothedval=0.8, input_smoothed=false, coeff_choice="S2", invcov="Diagonal", mask=nothing)
+    #=
+    Experiments handled by this wrapper:
+    S2 | S12 | S20
+    Create covariance using simulated noise + img true (Choice of smoothing or not smoothing)
+    Init that is smoothed or not smoothed
+    Choice of Diagonal | Diagonal+Eps | Full | Full+Eps:
+        +Eps adds an epsilon to the diagonal of the covariance matrix to reduce Cond No
+        Diagonal considers just the standard deviation of the simulated weights and Full adds an epsilon
+    Pixmask: Keeps certain pixels fixed to true values in the image (Not tested using this wrapper yet). False=> Floating pixels.
+    Coeffmask: Of length 2+Nf+Nf^2. Choice of coefficients to be optimized. True=>Optimized
+    =#
+    if std_added==nothing
+        std_added=std(img)
+    else
+
+    end
+    if std_sim==nothing
+        std_sim =std(img)
+    else
+
+    end
     if coeff_choice=="S2"
+        #=
+        Default assumes coefficients to be optimized are: All S1 and S2 coefficients larger than 1e-5
+        =#
         epsilon=1e-5
         img = readdust(Nx)
         fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+        (Nf,) = size(fhash["filt_index"])
         #img = (img .- mean(img))./std(img) #normalized
         high = quantile(img[:], 0.75) - quantile(img[:], 0.5)
         println("Added noise scale ", high)
         #Std Normal
-        std_added = std(img)
+
         noise = reshape(rand(Normal(0.0, std_added), Nx^2), (Nx, Nx))
         init = img+noise
         #Uniform Added Noise
@@ -238,12 +263,15 @@ function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothed
         #init[1, 2] += 10.0
         #init[23, 5] -= 25.0
         if input_smoothed init = imfilter(init, Kernel.gaussian(0.8)) end
-        std_sim = std(img)
         s2targ = DHC_compute(img, fhash, doS2=true, norm=norm, iso=false)
         #Mask
-        mask = s2targ .>= epsilon
-        mask[1]=false
-        mask[2]=false
+        if mask==nothing
+            mask = (s2targ .>= epsilon)
+            mask[1]=false
+            mask[2]=false
+        else
+            if size(mask)[1]!=(2+Nf+Nf^2) error("Wrong length mask") end
+        end
         sig2, s2cov = Data_Utils.S2_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=sim_smoothed, smoothval = sim_smoothedval, coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
         sig2 = sig2[:]
         println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask), " Size s2targ, type ", typeof(s2targ[mask]), " Size s2w ", typeof(sig2))
@@ -260,6 +288,9 @@ function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothed
         recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov, pixmask, "S2", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
         #recon_img = Deriv_Utils_New.img_reconfunc_coeffmask(init, fhash, s2targ[mask], s2icov[mask, mask], pixmask, Dict([("iterations", 500)]), coeff_mask=mask)
     elseif coeff_choice=="S20"
+        #=
+        Default assumes coefficients to be optimized are: All S20 coefficients
+        =#
         img = readdust(Nx)
         fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
         (Nf,) = size(fhash["filt_index"])
@@ -278,8 +309,13 @@ function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothed
         if input_smoothed init = imfilter(init, Kernel.gaussian(0.8)) end
         std_sim = std(img)
         #Mask
-        mask = trues(2+Nf+Nf^2)
-        mask[1:2+Nf] .= false
+        if mask==nothing
+            mask = trues(2+Nf+Nf^2)
+            mask[1:2+Nf] .= false
+        else
+            if size(mask)[1]!=(2+Nf+Nf^2) error("Wrong length mask") end
+        end
+
         s2targ = DHC_compute(img, fhash, doS2=false, doS20=true, norm=norm, iso=false)
         println("NF=", size(fhash["filt_index"]))
 
@@ -315,8 +351,12 @@ function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothed
         std_sim = std(img)
         s2targ = DHC_compute(img, fhash, doS2=false, doS20=false, doS12=true, norm=norm, iso=false)
         #Mask
-        mask = s2targ .>= 1e-5
-        mask[1:Nf+2] .= false
+        if mask==nothing
+            mask = (s2targ .>= 1e-5)
+            mask[1:Nf+2] .= false
+        else
+
+        end
         sig2, s2cov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=sim_smoothed, smoothval = sim_smoothedval, coeff_choice="S12", coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
         sig2 = sig2[:]
         println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask), " Size s2targ, type ", typeof(s2targ[mask]), " Size s2w ", typeof(sig2))
@@ -334,6 +374,95 @@ function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothed
 
     end
     return img, init, recon_img
+end
+
+function logimgreconS2test(Nx, pixmask; norm=norm, std_added=nothing, std_sim=nothing, sim_smoothed=false, sim_smoothedval=0.8, input_smoothed=false, coeff_choice="S2", invcov="Diagonal", mask=nothing)
+    #=
+    Uses the coefficients of the LOG of the image
+    Experiments handled by this wrapper:
+    S2 | S12 | S20
+    Create covariance using simulated noise + img true (Choice of smoothing or not smoothing)
+    Init that is smoothed or not smoothed
+    Choice of Diagonal | Diagonal+Eps | Full | Full+Eps:
+        +Eps adds an epsilon to the diagonal of the covariance matrix to reduce Cond No
+        Diagonal considers just the standard deviation of the simulated weights and Full adds an epsilon
+    Pixmask: Keeps certain pixels fixed to true values in the image (Not tested using this wrapper yet). False=> Floating pixels.
+    Coeffmask: Of length 2+Nf+Nf^2. Choice of coefficients to be optimized. True=>Optimized
+    =#
+    img = readdust(Nx)
+    oriimg = copy(img)
+    logimg = log.(img)
+    if std_added==nothing
+        std_added = std(oriimg)
+    else
+
+    end
+
+    epsilon=1e-5
+    fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+    (Nf,) = size(fhash["filt_index"])
+
+    #Std Normal
+    noise = reshape(rand(Normal(0.0, std_added), Nx^2), (Nx, Nx))
+    init = oriimg+noise
+
+    if std_sim==nothing
+        std_sim = std(oriimg)
+    else
+
+    end
+
+    if input_smoothed init = imfilter(init, Kernel.gaussian(0.8)) end
+
+    if coeff_choice=="S2"
+        s2targ = DHC_compute(logimg, fhash, doS2=true, norm=norm, iso=false)
+        #Mask: Default assumes coefficients to be optimized are: All S1 and S2 coefficients larger than 1e-5
+        if mask==nothing
+            mask = (s2targ .>= epsilon)
+            mask[1]=false
+            mask[2]=false
+        else
+            if size(mask)[1]!=(2+Nf+Nf^2) error("Wrong length mask") end
+        end
+    elseif coeff_choice=="S20"
+        s2targ = DHC_compute(logimg, fhash, doS20=true, doS2=false, norm=norm, iso=false)
+        #Mask: Default assumes only S20
+        if mask==nothing
+            mask = trues(2+Nf+Nf^2)
+            mask[1:2+Nf] .= false
+        else
+            if size(mask)[1]!=(2+Nf+Nf^2) error("Wrong length mask") end
+        end
+    else
+        if coeff_choice=="S12"
+            s2targ = DHC_compute(logimg, fhash, doS20=false, doS12=true, doS2=false, norm=norm, iso=false)
+            #Mask
+            if mask==nothing
+                mask = (s2targ .>= 1e-5)
+                mask[1:Nf+2] .= false
+            else
+                if size(mask)[1]!=(2+Nf+Nf^2) error("Wrong length mask") end
+            end
+        end
+    end
+
+
+    sig2, s2cov = whitenoiseweights_forlog(oriimg, fhash, coeff_choice, Nsam=10, loc=0.0, sig=std_sim, smooth=sim_smoothed, smoothval = sim_smoothedval, coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
+    sig2 = sig2[:]
+    println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask), " Size s2targ, type ", typeof(s2targ[mask]), " Size s2w ", typeof(sig2))
+
+    if invcov=="Diagonal"
+        s2icov = invert_covmat(sig2)
+    elseif invcov=="Diagonal+Eps"
+        s2icov = invert_covmat(sig2, 1e-5)
+    elseif invcov=="Full+Eps"
+        s2icov = invert_covmat(s2cov, 1e-5)
+    else#s2icov
+        s2icov = invert_covmat(s2cov)
+    end
+    logrecon_img = Deriv_Utils_New.image_recon_derivsum(log.(init), fhash, Float64.(s2targ[mask]), s2icov, pixmask, coeff_choice, coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
+    recon_img = exp.(logrecon_img)
+    return oriimg, init, recon_img
 end
 
 
@@ -429,7 +558,7 @@ mask[1:Nf+2] .= false
 std_sim=std(img)
 s2w, s2cov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=false, smoothval =0.8, coeff_choice="S20", coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
 Data_Utils.invert_covmat(s2w) #513, #1.26E-20
-Data_Utils.invert_covmat(s2w, 1e-5) #6.7, #1.26E-20
+Data_Utils.invert_covmat(s2w, 1e-5) #6.7, #1.26E-20 Try this!
 
 Data_Utils.invert_covmat(s2cov) #Breaks
 Data_Utils.invert_covmat(s2cov, 1e-10) #5e6, 1e-10
@@ -480,12 +609,80 @@ Data_Utils.invert_covmat(s2cov, 1e-5) #e8, Num Err=1e-8
 
 
 #NOTE: Trying all the variants with reasonable condition numbers
-#S2: Diagonal, All S1, S2 coeffs greater than eps=1e-5
+#S2: Diagonal, All S1, S2 coeffs greater than eps=1e-5: 22->7 Works well
 img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S2", invcov="Diagonal+Eps")
-Visualization.plot_synth_QA(img, init, recon, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth/S2_Diag_allgreaterthaneps.png")
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth/S2_Diag_allgreaterthaneps.png")
 mean(abs.(init - img)), mean(abs.(recon - img))
 
+#S2: FullCov, All S1, S2 coeffs greater than eps=1e-5: Breaks
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S2", invcov="Full+Eps")
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth/S2_Cov_allgreaterthaneps.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+
+
+#S2: Incl All S1+S2, adding an eps to the super small coeffs
+#Diagonal mat,  22->8 Works well
+Nx=64
+img = readdust(Nx)
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(Nf,) = size(fhash["filt_index"])
+s2targ = DHC_compute(img, fhash, doS2=true, doS20=false, doS12=false, norm=false, iso=false)
+mask = trues(2+Nf+Nf^2)
+mask[1:2] .= false
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S2", invcov="Diagonal+Eps",mask=mask)
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth/S2_DiagEps_allincl.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+
+#Cov, 22->8 Works well
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S2", invcov="Full+Eps",mask=mask)
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth/S2_CovEps_allincl.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+
+
+#S20: All S20 only incl: Best so far.
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S20", invcov="Diagonal+Eps")
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth/S20_DiagEps_allincl.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+
+#S20: All S20 only incl: Breaks
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S20", invcov="Full+Eps")
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth/S20_FullEps_allincl.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+
+#S12:
+
+#NOTE: With Smoothing
 #S2
-img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S2", invcov="Diagonal+Eps")
-Visualization.plot_synth_QA(img, init, recon, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth/S2_Diag_allgreaterthaneps.png")
+#Cov, 22->8 Works well
+mask = trues(2+Nf+Nf^2)
+mask[1:2] .= false
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=true, input_smoothed=true, coeff_choice="S2", invcov="Full+Eps",mask=mask)
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Smoothed/S2_CovEps_allincl.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+
+#S20: All S20 only incl: Best so far. All S20 incl.
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=true, input_smoothed=true, coeff_choice="S20", invcov="Diagonal+Eps")
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Smoothed/S20_DiagEps_allincl.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+
+#S12: All S12 only incl
+Nx=64
+img = readdust(Nx)
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(Nf,) = size(fhash["filt_index"])
+s12targ = DHC_compute(img, fhash, doS2=false, doS20=false, doS12=true, norm=false, iso=false)
+mask = s2targ .>=1 #This does not exclude any of the diagonal elements (S1)
+mask[1:Nf+2] .= false
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=true, input_smoothed=true, coeff_choice="S12", invcov="Diagonal+Eps", mask=mask)
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Smoothed/S12_DiagEps_allincl.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+
+#NOTE: With the log of the image's coefficients
+img = readdust(64)
+img, init, recon = logimgreconS2test(64, falses((64, 64)), norm=false, std_added=std(img)/5.0, std_sim=std(img)/5.0, sim_smoothed=false, input_smoothed=false, coeff_choice="S20", invcov="Diagonal+Eps")
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth//S20_LogCoeff_DiagEps_allincl.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, std_added=std(img)/5.0, std_sim=std(img)/5.0, input_smoothed=false, coeff_choice="S20", invcov="Diagonal+Eps")
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth/S20_DiagEps_allincl.png")
 mean(abs.(init - img)), mean(abs.(recon - img))

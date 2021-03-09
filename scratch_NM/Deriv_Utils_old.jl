@@ -274,7 +274,7 @@ module Deriv_Utils
                 f_v2 = f_val[f2]  # Values for f_i1
                 pnz = intersect(f_i1, f_i2) #Fd indices where both filters are nonzero
                 if length(pnz)!=0
-                    pnz_arr = vcat((x->[x[1], x[2]]').(pnz)...) #pnz*2: Assumption that the correct p to use in the phase are the indices!!! THIS IS WRONG instead create a kgrid and use pnz to index from that
+                    pnz_arr = vcat((x->[x[1], x[2]]').(pnz)...) #pnz*2
                     Φmat =  exp.((-2π*im)/Nx .* ((pnz_arr .- 1) * (xigrid .- 1))) #pnz*Nx^2
                     f_v1pnz = f_v1[findall(in(pnz), f_i1)]
                     t2 = real.(zarrc[f1, pnz] .* Φmat) #Check
