@@ -16,6 +16,7 @@ module Data_Utils
     export readdust
     export S2_uniweights
     export S2_whitenoiseweights
+    export invert_covmat
 
     function readdust(Nx)
         RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")

@@ -251,9 +251,9 @@ function imgreconS2test(Nx, pixmask; norm=norm, sim_smoothed=false, sim_smoothed
         if invcov=="Diagonal"
             s2icov = invert_covmat(sig2)
         elseif invcov=="Diagonal+Eps"
-            s2icov = invert_covmat(sig2, 1e-10)
+            s2icov = invert_covmat(sig2, 1e-5)
         elseif invcov=="Full+Eps"
-            s2icov = invert_covmat(s2cov, 1e-10)
+            s2icov = invert_covmat(s2cov, 1e-5)
         else#s2icov
             s2icov = invert_covmat(s2cov)
         end
@@ -477,3 +477,15 @@ std_sim=std(img)
 s2w, s2cov = Data_Utils.S20_whitenoiseweights(img, fhash, Nsam=10, loc=0.0, sig=std_sim, smooth=false, smoothval =0.8, coeff_choice="S12", coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
 Data_Utils.invert_covmat(s2w, 1e-5) #100k Try this!
 Data_Utils.invert_covmat(s2cov, 1e-5) #e8, Num Err=1e-8
+
+
+#NOTE: Trying all the variants with reasonable condition numbers
+#S2: Diagonal, All S1, S2 coeffs greater than eps=1e-5
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S2", invcov="Diagonal+Eps")
+Visualization.plot_synth_QA(img, init, recon, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth/S2_Diag_allgreaterthaneps.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+
+#S2
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S2", invcov="Diagonal+Eps")
+Visualization.plot_synth_QA(img, init, recon, fink_filter_hash(1, 8, nx=32, pc=1, wd=1, Omega=true), fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth/S2_Diag_allgreaterthaneps.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
