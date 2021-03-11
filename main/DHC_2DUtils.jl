@@ -1426,7 +1426,7 @@ module DHC_2DUtils
         return sparse(Mat)
     end
 
-    function trasformMaker(coeff, S1Mat, S2Mat)
+    function transformMaker(coeff, S1Mat, S2Mat)
         NS1 = size(S1Mat)[2]
         NS2 = size(S2Mat)[2]
         S1iso = transpose(S1Mat*transpose(coeff[:,2+1:2+NS1]))

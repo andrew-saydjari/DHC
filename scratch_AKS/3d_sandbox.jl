@@ -7,7 +7,7 @@ using HDF5
 using Test
 using SparseArrays
 
-filter_hash = fink_filter_hash(1, 8, nx=256, pc=1, wd=1)
+filter_hash = fink_filter_hash(1, 8, nx=128, pc=1, wd=1)
 out = DHC_compute(rand(256,256),filter_hash,doS2=true, doS12=false, doS20=false)
 out = DHC_compute(rand(256,256),filter_hash,doS2=true, doS12=true, doS20=false)
 out = DHC_compute(rand(256,256),filter_hash,doS2=true, doS12=true, doS20=true)
