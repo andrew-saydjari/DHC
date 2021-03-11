@@ -1302,7 +1302,133 @@ module DHC_2DUtils
     end
 
 
-    function isoMaker(coeff, S1Mat, S2Mat)
+    function S1_equiv_matrix(fhash,l_shift)
+            # fhash is the filter hash output by fink_filter_hash
+            # The output matrix converts an S1 coeff vector to S1iso by
+            #   summing over l
+            # Matrix is stored in sparse CSC format using SparseArrays.
+            # DPF 2021-Feb-18
+
+            # Does hash contain Omega filter?
+            Omega   = haskey(fhash, "Omega_index")
+            if Omega Ω_ind = fhash["Omega_index"] end
+
+            # unpack fhash
+            Nl      = length(fhash["theta_value"])
+            Nj      = length(fhash["j_value"])
+            Nf      = length(fhash["filt_value"])
+            ψ_ind   = fhash["psi_index"]
+            ϕ_ind   = fhash["phi_index"]
+
+            # number of iso coefficients
+            Niso    = Omega ? Nj+2 : Nj+1
+            Mat     = zeros(Int32, Nf, Nf)
+
+            # first J elements of iso
+            for j = 1:Nj
+                for l = 1:Nl
+                    λ = ψ_ind[j,l]
+                    λ1 = ψ_ind[j,mod1(l+l_shift,Nl)]
+                    Mat[λ1, λ] = 1
+                end
+            end
+
+            # Next elements are ϕ, Ω
+            Mat[ϕ_ind, ϕ_ind] = 1
+            if Omega Mat[Ω_ind, Ω_ind] = 1 end
+
+            return sparse(Mat)
+        end
+
+
+    function S2_equiv_matrix(fhash,l_shift)
+        # fhash is the filter hash output by fink_filter_hash
+        # The output matrix converts an S2 coeff vector to S2iso by
+        #   summing over l1,l2 and fixed Δl.
+        # Matrix is stored in sparse CSC format using SparseArrays.
+        # DPF 2021-Feb-18
+
+        # Does hash contain Omega filter?
+        Omega   = haskey(fhash, "Omega_index")
+        if Omega Ω_ind = fhash["Omega_index"] end
+
+        # unpack fhash
+        Nl      = length(fhash["theta_value"])
+        Nj      = length(fhash["j_value"])
+        Nf      = length(fhash["filt_value"])
+        ψ_ind   = fhash["psi_index"]
+        ϕ_ind   = fhash["phi_index"]
+
+        # number of iso coefficients
+        Niso    = Omega ? Nj*Nj*Nl+4*Nj+4 : Nj*Nj*Nl+2*Nj+1
+        Mat     = zeros(Int32, Nf*Nf, Nf*Nf)
+
+        # first J*J*L elements of iso
+        for j1 = 1:Nj
+            for j2 = 1:Nj
+                for l1 = 1:Nl
+                    for l2 = 1:Nl
+                        λ1     = ψ_ind[j1,l1]
+                        λ2     = ψ_ind[j2,l2]
+                        λ1_new     = ψ_ind[j1,mod1(l1+l_shift,Nl)]
+                        λ2_new     = ψ_ind[j2,mod1(l2+l_shift,Nl)]
+
+                        Icoeff = λ1+Nf*(λ2-1)
+                        Icoeff_new = λ1_new+Nf*(λ2_new-1)
+                        Mat[Icoeff_new, Icoeff] = 1
+                    end
+                end
+            end
+        end
+
+        # Next J elements are λϕ, then J elements ϕλ
+        for j = 1:Nj
+            for l = 1:Nl
+                λ      = ψ_ind[j,l]
+                Icoeff = λ+Nf*(ϕ_ind-1)  # λϕ
+
+                λ_new      = ψ_ind[j,mod1(l+l_shift,Nl)]
+                Icoeff_new = λ_new+Nf*(ϕ_ind-1)  # λϕ
+
+                Mat[Icoeff_new, Icoeff] = 1
+
+                Icoeff = ϕ_ind+Nf*(λ-1)  # ϕλ
+                Icoeff_new = ϕ_ind+Nf*(λ_new-1)  # ϕλ
+                Mat[Icoeff_new, Icoeff] = 1
+            end
+        end
+
+        # Next 1 element is ϕϕ
+        Icoeff = ϕ_ind+Nf*(ϕ_ind-1)
+        Mat[Icoeff, Icoeff] = 1
+
+        # If the Omega filter exists, add more terms
+        if Omega
+            # Next J elements are λΩ, then J elements Ωλ
+            for j = 1:Nj
+                for l = 1:Nl
+                    λ      = ψ_ind[j,l]
+                    λ_new      = ψ_ind[j,mod1(l+l_shift,Nl)]
+                    Icoeff = λ+Nf*(Ω_ind-1)  # λΩ
+                    Icoeff_new = λ_new+Nf*(Ω_ind-1)  # λΩ
+                    Mat[Icoeff_new, Icoeff] = 1
+
+                    Iiso   = I0+Nj+j
+                    Icoeff = Ω_ind+Nf*(λ-1)  # Ωλ
+                    Icoeff_new = Ω_ind+Nf*(λ_new-1)  # Ωλ
+                    Mat[Icoeff_new, Icoeff] = 1
+                end
+            end
+            # Next 3 elements are ϕΩ, Ωϕ, ΩΩ
+            Mat[ϕ_ind+Nf*(Ω_ind-1), ϕ_ind+Nf*(Ω_ind-1)] = 1
+            Mat[Ω_ind+Nf*(ϕ_ind-1), Ω_ind+Nf*(ϕ_ind-1)] = 1
+            Mat[Ω_ind+Nf*(Ω_ind-1), Ω_ind+Nf*(Ω_ind-1)] = 1
+        end
+
+        return sparse(Mat)
+    end
+
+    function trasformMaker(coeff, S1Mat, S2Mat)
         NS1 = size(S1Mat)[2]
         NS2 = size(S2Mat)[2]
         S1iso = transpose(S1Mat*transpose(coeff[:,2+1:2+NS1]))

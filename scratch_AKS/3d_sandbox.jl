@@ -7,6 +7,14 @@ using HDF5
 using Test
 using SparseArrays
 
+filter_hash = fink_filter_hash(1, 8, nx=256, pc=1, wd=1)
+out = DHC_compute(rand(256,256),filter_hash,doS2=true, doS12=false, doS20=false)
+out = DHC_compute(rand(256,256),filter_hash,doS2=true, doS12=true, doS20=false)
+out = DHC_compute(rand(256,256),filter_hash,doS2=true, doS12=true, doS20=true)
+out = DHC_compute(rand(256,256),filter_hash,doS2=true, doS12=true, doS20=true)
+out = DHC_compute(rand(256,256),filter_hash,doS2=true, doS12=true, doS20=true)
+out = DHC_compute(rand(256,256),filter_hash,doS2=true, doS12=true, doS20=true)
+
 function fink_filter_bank(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true)
     #c     - sets the scale sampling rate (1 is dyadic, 2 is half dyadic)
     #L     - number of angular bins (usually 8*pc or 16*pc)
@@ -246,7 +254,7 @@ Profile.clear()
 
 Juno.profiler()
 
-@benchmark filt_3d = fink_filter_bank_3dizer(hash, 1, nz=128)
+@benchmark fink_filter_bank_3dizer(hash, 1, nz=128)
 
 hash = fink_filter_hash(1, 8, nx=128, pc=1, wd=1)
 @benchmark filt_3d = fink_filter_bank_3dizer(hash, 1, nz=128)
