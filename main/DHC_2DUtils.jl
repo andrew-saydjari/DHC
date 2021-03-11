@@ -1301,7 +1301,6 @@ module DHC_2DUtils
         return sparse(Mat)
     end
 
-
     function S1_equiv_matrix(fhash,l_shift)
             # fhash is the filter hash output by fink_filter_hash
             # The output matrix converts an S1 coeff vector to S1iso by
@@ -1339,7 +1338,6 @@ module DHC_2DUtils
 
             return sparse(Mat)
         end
-
 
     function S2_equiv_matrix(fhash,l_shift)
         # fhash is the filter hash output by fink_filter_hash
