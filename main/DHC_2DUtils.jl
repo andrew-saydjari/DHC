@@ -38,6 +38,8 @@ module DHC_2DUtils
         hash["S1_iso_mat"] = S1_iso_mat
         S2_iso_mat = S2_iso_matrix(hash)
         hash["S2_iso_mat"] = S2_iso_mat
+        hash["num_iso_coeff"] = size(S1_iso_mat)[1] + size(S2_iso_mat)[1] + 2
+        hash["num_coeff"] = size(S1_iso_mat)[2] + size(S2_iso_mat)[2] + 2
 
         return hash
     end
