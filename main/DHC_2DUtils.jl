@@ -20,7 +20,9 @@ module DHC_2DUtils
     export DHC_compute_3d
     export S1_iso_matrix3d
     export S2_iso_matrix3d
-    export isoMaker
+    export transformMaker
+
+## Filter hash construct core
 
     function fink_filter_hash(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true)
         # -------- compute the filter bank
@@ -102,6 +104,100 @@ module DHC_2DUtils
         return hash
     end
 
+    function fink_filter_bank_3dizer(hash, cz; nz=256)
+        # -------- set parameters
+        nx = convert(Int64,hash["npix"])
+        n2d = size(hash["filt_value"])[1]
+        dz = nz/2-1
+        J = size(hash["j_value"])[1]
+        L = size(hash["theta_value"])[1]
+
+        im_scale = convert(Int8,log2(nz))
+        # -------- number of bins in radial direction (size scales)
+        K = (im_scale-2)*cz
+
+        # -------- allocate output array of zeros
+        J_L_K     = zeros(Int32, n2d*K,3)
+        psi_index = zeros(Int32, J+1, L, K)
+        k_value   = zeros(Float64, K)
+        logr      = zeros(Float64,nz)
+        filt_temp = zeros(Float64,nx,nx,nz)
+        F_z       = zeros(Float64,nx,nx,nz)
+        #F_p       = zeros(Float64,nx,nx,nz)
+
+        filtind = fill(CartesianIndex{3}[], K*n2d)
+        filtval = fill(Float64[], K*n2d)
+
+        for z = 1:convert(Int64,dz+1)
+            sz = mod(z+dz,nz)-dz-1
+            z2 = sz^2
+            logr[z] = 0.5*log2(max(1,z2))
+        end
+
+        @inbounds for k_ind = 1:K
+            k = k_ind/cz
+            k_value[k_ind] = k  # store for later
+            krad  = im_scale-k-1
+            Δk    = abs.(logr.-krad)
+            kmask = (Δk .<= 1/cz)
+            k_count = count(kmask)
+            k_vals = findall(kmask)
+
+            # -------- radial part
+            #I have somehow dropped a factor of sqrt(2) which has been reinserted as a 0.5... fix my brain
+            @views F_z[:,:,kmask].= reshape(1/sqrt(2).*cos.(Δk[kmask] .* (cz*π/2)),1,1,k_count)
+            @inbounds for index = 1:n2d
+                p_ind = hash["filt_index"][index]
+                p_filt = hash["filt_value"][index]
+                #F_p[p_ind,:] .= p_filt
+                f_ind    = k_ind + (index-1)*K
+                @views filt_tmp = p_filt.*F_z[p_ind,kmask]
+                #temp_ind = findall((F_p .> 1E-13) .& (F_z .> 1E-13))
+                #@views filt_tmp = F_p[temp_ind].*F_z[temp_ind]
+                ind = findall(filt_tmp .> 1E-13)
+                @views filtind[f_ind] = map(x->CartesianIndex(p_ind[x[1]][1],p_ind[x[1]][2],k_vals[x[2]]),ind)
+                #filtind[f_ind] = temp_ind[ind]
+                @views filtval[f_ind] = filt_tmp[ind]
+                @views J_L_K[f_ind,:] = [hash["J_L"][index,1],hash["J_L"][index,2],k_ind-1]
+                psi_index[hash["J_L"][index,1]+1,hash["J_L"][index,2]+1,k_ind] = f_ind
+
+            end
+        end
+
+        # -------- metadata dictionary
+        info=Dict()
+        info["npix"]         = hash["npix"]
+        info["j_value"]      = hash["j_value"]
+        info["theta_value"]  = hash["theta_value"]
+        info["2d_psi_index"]    = hash["psi_index"]
+        info["2d_phi_index"]    = hash["phi_index"]
+        info["2d_J_L"]          = hash["J_L"]
+        info["2d_pc"]           = hash["pc"]
+        info["2d_wd"]           = hash["wd"]
+        info["2d_fs_center_r"]  = hash["fs_center_r"]
+        info["2d_filt_index"]   = hash["filt_index"]
+        info["2d_filt_value"]   = hash["filt_value"]
+
+        info["nz"]              = nz
+        info["cz"]              = cz
+        info["J_L_K"]           = psi_index
+        info["psi_index"]       = psi_index
+        info["k_value"]         = k_value
+        info["filt_index"]      = filtind
+        info["filt_value"]      = filtval
+
+        # -------- compute matrix that projects iso coeffs, add to hash
+        S1_iso_mat = S1_iso_matrix3d(info)
+        info["S1_iso_mat"] = S1_iso_mat
+        S2_iso_mat = S2_iso_matrix3d(info)
+        info["S2_iso_mat"] = S2_iso_mat
+
+        #
+
+        return info
+    end
+
+## Matrix for transformations
     function S1_iso_matrix(fhash)
         # fhash is the filter hash output by fink_filter_hash
         # The output matrix converts an S1 coeff vector to S1iso by
@@ -139,7 +235,6 @@ module DHC_2DUtils
 
         return sparse(Mat)
     end
-
 
     function S2_iso_matrix(fhash)
         # fhash is the filter hash output by fink_filter_hash
@@ -224,7 +319,283 @@ module DHC_2DUtils
         return sparse(Mat)
     end
 
+    function S1_iso_matrix3d(fhash)
+        # fhash is the filter hash output by fink_filter_hash
+        # The output matrix converts an S1 coeff vector to S1iso by
+        #   summing over l
+        # Matrix is stored in sparse CSC format using SparseArrays.
+        # DPF 2021-Feb-18
+        # AKS 2021-Feb-22
 
+        # Does hash contain Omega filter?
+        #Omega   = haskey(fhash, "Omega_index")
+        #if Omega Ω_ind = fhash["Omega_index"] end
+
+        # unpack fhash
+        Nl      = length(fhash["theta_value"])
+        Nj      = length(fhash["j_value"])
+        Nk      = length(fhash["k_value"])
+        Nf      = length(fhash["filt_value"])
+        ψ_ind   = fhash["psi_index"]
+        #ϕ_ind   = fhash["phi_index"]
+
+        # number of iso coefficients
+        #Niso    = Omega ? Nj+2 : Nj+1
+        Niso    = (Nj+1)*Nk
+        Mat     = zeros(Int32, Niso, Nf)
+
+        # first J elements of iso
+        for j = 1:Nj
+            for l = 1:Nl
+                for k=1:Nk
+                    λ = ψ_ind[j,l,k]
+                    Mat[j+(k-1)*Nj, λ] = 1
+                end
+            end
+        end
+
+        j = Nj+1
+        l = 1
+        for k=1:Nk
+            λ = ψ_ind[j,l,k]
+            Mat[j+(k-1)*Nj, λ] = 1
+        end
+
+        return sparse(Mat)
+    end
+
+    function S2_iso_matrix3d(fhash)
+        # fhash is the filter hash output by fink_filter_hash
+        # The output matrix converts an S2 coeff vector to S2iso by
+        #   summing over l1,l2 and fixed Δl.
+        # Matrix is stored in sparse CSC format using SparseArrays.
+        # DPF 2021-Feb-18
+        # AKS 2021-Feb-22
+
+        # Does hash contain Omega filter?
+        #Omega   = haskey(fhash, "Omega_index")
+        #if Omega Ω_ind = fhash["Omega_index"] end
+
+        # unpack fhash
+        Nl      = length(fhash["theta_value"])
+        Nj      = length(fhash["j_value"])
+        Nk      = length(fhash["k_value"])
+        Nf      = length(fhash["filt_value"])
+        ψ_ind   = fhash["psi_index"]
+        #ϕ_ind   = fhash["phi_index"]
+
+        # number of iso coefficients
+        #Niso    = Omega ? Nj*Nj*Nl+4*Nj+4 : Nj*Nj*Nl+2*Nj+1
+        Niso    = Nj*Nj*Nk*Nk*Nl+2*Nj*Nk*Nk+Nk*Nk
+        Mat     = zeros(Int32, Niso, Nf*Nf)
+
+        #should probably think about reformatting to (Nj+1) so phi
+        #phi cross terms are in the right place
+
+        # first J*J*K*K*L elements of iso
+        for j1 = 1:Nj
+            for j2 = 1:Nj
+                for l1 = 1:Nl
+                    for l2 = 1:Nl
+                        for k1 = 1:Nk
+                            for k2 = 1:Nk
+                                DeltaL = mod(l1-l2, Nl)
+                                λ1     = ψ_ind[j1,l1,k1]
+                                λ2     = ψ_ind[j2,l2,k2]
+
+                                Iiso   = k1+Nk*((k2-1)+Nk*((j1-1)+Nj*((j2-1)+Nj*DeltaL)))
+                                Icoeff = λ1+Nf*(λ2-1)
+                                Mat[Iiso, Icoeff] = 1
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        # Next J elements are λϕ, then J elements ϕλ
+        for j = 1:Nj
+            for l = 1:Nl
+                for k1 = 1:Nk
+                    for k2 =1:Nk
+                        λ      = ψ_ind[j,l,k1]
+                        Iiso   = Nj*Nj*Nk*Nk*Nl+k1+Nk*((k2-1)+Nk*(j-1))
+                        Icoeff = λ+Nf*(ψ_ind[Nj+1,1,k2]-1)  # λϕ
+                        Mat[Iiso, Icoeff] = 1
+
+                        Iiso   = Nj*Nj*Nk*Nk*Nl+Nj*Nk*Nk+k1+Nk*((k2-1)+Nk*(j-1))
+                        Icoeff = (ψ_ind[Nj+1,1,k2]-1)+Nf*(λ-1)  # ϕλ
+                        Mat[Iiso, Icoeff] = 1
+                    end
+                end
+            end
+        end
+
+        # Next Nk*Nk elements are ϕ(k)ϕ(k)
+        j = Nj+1
+        l = 1
+        for k1=1:Nk
+            for k2=1:Nk
+                λ1 = ψ_ind[j,l,k1]
+                λ2 = ψ_ind[j,l,k2]
+
+                Iiso = Nj*Nj*Nk*Nk*Nl+2*Nj*Nk*Nk+k1+Nk*(k2-1)
+                Icoeff = λ1+Nf*(λ2-1)
+                Mat[Iiso, Icoeff] = 1
+            end
+        end
+
+        # # If the Omega filter exists, add more terms
+        # if Omega
+        #     # Next J elements are λΩ, then J elements Ωλ
+        #     for j = 1:Nj
+        #         for l = 1:Nl
+        #             λ      = ψ_ind[j,l]
+        #             Iiso   = I0+j
+        #             Icoeff = λ+Nf*(Ω_ind-1)  # λΩ
+        #             Mat[Iiso, Icoeff] = 1
+        #
+        #             Iiso   = I0+Nj+j
+        #             Icoeff = Ω_ind+Nf*(λ-1)  # Ωλ
+        #             Mat[Iiso, Icoeff] = 1
+        #         end
+        #     end
+        #     # Next 3 elements are ϕΩ, Ωϕ, ΩΩ
+        #     Iiso   = I0+Nj+Nj
+        #     Mat[Iiso+1, ϕ_ind+Nf*(Ω_ind-1)] = 1
+        #     Mat[Iiso+2, Ω_ind+Nf*(ϕ_ind-1)] = 1
+        #     Mat[Iiso+3, Ω_ind+Nf*(Ω_ind-1)] = 1
+        # end
+        #
+        return sparse(Mat)
+    end
+
+    function S1_equiv_matrix(fhash,l_shift)
+            # fhash is the filter hash output by fink_filter_hash
+            # The output matrix converts an S1 coeff vector to S1iso by
+            #   summing over l
+            # Matrix is stored in sparse CSC format using SparseArrays.
+            # DPF 2021-Feb-18
+
+            # Does hash contain Omega filter?
+            Omega   = haskey(fhash, "Omega_index")
+            if Omega Ω_ind = fhash["Omega_index"] end
+
+            # unpack fhash
+            Nl      = length(fhash["theta_value"])
+            Nj      = length(fhash["j_value"])
+            Nf      = length(fhash["filt_value"])
+            ψ_ind   = fhash["psi_index"]
+            ϕ_ind   = fhash["phi_index"]
+
+            # number of iso coefficients
+            Niso    = Omega ? Nj+2 : Nj+1
+            Mat     = zeros(Int32, Nf, Nf)
+
+            # first J elements of iso
+            for j = 1:Nj
+                for l = 1:Nl
+                    λ = ψ_ind[j,l]
+                    λ1 = ψ_ind[j,mod1(l+l_shift,Nl)]
+                    Mat[λ1, λ] = 1
+                end
+            end
+
+            # Next elements are ϕ, Ω
+            Mat[ϕ_ind, ϕ_ind] = 1
+            if Omega Mat[Ω_ind, Ω_ind] = 1 end
+
+            return sparse(Mat)
+    end
+
+    function S2_equiv_matrix(fhash,l_shift)
+        # fhash is the filter hash output by fink_filter_hash
+        # The output matrix converts an S2 coeff vector to S2iso by
+        #   summing over l1,l2 and fixed Δl.
+        # Matrix is stored in sparse CSC format using SparseArrays.
+        # DPF 2021-Feb-18
+
+        # Does hash contain Omega filter?
+        Omega   = haskey(fhash, "Omega_index")
+        if Omega Ω_ind = fhash["Omega_index"] end
+
+        # unpack fhash
+        Nl      = length(fhash["theta_value"])
+        Nj      = length(fhash["j_value"])
+        Nf      = length(fhash["filt_value"])
+        ψ_ind   = fhash["psi_index"]
+        ϕ_ind   = fhash["phi_index"]
+
+        # number of iso coefficients
+        Niso    = Omega ? Nj*Nj*Nl+4*Nj+4 : Nj*Nj*Nl+2*Nj+1
+        Mat     = zeros(Int32, Nf*Nf, Nf*Nf)
+
+        # first J*J*L elements of iso
+        for j1 = 1:Nj
+            for j2 = 1:Nj
+                for l1 = 1:Nl
+                    for l2 = 1:Nl
+                        λ1     = ψ_ind[j1,l1]
+                        λ2     = ψ_ind[j2,l2]
+                        λ1_new     = ψ_ind[j1,mod1(l1+l_shift,Nl)]
+                        λ2_new     = ψ_ind[j2,mod1(l2+l_shift,Nl)]
+
+                        Icoeff = λ1+Nf*(λ2-1)
+                        Icoeff_new = λ1_new+Nf*(λ2_new-1)
+                        Mat[Icoeff_new, Icoeff] = 1
+                    end
+                end
+            end
+        end
+
+        # Next J elements are λϕ, then J elements ϕλ
+        for j = 1:Nj
+            for l = 1:Nl
+                λ      = ψ_ind[j,l]
+                Icoeff = λ+Nf*(ϕ_ind-1)  # λϕ
+
+                λ_new      = ψ_ind[j,mod1(l+l_shift,Nl)]
+                Icoeff_new = λ_new+Nf*(ϕ_ind-1)  # λϕ
+
+                Mat[Icoeff_new, Icoeff] = 1
+
+                Icoeff = ϕ_ind+Nf*(λ-1)  # ϕλ
+                Icoeff_new = ϕ_ind+Nf*(λ_new-1)  # ϕλ
+                Mat[Icoeff_new, Icoeff] = 1
+            end
+        end
+
+        # Next 1 element is ϕϕ
+        Icoeff = ϕ_ind+Nf*(ϕ_ind-1)
+        Mat[Icoeff, Icoeff] = 1
+
+        # If the Omega filter exists, add more terms
+        if Omega
+            # Next J elements are λΩ, then J elements Ωλ
+            for j = 1:Nj
+                for l = 1:Nl
+                    λ      = ψ_ind[j,l]
+                    λ_new      = ψ_ind[j,mod1(l+l_shift,Nl)]
+                    Icoeff = λ+Nf*(Ω_ind-1)  # λΩ
+                    Icoeff_new = λ_new+Nf*(Ω_ind-1)  # λΩ
+                    Mat[Icoeff_new, Icoeff] = 1
+
+                    Iiso   = I0+Nj+j
+                    Icoeff = Ω_ind+Nf*(λ-1)  # Ωλ
+                    Icoeff_new = Ω_ind+Nf*(λ_new-1)  # Ωλ
+                    Mat[Icoeff_new, Icoeff] = 1
+                end
+            end
+            # Next 3 elements are ϕΩ, Ωϕ, ΩΩ
+            Mat[ϕ_ind+Nf*(Ω_ind-1), ϕ_ind+Nf*(Ω_ind-1)] = 1
+            Mat[Ω_ind+Nf*(ϕ_ind-1), Ω_ind+Nf*(ϕ_ind-1)] = 1
+            Mat[Ω_ind+Nf*(Ω_ind-1), Ω_ind+Nf*(Ω_ind-1)] = 1
+        end
+
+        return sparse(Mat)
+    end
+
+## Derivatives
     function wst_S1_deriv(image::Array{Float64,2}, filter_hash::Dict, FFTthreads::Int=1)
 
         # Use nthread threads for FFT -- but for Nx<512 nthread=1 is fastest.  Overhead?
@@ -260,7 +631,6 @@ module DHC_2DUtils
         end
         return dS1dα
     end
-
 
     function wst_S20_deriv(image::Array{Float64,2}, filter_hash::Dict, FFTthreads::Int=1)
 
@@ -320,7 +690,6 @@ module DHC_2DUtils
         return dS20dα
     end
 
-
     function wst_S20_deriv_sum(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64}, FFTthreads::Int=1)
         # Sum over (f1,f2) filter pairs for S20 derivative.  This is much faster
         #   than calling wst_S20_deriv() because the sum can be moved inside the FFT.
@@ -372,6 +741,7 @@ module DHC_2DUtils
         return ΣdS20dα
     end
 
+## Core compute function
 
     function DHC_compute(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
         doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false, FFTthreads=2)
@@ -740,100 +1110,6 @@ module DHC_2DUtils
         return out_coeff
     end
 
-    function fink_filter_bank_3dizer(hash, cz; nz=256)
-        # -------- set parameters
-        nx = convert(Int64,hash["npix"])
-        n2d = size(hash["filt_value"])[1]
-        dz = nz/2-1
-        J = size(hash["j_value"])[1]
-        L = size(hash["theta_value"])[1]
-
-        im_scale = convert(Int8,log2(nz))
-        # -------- number of bins in radial direction (size scales)
-        K = (im_scale-2)*cz
-
-        # -------- allocate output array of zeros
-        J_L_K     = zeros(Int32, n2d*K,3)
-        psi_index = zeros(Int32, J+1, L, K)
-        k_value   = zeros(Float64, K)
-        logr      = zeros(Float64,nz)
-        filt_temp = zeros(Float64,nx,nx,nz)
-        F_z       = zeros(Float64,nx,nx,nz)
-        #F_p       = zeros(Float64,nx,nx,nz)
-
-        filtind = fill(CartesianIndex{3}[], K*n2d)
-        filtval = fill(Float64[], K*n2d)
-
-        for z = 1:convert(Int64,dz+1)
-            sz = mod(z+dz,nz)-dz-1
-            z2 = sz^2
-            logr[z] = 0.5*log2(max(1,z2))
-        end
-
-        @inbounds for k_ind = 1:K
-            k = k_ind/cz
-            k_value[k_ind] = k  # store for later
-            krad  = im_scale-k-1
-            Δk    = abs.(logr.-krad)
-            kmask = (Δk .<= 1/cz)
-            k_count = count(kmask)
-            k_vals = findall(kmask)
-
-            # -------- radial part
-            #I have somehow dropped a factor of sqrt(2) which has been reinserted as a 0.5... fix my brain
-            @views F_z[:,:,kmask].= reshape(1/sqrt(2).*cos.(Δk[kmask] .* (cz*π/2)),1,1,k_count)
-            @inbounds for index = 1:n2d
-                p_ind = hash["filt_index"][index]
-                p_filt = hash["filt_value"][index]
-                #F_p[p_ind,:] .= p_filt
-                f_ind    = k_ind + (index-1)*K
-                @views filt_tmp = p_filt.*F_z[p_ind,kmask]
-                #temp_ind = findall((F_p .> 1E-13) .& (F_z .> 1E-13))
-                #@views filt_tmp = F_p[temp_ind].*F_z[temp_ind]
-                ind = findall(filt_tmp .> 1E-13)
-                @views filtind[f_ind] = map(x->CartesianIndex(p_ind[x[1]][1],p_ind[x[1]][2],k_vals[x[2]]),ind)
-                #filtind[f_ind] = temp_ind[ind]
-                @views filtval[f_ind] = filt_tmp[ind]
-                @views J_L_K[f_ind,:] = [hash["J_L"][index,1],hash["J_L"][index,2],k_ind-1]
-                psi_index[hash["J_L"][index,1]+1,hash["J_L"][index,2]+1,k_ind] = f_ind
-
-            end
-        end
-
-        # -------- metadata dictionary
-        info=Dict()
-        info["npix"]         = hash["npix"]
-        info["j_value"]      = hash["j_value"]
-        info["theta_value"]  = hash["theta_value"]
-        info["2d_psi_index"]    = hash["psi_index"]
-        info["2d_phi_index"]    = hash["phi_index"]
-        info["2d_J_L"]          = hash["J_L"]
-        info["2d_pc"]           = hash["pc"]
-        info["2d_wd"]           = hash["wd"]
-        info["2d_fs_center_r"]  = hash["fs_center_r"]
-        info["2d_filt_index"]   = hash["filt_index"]
-        info["2d_filt_value"]   = hash["filt_value"]
-
-        info["nz"]              = nz
-        info["cz"]              = cz
-        info["J_L_K"]           = psi_index
-        info["psi_index"]       = psi_index
-        info["k_value"]         = k_value
-        info["filt_index"]      = filtind
-        info["filt_value"]      = filtval
-
-        # -------- compute matrix that projects iso coeffs, add to hash
-        S1_iso_mat = S1_iso_matrix3d(info)
-        info["S1_iso_mat"] = S1_iso_mat
-        S2_iso_mat = S2_iso_matrix3d(info)
-        info["S2_iso_mat"] = S2_iso_mat
-
-        #
-
-        return info
-    end
-
-
     function DHC_compute_3d(image::Array{Float64,3}, filter_hash; FFTthreads=2)
         # Use 2 threads for FFT
         FFTW.set_num_threads(FFTthreads)
@@ -1151,282 +1427,7 @@ module DHC_2DUtils
         return out_coeff
     end
 
-    function S1_iso_matrix3d(fhash)
-        # fhash is the filter hash output by fink_filter_hash
-        # The output matrix converts an S1 coeff vector to S1iso by
-        #   summing over l
-        # Matrix is stored in sparse CSC format using SparseArrays.
-        # DPF 2021-Feb-18
-        # AKS 2021-Feb-22
-
-        # Does hash contain Omega filter?
-        #Omega   = haskey(fhash, "Omega_index")
-        #if Omega Ω_ind = fhash["Omega_index"] end
-
-        # unpack fhash
-        Nl      = length(fhash["theta_value"])
-        Nj      = length(fhash["j_value"])
-        Nk      = length(fhash["k_value"])
-        Nf      = length(fhash["filt_value"])
-        ψ_ind   = fhash["psi_index"]
-        #ϕ_ind   = fhash["phi_index"]
-
-        # number of iso coefficients
-        #Niso    = Omega ? Nj+2 : Nj+1
-        Niso    = (Nj+1)*Nk
-        Mat     = zeros(Int32, Niso, Nf)
-
-        # first J elements of iso
-        for j = 1:Nj
-            for l = 1:Nl
-                for k=1:Nk
-                    λ = ψ_ind[j,l,k]
-                    Mat[j+(k-1)*Nj, λ] = 1
-                end
-            end
-        end
-
-        j = Nj+1
-        l = 1
-        for k=1:Nk
-            λ = ψ_ind[j,l,k]
-            Mat[j+(k-1)*Nj, λ] = 1
-        end
-
-        return sparse(Mat)
-    end
-
-
-    function S2_iso_matrix3d(fhash)
-        # fhash is the filter hash output by fink_filter_hash
-        # The output matrix converts an S2 coeff vector to S2iso by
-        #   summing over l1,l2 and fixed Δl.
-        # Matrix is stored in sparse CSC format using SparseArrays.
-        # DPF 2021-Feb-18
-        # AKS 2021-Feb-22
-
-        # Does hash contain Omega filter?
-        #Omega   = haskey(fhash, "Omega_index")
-        #if Omega Ω_ind = fhash["Omega_index"] end
-
-        # unpack fhash
-        Nl      = length(fhash["theta_value"])
-        Nj      = length(fhash["j_value"])
-        Nk      = length(fhash["k_value"])
-        Nf      = length(fhash["filt_value"])
-        ψ_ind   = fhash["psi_index"]
-        #ϕ_ind   = fhash["phi_index"]
-
-        # number of iso coefficients
-        #Niso    = Omega ? Nj*Nj*Nl+4*Nj+4 : Nj*Nj*Nl+2*Nj+1
-        Niso    = Nj*Nj*Nk*Nk*Nl+2*Nj*Nk*Nk+Nk*Nk
-        Mat     = zeros(Int32, Niso, Nf*Nf)
-
-        #should probably think about reformatting to (Nj+1) so phi
-        #phi cross terms are in the right place
-
-        # first J*J*K*K*L elements of iso
-        for j1 = 1:Nj
-            for j2 = 1:Nj
-                for l1 = 1:Nl
-                    for l2 = 1:Nl
-                        for k1 = 1:Nk
-                            for k2 = 1:Nk
-                                DeltaL = mod(l1-l2, Nl)
-                                λ1     = ψ_ind[j1,l1,k1]
-                                λ2     = ψ_ind[j2,l2,k2]
-
-                                Iiso   = k1+Nk*((k2-1)+Nk*((j1-1)+Nj*((j2-1)+Nj*DeltaL)))
-                                Icoeff = λ1+Nf*(λ2-1)
-                                Mat[Iiso, Icoeff] = 1
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        # Next J elements are λϕ, then J elements ϕλ
-        for j = 1:Nj
-            for l = 1:Nl
-                for k1 = 1:Nk
-                    for k2 =1:Nk
-                        λ      = ψ_ind[j,l,k1]
-                        Iiso   = Nj*Nj*Nk*Nk*Nl+k1+Nk*((k2-1)+Nk*(j-1))
-                        Icoeff = λ+Nf*(ψ_ind[Nj+1,1,k2]-1)  # λϕ
-                        Mat[Iiso, Icoeff] = 1
-
-                        Iiso   = Nj*Nj*Nk*Nk*Nl+Nj*Nk*Nk+k1+Nk*((k2-1)+Nk*(j-1))
-                        Icoeff = (ψ_ind[Nj+1,1,k2]-1)+Nf*(λ-1)  # ϕλ
-                        Mat[Iiso, Icoeff] = 1
-                    end
-                end
-            end
-        end
-
-        # Next Nk*Nk elements are ϕ(k)ϕ(k)
-        j = Nj+1
-        l = 1
-        for k1=1:Nk
-            for k2=1:Nk
-                λ1 = ψ_ind[j,l,k1]
-                λ2 = ψ_ind[j,l,k2]
-
-                Iiso = Nj*Nj*Nk*Nk*Nl+2*Nj*Nk*Nk+k1+Nk*(k2-1)
-                Icoeff = λ1+Nf*(λ2-1)
-                Mat[Iiso, Icoeff] = 1
-            end
-        end
-
-        # # If the Omega filter exists, add more terms
-        # if Omega
-        #     # Next J elements are λΩ, then J elements Ωλ
-        #     for j = 1:Nj
-        #         for l = 1:Nl
-        #             λ      = ψ_ind[j,l]
-        #             Iiso   = I0+j
-        #             Icoeff = λ+Nf*(Ω_ind-1)  # λΩ
-        #             Mat[Iiso, Icoeff] = 1
-        #
-        #             Iiso   = I0+Nj+j
-        #             Icoeff = Ω_ind+Nf*(λ-1)  # Ωλ
-        #             Mat[Iiso, Icoeff] = 1
-        #         end
-        #     end
-        #     # Next 3 elements are ϕΩ, Ωϕ, ΩΩ
-        #     Iiso   = I0+Nj+Nj
-        #     Mat[Iiso+1, ϕ_ind+Nf*(Ω_ind-1)] = 1
-        #     Mat[Iiso+2, Ω_ind+Nf*(ϕ_ind-1)] = 1
-        #     Mat[Iiso+3, Ω_ind+Nf*(Ω_ind-1)] = 1
-        # end
-        #
-        return sparse(Mat)
-    end
-
-    function S1_equiv_matrix(fhash,l_shift)
-            # fhash is the filter hash output by fink_filter_hash
-            # The output matrix converts an S1 coeff vector to S1iso by
-            #   summing over l
-            # Matrix is stored in sparse CSC format using SparseArrays.
-            # DPF 2021-Feb-18
-
-            # Does hash contain Omega filter?
-            Omega   = haskey(fhash, "Omega_index")
-            if Omega Ω_ind = fhash["Omega_index"] end
-
-            # unpack fhash
-            Nl      = length(fhash["theta_value"])
-            Nj      = length(fhash["j_value"])
-            Nf      = length(fhash["filt_value"])
-            ψ_ind   = fhash["psi_index"]
-            ϕ_ind   = fhash["phi_index"]
-
-            # number of iso coefficients
-            Niso    = Omega ? Nj+2 : Nj+1
-            Mat     = zeros(Int32, Nf, Nf)
-
-            # first J elements of iso
-            for j = 1:Nj
-                for l = 1:Nl
-                    λ = ψ_ind[j,l]
-                    λ1 = ψ_ind[j,mod1(l+l_shift,Nl)]
-                    Mat[λ1, λ] = 1
-                end
-            end
-
-            # Next elements are ϕ, Ω
-            Mat[ϕ_ind, ϕ_ind] = 1
-            if Omega Mat[Ω_ind, Ω_ind] = 1 end
-
-            return sparse(Mat)
-        end
-
-    function S2_equiv_matrix(fhash,l_shift)
-        # fhash is the filter hash output by fink_filter_hash
-        # The output matrix converts an S2 coeff vector to S2iso by
-        #   summing over l1,l2 and fixed Δl.
-        # Matrix is stored in sparse CSC format using SparseArrays.
-        # DPF 2021-Feb-18
-
-        # Does hash contain Omega filter?
-        Omega   = haskey(fhash, "Omega_index")
-        if Omega Ω_ind = fhash["Omega_index"] end
-
-        # unpack fhash
-        Nl      = length(fhash["theta_value"])
-        Nj      = length(fhash["j_value"])
-        Nf      = length(fhash["filt_value"])
-        ψ_ind   = fhash["psi_index"]
-        ϕ_ind   = fhash["phi_index"]
-
-        # number of iso coefficients
-        Niso    = Omega ? Nj*Nj*Nl+4*Nj+4 : Nj*Nj*Nl+2*Nj+1
-        Mat     = zeros(Int32, Nf*Nf, Nf*Nf)
-
-        # first J*J*L elements of iso
-        for j1 = 1:Nj
-            for j2 = 1:Nj
-                for l1 = 1:Nl
-                    for l2 = 1:Nl
-                        λ1     = ψ_ind[j1,l1]
-                        λ2     = ψ_ind[j2,l2]
-                        λ1_new     = ψ_ind[j1,mod1(l1+l_shift,Nl)]
-                        λ2_new     = ψ_ind[j2,mod1(l2+l_shift,Nl)]
-
-                        Icoeff = λ1+Nf*(λ2-1)
-                        Icoeff_new = λ1_new+Nf*(λ2_new-1)
-                        Mat[Icoeff_new, Icoeff] = 1
-                    end
-                end
-            end
-        end
-
-        # Next J elements are λϕ, then J elements ϕλ
-        for j = 1:Nj
-            for l = 1:Nl
-                λ      = ψ_ind[j,l]
-                Icoeff = λ+Nf*(ϕ_ind-1)  # λϕ
-
-                λ_new      = ψ_ind[j,mod1(l+l_shift,Nl)]
-                Icoeff_new = λ_new+Nf*(ϕ_ind-1)  # λϕ
-
-                Mat[Icoeff_new, Icoeff] = 1
-
-                Icoeff = ϕ_ind+Nf*(λ-1)  # ϕλ
-                Icoeff_new = ϕ_ind+Nf*(λ_new-1)  # ϕλ
-                Mat[Icoeff_new, Icoeff] = 1
-            end
-        end
-
-        # Next 1 element is ϕϕ
-        Icoeff = ϕ_ind+Nf*(ϕ_ind-1)
-        Mat[Icoeff, Icoeff] = 1
-
-        # If the Omega filter exists, add more terms
-        if Omega
-            # Next J elements are λΩ, then J elements Ωλ
-            for j = 1:Nj
-                for l = 1:Nl
-                    λ      = ψ_ind[j,l]
-                    λ_new      = ψ_ind[j,mod1(l+l_shift,Nl)]
-                    Icoeff = λ+Nf*(Ω_ind-1)  # λΩ
-                    Icoeff_new = λ_new+Nf*(Ω_ind-1)  # λΩ
-                    Mat[Icoeff_new, Icoeff] = 1
-
-                    Iiso   = I0+Nj+j
-                    Icoeff = Ω_ind+Nf*(λ-1)  # Ωλ
-                    Icoeff_new = Ω_ind+Nf*(λ_new-1)  # Ωλ
-                    Mat[Icoeff_new, Icoeff] = 1
-                end
-            end
-            # Next 3 elements are ϕΩ, Ωϕ, ΩΩ
-            Mat[ϕ_ind+Nf*(Ω_ind-1), ϕ_ind+Nf*(Ω_ind-1)] = 1
-            Mat[Ω_ind+Nf*(ϕ_ind-1), Ω_ind+Nf*(ϕ_ind-1)] = 1
-            Mat[Ω_ind+Nf*(Ω_ind-1), Ω_ind+Nf*(Ω_ind-1)] = 1
-        end
-
-        return sparse(Mat)
-    end
+## Post processing
 
     function transformMaker(coeff, S1Mat, S2Mat)
         NS1 = size(S1Mat)[2]
@@ -1436,6 +1437,7 @@ module DHC_2DUtils
         return hcat(coeff[:,1:2],S1iso,S2iso)
     end
 
+## Filter bank utilities
     function fink_filter_bank(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true)
         #c     - sets the scale sampling rate (1 is dyadic, 2 is half dyadic)
         #L     - number of angular bins (usually 8*pc or 16*pc)
