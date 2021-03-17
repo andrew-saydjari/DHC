@@ -21,6 +21,7 @@ module DHC_2DUtils
     export S1_iso_matrix3d
     export S2_iso_matrix3d
     export transformMaker
+    export DHC_compute_RGB
 
 ## Filter hash construct core
 
