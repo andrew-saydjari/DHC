@@ -300,9 +300,33 @@ DHC_compute_RGB(out_test,filter_hash)
 
 @time DHC_compute_RGB(out_test,filter_hash,doS20=true)
 
-
 chan_img = channelview(train_x[:,:,:,ind])
 cv = colorview(RGB, StackedView(train_x[:,:,1,ind],train_x[:,:,2,ind],train_x[:,:,3,ind]))
 convert(RGB, HSL(270, 0.5, 0.5))
 y_im = YCbCr.(cv)
 channels = permutedims(channelview(float.(y_im)),(2,3,1))
+
+cifar_DHC_out = h5read("../DHC/scratch_AKS/data/cifar10_RGB.h5", "main/train_data")
+
+function transformMaker2(coeff, S1Mat, S2Mat; Nc=1)
+    NS1 = size(S1Mat)[2]
+    NS2 = size(S2Mat)[2]
+    if Nc==1
+        S0iso = coeff[:,1:2]
+        S1iso = transpose(S1Mat*transpose(coeff[:,2+1:2+NS1]))
+        S2iso = transpose(S2Mat*transpose(coeff[:,2+NS1+1:2+NS1+NS2]))
+    else
+        S0iso = coeff[:,1:2*Nc]
+        S1MatChan = blockdiag(collect(Iterators.repeated(S1Mat,Nc))...)
+        S2MatChan = blockdiag(collect(Iterators.repeated(S2Mat,Nc*Nc))...)
+        S1iso = transpose(S1MatChan*transpose(coeff[:,2*Nc+1:2*Nc+Nc*NS1]))
+        S2iso = transpose(S2MatChan*transpose(coeff[:,2*Nc+Nc*NS1+1:end]))
+    end
+    return hcat(S0iso,S1iso,S2iso)
+end
+
+transformMaker2(cifar_DHC_out',filter_hash["S1_iso_mat"],filter_hash["S2_iso_mat"],Nc=3)
+
+Nc = 3
+NS1 = size(filter_hash["S1_iso_mat"])[2]
+cifar_DHC_out[2*Nc+Nc*NS1+1:end,:]
