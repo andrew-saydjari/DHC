@@ -22,12 +22,14 @@ module DHC_2DUtils
     export S2_iso_matrix3d
     export transformMaker
     export DHC_compute_RGB
+    export S1_iso_matrix
+    export S2_iso_matrix
 
 ## Filter hash construct core
 
-    function fink_filter_hash(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true)
+    function fink_filter_hash(c, L; nx=256, wd=2, pc=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1)
         # -------- compute the filter bank
-        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on)
+        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on, wd_cutoff=wd_cutoff)
 
         # -------- list of non-zero pixels
         flist = fink_filter_list(filt)
@@ -1567,7 +1569,8 @@ module DHC_2DUtils
     end
 
 ## Filter bank utilities
-    function fink_filter_bank(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true)
+
+    function fink_filter_bank(c, L; nx=256, wd=2, pc=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1)
         #c     - sets the scale sampling rate (1 is dyadic, 2 is half dyadic)
         #L     - number of angular bins (usually 8*pc or 16*pc)
         #wd    - width of the wavelets (default 1, wd=2 for a double covering)
@@ -1585,7 +1588,7 @@ module DHC_2DUtils
 
         im_scale = convert(Int8,log2(nx))
         # -------- number of bins in radial direction (size scales)
-        J = (im_scale-2)*c
+        J = (im_scale-3)*c + 1
 
         # -------- allocate output array of zeros
         filt      = zeros(nx, nx, J*L+(Omega ? 2 : 1))
@@ -1597,12 +1600,12 @@ module DHC_2DUtils
         # -------- compute the required wd
         j_rad_exp = zeros(J)
         for j_ind = 1:J
-            j = j_ind/c
-            jrad  = im_scale-j-1
+            j = (j_ind-1)/c
+            jrad  = im_scale-j-2
             j_rad_exp[j_ind] = 2^(jrad)
         end
 
-        wd_j = max.(ceil.(L./(pc.*π.*j_rad_exp)),wd)
+        wd_j = max.(ceil.(wd_cutoff.*L./(pc.*π.*j_rad_exp)),wd)
 
         if !safety_on
             wd_j.=wd
@@ -1650,15 +1653,15 @@ module DHC_2DUtils
             # -------- loop over j for the radial part
             #    for (j_ind, j) in enumerate(1/c:1/c:im_scale-2)
                 j_ind_w_wd = findall(wd_j.==wd)
-                for j_ind = j_ind_w_wd
-                    j = j_ind/c
-                    j_value[j_ind] = j  # store for later
-                    jrad  = im_scale-j-1
+                for j_ind in j_ind_w_wd
+                    j = (j_ind-1)/c
+                    j_value[j_ind] = 1+j  # store for later
+                    jrad  = im_scale-j-2
                     Δj    = abs.(logr[angmask].-jrad)
-                    rmask = (Δj .<= 1/c)
+                    rmask = (Δj .<= 1) #deprecating the 1/c to 1, constant width
 
             # -------- radial part
-                    F_radial = cos.(Δj[rmask] .* (c*π/2))
+                    F_radial = cos.(Δj[rmask] .* (π/2)) #deprecating c*π/2 to π/2
                     ind      = angmask[rmask]
             #      Let's have these be (J,L) if you reshape...
             #        f_ind    = (j_ind-1)*L+l+1
@@ -1705,6 +1708,7 @@ module DHC_2DUtils
         info["J_L"]          = psi_ind_in
         info["pc"]           = pc
         info["wd"]           = wd_j
+        info["wd_cutoff"]    = wd_cutoff
         info["fs_center_r"]  = j_rad_exp
 
         if Omega     # append a filter containing the rest (outside Nyquist)
