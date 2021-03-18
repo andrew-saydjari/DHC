@@ -223,6 +223,7 @@ function fink_filter_bank_csafe(c, L; nx=256, wd=1, pc=1, shift=false, Omega=fal
     im_scale = convert(Int8,log2(nx))
     # -------- number of bins in radial direction (size scales)
     J = (im_scale-3)*c + 1
+    normj = 1/sqrt(c)
 
     # -------- allocate output array of zeros
     filt      = zeros(nx, nx, J*L+(Omega ? 2 : 1))
@@ -253,7 +254,7 @@ function fink_filter_bank_csafe(c, L; nx=256, wd=1, pc=1, shift=false, Omega=fal
         logr = zeros(nx, nx)
 
         wdθ  = wd*dθ
-        norm = 1.0/sqrt(wd)
+        norm = 1.0/(sqrt(wd))
         # -------- loop over l
         for l = 0:L-1
             θ_l        = dθ*l+θ_sh
@@ -295,7 +296,7 @@ function fink_filter_bank_csafe(c, L; nx=256, wd=1, pc=1, shift=false, Omega=fal
                 rmask = (Δj .<= 1) #deprecating the 1/c to 1, constant width
 
         # -------- radial part
-                F_radial = cos.(Δj[rmask] .* (π/2)) #deprecating c*π/2 to π/2
+                F_radial = normj .* cos.(Δj[rmask] .* (π/2)) #deprecating c*π/2 to π/2
                 ind      = angmask[rmask]
         #      Let's have these be (J,L) if you reshape...
         #        f_ind    = (j_ind-1)*L+l+1
@@ -377,3 +378,25 @@ filt_test = fink_filter_bank_csafe(1,8,wd=1,pc=1)[1]
 plot_filter_bank_QA(filt_test, fhash; fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/images/filter_bank_QA_csafe_wd1_C1_wide.png")
 
 # with wd=1, smallest is widened to 3, next to 2, rest to 1
+
+heatmap(fftshift(dropdims(sum(filt_test[:,:,:].^2,dims=3),dims=3)))
+
+fhash = fink_filter_bank(3,16,wd=2,pc=1)
+
+heatmap(fftshift(dropdims(sum(fhash[1].^2,dims=3),dims=3)))
+
+fhash = fink_filter_bank_csafe(4,16,wd=2,pc=1)
+
+heatmap(fftshift(dropdims(sum(fhash[1].^2,dims=3),dims=3)))
+
+fhash = fink_filter_hash_csafe(1,8,wd=1,pc=1,safety_on=false)
+filt_test = fink_filter_bank_csafe(1,8,wd=1,pc=1,safety_on=false)[1]
+
+plot_filter_bank_QA(filt_test, fhash; fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/images/filter_bank_QA_csafe_wd1_C1_wide_unsafe.png")
+
+
+filt_test = fink_filter_bank_csafe(1,8,wd=1,pc=2,safety_on=false)[1]
+heatmap(fftshift(dropdims(sum(filt_test[:,:,:].^2,dims=3),dims=3)))
+
+filt_test = fink_filter_bank_csafe(2,8,wd=4,pc=2)[1]
+heatmap(fftshift(dropdims(sum(filt_test[:,:,:].^2,dims=3),dims=3)))

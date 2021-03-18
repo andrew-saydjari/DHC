@@ -1589,6 +1589,7 @@ module DHC_2DUtils
         im_scale = convert(Int8,log2(nx))
         # -------- number of bins in radial direction (size scales)
         J = (im_scale-3)*c + 1
+        normj = 1/sqrt(c)
 
         # -------- allocate output array of zeros
         filt      = zeros(nx, nx, J*L+(Omega ? 2 : 1))
@@ -1619,7 +1620,7 @@ module DHC_2DUtils
             logr = zeros(nx, nx)
 
             wdθ  = wd*dθ
-            norm = 1.0/sqrt(wd)
+            norm = 1.0/(sqrt(wd))
             # -------- loop over l
             for l = 0:L-1
                 θ_l        = dθ*l+θ_sh
@@ -1661,7 +1662,7 @@ module DHC_2DUtils
                     rmask = (Δj .<= 1) #deprecating the 1/c to 1, constant width
 
             # -------- radial part
-                    F_radial = cos.(Δj[rmask] .* (π/2)) #deprecating c*π/2 to π/2
+                    F_radial = normj .* cos.(Δj[rmask] .* (π/2)) #deprecating c*π/2 to π/2
                     ind      = angmask[rmask]
             #      Let's have these be (J,L) if you reshape...
             #        f_ind    = (j_ind-1)*L+l+1
