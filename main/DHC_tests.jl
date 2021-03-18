@@ -71,6 +71,7 @@ module DHC_tests
         plot1(ps, wavepow, label=string("j=1:",jval[end]," ℓ=0:",L-1)) #clim=(-0.1,1)
 
         if info["pc"]==1
+            wavepow ./= 2
             wavepow += circshift(wavepow[end:-1:1,end:-1:1],(1,1))
         end
         plot1(ps, wavepow, bin=32, label="missing power") #clim=(-0.1,1)
