@@ -143,13 +143,13 @@ cmd=`ffmpeg -r 15 -f image2 -i frame%04d.png -vcodec libx264 -crf 25 -pix_fmt yu
 run(cmd)
 
 
-function rod_test(filter_hash, Nsam=1; nx=256, doS20=false)
+function rod_test(filter_hash, Nsam=1; nx=256, doS20=false, doS1=false)
     # Loop over many rod position angles, return Siso for all
     Nf      = length(filter_hash["filt_value"])
     Nj      = length(filter_hash["j_value"])
     Nl      = length(filter_hash["theta_value"])
     Npix    = filter_hash["npix"]
-    isomat  = filter_hash["S2_iso_mat"]
+    isomat  = doS1 ? filter_hash["S1_iso_mat"] : filter_hash["S2_iso_mat"]
     Niso    = size(isomat, 1)
 
     angmax  = 180.0
@@ -162,19 +162,20 @@ function rod_test(filter_hash, Nsam=1; nx=256, doS20=false)
         rod1 = zeros(nx,nx)
         ang = i*angstep
 
-        t = zeros(2+Nf+Nf*Nf)
+        t = 0.0
         for k=1:Nsam
             rod1 = rod_image(1,1,30*(nx/256),ang+dang*k/4,8,nx=nx)
             rod1 .-= mean(rod1)
-            t   += DHC_compute(rod1, filter_hash, doS2=!doS20, doS20=doS20)
+            doS2 = (!doS20 & !doS1)
+            t   = t.+DHC_compute(rod1, filter_hash, doS2=doS2, doS20=doS20)
         end
         t   ./= Nsam
 
         off2 = 2+Nf
-        S2 = t[off2+1:off2+Nf*Nf]
+        Sarr = doS1 ? t[3:end] : t[off2+1:off2+Nf*Nf]
 
-        println(i," of ",Nang,"  Sum of S2:  ",sum(S2), "  Sum of rod: ",sum(rod1))
-        Siso[:,i] = isomat * S2
+        println(i," of ",Nang,"  Sum of S:  ",sum(Sarr), "  Sum of rod: ",sum(rod1))
+        Siso[:,i] = isomat * Sarr
 
     end
     println(std(Siso))
@@ -218,6 +219,33 @@ function rodtest_plot_rms(Siso1,Siso4,Siso16;outname="test.png",
     return
 end
 
+
+function rodtest_plot_rms_S1(Siso1,Siso4,Siso16;outname="test.png",
+    label="Nsam=".*["1","4","16"], title=title)
+
+    ylim=10.0 .^(-8,0)
+    marg   = 10mm
+    coefftype = "S1"
+    xlabel = coefftype*"_ISO Index"
+    p1=plot(rodtest_rms(Siso1,frac=true),ylim=ylim,xlabel=xlabel,
+            ylabel="Fractional RMS", yscale=:log10, line=(:gray, :dot),
+            label=label[1],size=(700,1000),leftmargin=marg)
+    plot!(p1,rodtest_rms(Siso4,frac=true), line=(:gray, :dash),label=label[2])
+    plot!(p1,rodtest_rms(Siso16,frac=true), line=(:blue),label=label[3])
+    annotate!(p1,10,0.6*ylim[2],text(title,:left,:blue,16))
+
+    p2=plot(rodtest_rms(Siso1),ylim=[1E-10,1E-2],xlabel=xlabel,
+            ylabel="RMS [Energy]", yscale=:log10, line=(:gray, :dot),
+            label=label[1],size=(700,1000))
+    plot!(p2,rodtest_rms(Siso4), line=(:gray, :dash),label=label[2])
+    plot!(p2,rodtest_rms(Siso16), line=(:green),label=label[3])
+
+    ps = [p1,p2]
+    myplot = plot(ps..., layout=(2,1))
+    savefig(myplot, outname)
+
+    return
+end
 
 
 function rodtest_plot_coeffs(Siso1,Siso4,Siso16;outname="test.png",
@@ -275,6 +303,26 @@ function rod_test_plot(Nsam; L=8, wd=1, nx=128,
     return
 end
 
+
+function rod_test_plot_S1(Nsam; L=8, wd=1, nx=128,
+                       outname="test.png", doS20=false)
+    # run rod_test for 3 values of Nsam and output PNG file
+    fhash = fink_filter_hash(1, L, wd=wd, nx=nx, Omega=true)
+    println(fhash["wd"])
+    Siso_A = rod_test(fhash, Nsam[1], nx=nx, doS1=true)
+    Siso_B = rod_test(fhash, Nsam[2], nx=nx, doS1=true)
+    Siso_C = rod_test(fhash, Nsam[3], nx=nx, doS1=true)
+    mylabels = "Nsam=".*string.(Nsam)
+    coefftype = doS20 ? "S20" : "S2"
+    title = string(coefftype, "iso, L=", L, ", wd=", wd)
+    rodtest_plot_rms_S1(Siso_A, Siso_B, Siso_C, outname=outname,
+                     label=mylabels, title=title)
+
+    return
+end
+
+
+
 # Just run this code to make the plots I sent on Mar 14, 2021 (π-day!)
 nx=128
 snx = string(nx)
@@ -289,3 +337,8 @@ rod_test_plot(Nsam; L=8, wd=1, nx=nx, outname="S20-RMS-NL8-wd1-"*snx*".png", doS
 rod_test_plot(Nsam; L=8, wd=2, nx=nx, outname="S20-RMS-NL8-wd2-"*snx*".png", doS20=true)
 rod_test_plot(Nsam; L=8, wd=4, nx=nx, outname="S20-RMS-NL8-wd4-"*snx*".png", doS20=true)
 rod_test_plot([1,4,32]; L=16, wd=4, nx=nx, outname="S20-RMS-NL16-wd4-"*snx*".png", doS20=true)
+
+rod_test_plot_S1(Nsam; L=8, wd=1, nx=nx, outname="S1-RMS-NL8-wd1-"*snx*".png")
+rod_test_plot_S1(Nsam; L=8, wd=2, nx=nx, outname="S1-RMS-NL8-wd2-"*snx*".png")
+rod_test_plot_S1(Nsam; L=8, wd=4, nx=nx, outname="S1-RMS-NL8-wd4-"*snx*".png")
+rod_test_plot_S1([1,4,32]; L=16, wd=4, nx=nx, outname="S1-RMS-NL16-wd4-"*snx*".png")
