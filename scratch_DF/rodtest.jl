@@ -50,14 +50,14 @@ function rod_image(xcen, ycen, length, pa, fwhm; nx=256)
 end
 
 
-function rod_test_old(filter_hash, Nsam=1)
+function rod_test_old(filter_hash, Nsam=1; doS20=false)
 
     Nf      = length(filter_hash["filt_value"])
     Nj      = length(filter_hash["j_value"])
     Nl      = length(filter_hash["theta_value"])
     Npix    = filter_hash["npix"]
     jlind   = filter_hash["psi_index"]
-    angmax  = 90.0
+    angmax  = 180.0
     angstep = 2.5
     nang    = Int64(angmax ÷ angstep+1)
     energy     = zeros(nang)
@@ -67,13 +67,13 @@ function rod_test_old(filter_hash, Nsam=1)
     Ef         = zeros(Nf, nang)  # energy in each filter
     dang       = 180/Nl
     for i = 1:nang
-        ang = i*angstep
+        ang = (i-1)*angstep
 
 
         t = zeros(2+Nf+Nf*Nf)
-        for k=1:Nsam
-            rod1 = rod_image(10,10,30,ang+dang*k/4,8)
-            t   += DHC_compute(rod1, filter_hash)
+        for k=0:Nsam-1
+            rod1 = rod_image(10,10,30,ang+dang*k/4,8, nx=fhash["npix"])
+            t   += DHC_compute(rod1, filter_hash, doS2=!doS20,doS20=doS20)
         end
         t   ./= Nsam
 
@@ -111,6 +111,36 @@ function rod_test_old(filter_hash, Nsam=1)
     println(std(Siso))
     return (Siso, Sall)
 end
+
+
+function make_mp4(fhash; doS20=false)
+
+    clims = (-12,-3)
+    if doS20
+        clims=(-6,-1)
+    end
+
+    prefix = "frame"
+    suffix = ".png"
+    Sisofoo, Sall = rod_test_old(fhash, doS20=doS20)
+    Nj      = length(fhash["j_value"])
+    Nl      = length(fhash["theta_value"])
+    Nframe  = size(Sall, 5)
+
+    for i=1:Nframe
+        p=heatmap(log10.(reshape(Sall[:,:,:,:,i],Nj*Nl,Nj*Nl)),
+        size=(512,512),aspect_ratio=1,clims=clims)
+        #display(p)
+        outname = prefix*lpad(i,4,'0')*suffix
+        println(outname)
+        savefig(p, outname)
+    end
+    return 0
+end
+
+
+cmd=`ffmpeg -r 15 -f image2 -i frame%04d.png -vcodec libx264 -crf 25 -pix_fmt yuv420p test.mp4`
+run(cmd)
 
 
 function rod_test(filter_hash, Nsam=1; nx=256, doS20=false)
