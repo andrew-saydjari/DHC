@@ -7,6 +7,8 @@ module DHC_tests
     theme(:dark)
 
     export plot_filter_bank_QA
+    export plot_filter_bank_QAxy
+    export plot_filter_bank_QAxz
 
     function plot_filter_bank_QA(filt, info; fname="filter_bank_QA.png")
 
@@ -151,7 +153,7 @@ module DHC_tests
                     filt[index[ind]] = value[ind]
                     #temp = dropdims(sum(filt,dims=3),dims=3)
                     temp = filt[:,:,kfs]
-                    plot1(ps, fftshift(temp[:,:]), clim=(0,1),
+                    plot1(ps, fftshift(temp[:,:]),
                           bin=bfac, label=label)
                 end
                 fac = max(1,2.0^(5-j))
@@ -173,7 +175,7 @@ module DHC_tests
                     filt[index[indx]] .+= value[indx].^2
                 end
                 ring = filt[:,:,kfs]
-                plot1(ps, fftshift(ring[:,:]), clim=(0,1),
+                plot1(ps, fftshift(ring[:,:]),
                       bin=bfac, label=string("j=",j_ind," ℓ=",0,":",L-1," k=",k_ind))
             end
         end
@@ -184,9 +186,10 @@ module DHC_tests
         end
 
         wavepow = fftshift(dropdims(sum(filt, dims=3), dims=3))
-        plot1(ps, wavepow, clim=(-0.1,1), label=string("j=1:",J," ℓ=0:",L-1," K=1:",K),color=:black)
+        plot1(ps, wavepow, label=string("j=1:",J," ℓ=0:",L-1," K=1:",K),color=:white)
 
         if hash["2d_pc"]==1
+            wavepow ./= 2
             wavepow += circshift(wavepow[end:-1:1,end:-1:1],(1,1))
         end
         plot1(ps, wavepow, #clim=(0,K),
