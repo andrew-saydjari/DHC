@@ -107,29 +107,43 @@ module DHC_2DUtils
         return hash
     end
 
-    function fink_filter_bank_3dizer(hash, cz; nz=256)
+    function fink_filter_bank_3dizer_AKS(hash, cz; nz=256, pcz=1, Omega3d=false)
+        @assert hash["pc"]==2 #can remove later when we add support for pcz=2
+        @assert pcz==1
+
         # -------- set parameters
         nx = convert(Int64,hash["npix"])
         n2d = size(hash["filt_value"])[1]
         dz = nz/2-1
         J = size(hash["j_value"])[1]
         L = size(hash["theta_value"])[1]
+        psi_ind_L2d = hash["psi_ind_L"]
 
         im_scale = convert(Int8,log2(nz))
         # -------- number of bins in radial direction (size scales)
-        K = (im_scale-2)*cz
+        K = (im_scale-3)*cz + 1
+        normj = 1/sqrt(cz)
+
+        Omega2d = haskey(hash, "Omega_index")
+
+        if Omega2d
+            tot_num_filt = n2d*K + 3
+        else
+            tot_num_filt = n2d*K + 1
+        end
 
         # -------- allocate output array of zeros
-        J_L_K     = zeros(Int32, n2d*K,3)
-        psi_index = zeros(Int32, J+1, L, K)
+        J_L_K     = zeros(Int32, tot_num_filt,3)
+        psi_ind_L = zeros(Int32, tot_num_filt)
+        psi_index = zeros(Int32, J+1, L, K+1)
         k_value   = zeros(Float64, K)
         logr      = zeros(Float64,nz)
         filt_temp = zeros(Float64,nx,nx,nz)
         F_z       = zeros(Float64,nx,nx,nz)
         #F_p       = zeros(Float64,nx,nx,nz)
 
-        filtind = fill(CartesianIndex{3}[], K*n2d)
-        filtval = fill(Float64[], K*n2d)
+        filtind = fill(CartesianIndex{3}[], tot_num_filt)
+        filtval = fill(Float64[], tot_num_filt)
 
         for z = 1:convert(Int64,dz+1)
             sz = mod(z+dz,nz)-dz-1
@@ -138,17 +152,17 @@ module DHC_2DUtils
         end
 
         @inbounds for k_ind = 1:K
-            k = k_ind/cz
+            k = (k_ind-1)/cz
             k_value[k_ind] = k  # store for later
-            krad  = im_scale-k-1
+            krad  = im_scale-k-2
             Δk    = abs.(logr.-krad)
-            kmask = (Δk .<= 1/cz)
+            kmask = (Δk .<= 1)
             k_count = count(kmask)
             k_vals = findall(kmask)
 
             # -------- radial part
             #I have somehow dropped a factor of sqrt(2) which has been reinserted as a 0.5... fix my brain
-            @views F_z[:,:,kmask].= reshape(1/sqrt(2).*cos.(Δk[kmask] .* (cz*π/2)),1,1,k_count)
+            @views F_z[:,:,kmask].= reshape(cos.(Δk[kmask] .* (π/2)),1,1,k_count)
             @inbounds for index = 1:n2d
                 p_ind = hash["filt_index"][index]
                 p_filt = hash["filt_value"][index]
@@ -163,8 +177,91 @@ module DHC_2DUtils
                 @views filtval[f_ind] = filt_tmp[ind]
                 @views J_L_K[f_ind,:] = [hash["J_L"][index,1],hash["J_L"][index,2],k_ind-1]
                 psi_index[hash["J_L"][index,1]+1,hash["J_L"][index,2]+1,k_ind] = f_ind
-
+                psi_ind_L[f_ind] = psi_ind_L2d[index]
             end
+        end
+
+        filter_power = zeros(nx,nx,nz)
+        center_power = zeros(nx,nx,nz)
+        for j = 1:J
+            for l = 1:L
+                for k = 1:K
+                    index = psi_index[j,l,k]
+                    filter_power[filtind[index]] .+= filtval[index].^2
+                end
+            end
+        end
+
+        for k = 1:K
+            index = psi_index[J+1,1,k]
+            filter_power[filtind[index]] .+= filtval[index].^2
+        end
+
+        #### ------- This is phi0 containing the plane
+        # phi contains power near k=0 not yet accounted for
+        # for plane half-covered (pcz=1), add other half-plane
+
+        if pcz == 1
+            filter_power .+= circshift(filter_power[:,:,end:-1:1],(0,0,1))
+        end
+
+        center_power = fftshift(filter_power)
+        phi_cen = zeros(nx, nx, nz)
+        phi_cen[:,:,nz÷2:nz÷2+2] = center_power[:,:,nz÷2+3].*ones(1,1,3)
+        phi_cen_shift = fftshift(phi_cen)
+        ind = findall(phi_cen_shift .> 1E-13)
+        val = phi_cen_shift[ind]
+
+        # -------- before adding ϕ to filter bank, renormalize ψ if pc=1
+        if pcz==1 filtval[1:n2d*K] .*= sqrt(2.0) end  # double power for half coverage
+
+        # -------- add result to filter array
+        filtind[n2d*K + 1] = ind
+        filtval[n2d*K + 1] = sqrt.(val)
+        J_L_K[n2d*K + 1,:] = [J+1,0,K+1]
+        psi_index[J+1,1,K+1] = n2d*K + 1
+        psi_ind_L[n2d*K + 1] = 0
+
+        if Omega3d
+            #### ------- This is omega0 containing the plane
+
+            omega0 = zeros(nx, nx, nz)
+            omega0[:,:,nz÷2:nz÷2+2] .= ones(nx,nx,3)
+            omega0 .-= phi_cen
+
+            omega0_shift = fftshift(omega0)
+            ind = findall(omega0_shift .> 1E-13)
+            val = omega0_shift[ind]
+
+            # -------- add result to filter array
+            filtind[n2d*K + 2] = ind
+            filtval[n2d*K + 2] = sqrt.(val)
+            J_L_K[n2d*K + 2,:] = [J+1,1,K+1]
+            psi_index[J+1,2,K+1] = n2d*K + 2
+            psi_ind_L[n2d*K + 2] = 0
+
+            #### ------- This is omega3 around the edges
+
+            filter_power = zeros(nx,nx,nz)
+            center_power = zeros(nx,nx,nz)
+            for index = 1:n2d*K + 2
+                filter_power[filtind[index]] .+= filtval[index].^2
+            end
+
+            if pcz == 1
+                filter_power .+= circshift(filter_power[:,:,end:-1:1],(0,0,1))
+            end
+
+            center_power = ones(nx,nx,nz) .- filter_power
+            ind = findall(center_power .> 1E-13)
+            val = center_power[ind]
+
+            # -------- add result to filter array
+            filtind[n2d*K + 3] = ind
+            filtval[n2d*K + 3] = sqrt.(val)
+            J_L_K[n2d*K + 3,:] = [J+1,2,K+1]
+            psi_index[J+1,3,K+1] = n2d*K + 3
+            psi_ind_L[n2d*K + 3] = 0
         end
 
         # -------- metadata dictionary
@@ -180,6 +277,9 @@ module DHC_2DUtils
         info["2d_fs_center_r"]  = hash["fs_center_r"]
         info["2d_filt_index"]   = hash["filt_index"]
         info["2d_filt_value"]   = hash["filt_value"]
+        if Omega2d
+            info["Omega_index"]   = hash["Omega_index"]
+        end
 
         info["nz"]              = nz
         info["cz"]              = cz
@@ -188,13 +288,15 @@ module DHC_2DUtils
         info["k_value"]         = k_value
         info["filt_index"]      = filtind
         info["filt_value"]      = filtval
+        info["pcz"]             = pcz
+        info["Omega3d"]        = Omega3d
+        info["psi_ind_L"]       = psi_ind_L
 
         # -------- compute matrix that projects iso coeffs, add to hash
         S1_iso_mat = S1_iso_matrix3d(info)
         info["S1_iso_mat"] = S1_iso_mat
         S2_iso_mat = S2_iso_matrix3d(info)
         info["S2_iso_mat"] = S2_iso_mat
-
         #
 
         return info
@@ -211,6 +313,7 @@ module DHC_2DUtils
         # Does hash contain Omega filter?
         Omega   = haskey(fhash, "Omega_index")
         if Omega Ω_ind = fhash["Omega_index"] end
+        println(Omega)
 
         # unpack fhash
         Nl      = length(fhash["theta_value"])
@@ -331,8 +434,7 @@ module DHC_2DUtils
         # AKS 2021-Feb-22
 
         # Does hash contain Omega filter?
-        #Omega   = haskey(fhash, "Omega_index")
-        #if Omega Ω_ind = fhash["Omega_index"] end
+        Omega   = haskey(fhash, "Omega_index") & fhash["Omega3d"]
 
         # unpack fhash
         Nl      = length(fhash["theta_value"])
@@ -340,11 +442,10 @@ module DHC_2DUtils
         Nk      = length(fhash["k_value"])
         Nf      = length(fhash["filt_value"])
         ψ_ind   = fhash["psi_index"]
-        #ϕ_ind   = fhash["phi_index"]
 
         # number of iso coefficients
-        #Niso    = Omega ? Nj+2 : Nj+1
-        Niso    = (Nj+1)*Nk
+        Niso    = Omega ? (Nj+2)*Nk+3 : (Nj+1)*Nk+1
+        Nstep   = Omega ? Nj+2 : Nj+1
         Mat     = zeros(Int32, Niso, Nf)
 
         # first J elements of iso
@@ -352,16 +453,46 @@ module DHC_2DUtils
             for l = 1:Nl
                 for k=1:Nk
                     λ = ψ_ind[j,l,k]
-                    Mat[j+(k-1)*Nj, λ] = 1
+                    Mat[j+(k-1)*Nstep, λ] = 1
                 end
             end
         end
 
+        #this is currently how I am storing the phi_k, omega_k
         j = Nj+1
         l = 1
         for k=1:Nk
             λ = ψ_ind[j,l,k]
-            Mat[j+(k-1)*Nj, λ] = 1
+            Mat[j+(k-1)*Nstep, λ] = 1
+        end
+
+        if Omega
+            j = Nj+1
+            l = 2
+            for k=1:Nk
+                λ = ψ_ind[j,l,k]
+                Mat[j+1+(k-1)*Nstep, λ] = 1
+            end
+        end
+
+        ### these are the 3d globals
+
+        #phi0
+        λ = ψ_ind[Nj+1,1,Nk+1]
+        if Omega
+            Mat[Niso-2, λ] = 1
+        else
+            Mat[Niso, λ] = 1
+        end
+
+        if Omega
+            #omega_0
+            λ = ψ_ind[Nj+1,2,Nk+1]
+            Mat[Niso-1, λ] = 1
+
+            # omega_3d
+            λ = ψ_ind[Nj+1,3,Nk+1]
+            Mat[Niso, λ] = 1
         end
 
         return sparse(Mat)
@@ -376,37 +507,40 @@ module DHC_2DUtils
         # AKS 2021-Feb-22
 
         # Does hash contain Omega filter?
-        #Omega   = haskey(fhash, "Omega_index")
-        #if Omega Ω_ind = fhash["Omega_index"] end
+        Omega   = haskey(fhash, "Omega3d")
 
         # unpack fhash
-        Nl      = length(fhash["theta_value"])
-        Nj      = length(fhash["j_value"])
-        Nk      = length(fhash["k_value"])
-        Nf      = length(fhash["filt_value"])
+        L      = length(fhash["theta_value"])
+        J      = length(fhash["j_value"])
+        K      = length(fhash["k_value"])
+        Nf     = length(fhash["filt_value"])
         ψ_ind   = fhash["psi_index"]
-        #ϕ_ind   = fhash["phi_index"]
 
         # number of iso coefficients
-        #Niso    = Omega ? Nj*Nj*Nl+4*Nj+4 : Nj*Nj*Nl+2*Nj+1
-        Niso    = Nj*Nj*Nk*Nk*Nl+2*Nj*Nk*Nk+Nk*Nk
-        Mat     = zeros(Int32, Niso, Nf*Nf)
+        NisoL   = Omega ? J*J*K*K*L+2*J*K*K+2*J*K*K+6*J*K : J*J*K*K*L+2*J*K*K+2*J*K
+        NnoL    = Omega ? 2*K+3 : K+1
+        Mat     = zeros(Int32, NisoL+NnoL^2, Nf*Nf)
+
+        indexes = 1:Nf
+        mask = filt_3d["psi_ind_L"].==0
+        NnoLind = indexes[mask]
 
         #should probably think about reformatting to (Nj+1) so phi
         #phi cross terms are in the right place
 
         # first J*J*K*K*L elements of iso
-        for j1 = 1:Nj
-            for j2 = 1:Nj
-                for l1 = 1:Nl
-                    for l2 = 1:Nl
-                        for k1 = 1:Nk
-                            for k2 = 1:Nk
-                                DeltaL = mod(l1-l2, Nl)
+        ref = 0
+        for j1 = 1:J
+            for j2 = 1:J
+                for l1 = 1:L
+                    for l2 = 1:L
+                        for k1 = 1:K
+                            for k2 = 1:K
+                                DeltaL = mod(l1-l2, L)
                                 λ1     = ψ_ind[j1,l1,k1]
                                 λ2     = ψ_ind[j2,l2,k2]
 
-                                Iiso   = k1+Nk*((k2-1)+Nk*((j1-1)+Nj*((j2-1)+Nj*DeltaL)))
+                                Iiso   = k1+K*((k2-1)+K*((j1-1)+J*((j2-1)+J*DeltaL)))
                                 Icoeff = λ1+Nf*(λ2-1)
                                 Mat[Iiso, Icoeff] = 1
                             end
@@ -415,61 +549,119 @@ module DHC_2DUtils
                 end
             end
         end
+        ref+=J*J*K*K*L
 
-        # Next J elements are λϕ, then J elements ϕλ
-        for j = 1:Nj
-            for l = 1:Nl
-                for k1 = 1:Nk
-                    for k2 =1:Nk
+        # Next JKK elements are λϕ, then JKK elements ϕλ
+
+        for j = 1:J
+            for l = 1:L
+                for k1 = 1:K
+                    for k2 =1:K
                         λ      = ψ_ind[j,l,k1]
-                        Iiso   = Nj*Nj*Nk*Nk*Nl+k1+Nk*((k2-1)+Nk*(j-1))
-                        Icoeff = λ+Nf*(ψ_ind[Nj+1,1,k2]-1)  # λϕ
+                        Iiso   = ref + k1+K*((k2-1)+K*(j-1))
+                        Icoeff = λ+Nf*(ψ_ind[J+1,1,k2]-1)  # λϕ
                         Mat[Iiso, Icoeff] = 1
 
-                        Iiso   = Nj*Nj*Nk*Nk*Nl+Nj*Nk*Nk+k1+Nk*((k2-1)+Nk*(j-1))
-                        Icoeff = (ψ_ind[Nj+1,1,k2]-1)+Nf*(λ-1)  # ϕλ
+                        Iiso   = ref+J*K*K+k1+K*((k2-1)+K*(j-1))
+                        Icoeff = ψ_ind[J+1,1,k2]+Nf*(λ-1)  # ϕλ
                         Mat[Iiso, Icoeff] = 1
                     end
                 end
             end
         end
 
-        # Next Nk*Nk elements are ϕ(k)ϕ(k)
-        j = Nj+1
-        l = 1
-        for k1=1:Nk
-            for k2=1:Nk
-                λ1 = ψ_ind[j,l,k1]
-                λ2 = ψ_ind[j,l,k2]
+        ref += 2*J*K*K
 
-                Iiso = Nj*Nj*Nk*Nk*Nl+2*Nj*Nk*Nk+k1+Nk*(k2-1)
+        # Next JKK elements are λΩ, then JKK elements Ωλ
+        if Omega
+            for j = 1:J
+                for l = 1:L
+                    for k1 = 1:K
+                        for k2 =1:K
+                            λ      = ψ_ind[j,l,k1]
+                            Iiso   = ref + k1+K*((k2-1)+K*(j-1))
+                            Icoeff = λ+Nf*(ψ_ind[J+1,2,k2]-1)  # λϕ
+                            Mat[Iiso, Icoeff] = 1
+
+                            Iiso   = ref+J*K*K+k1+K*((k2-1)+K*(j-1))
+                            Icoeff = ψ_ind[J+1,2,k2]+Nf*(λ-1)  # ϕλ
+                            Mat[Iiso, Icoeff] = 1
+                        end
+                    end
+                end
+            end
+            ref += 2*J*K*K
+        end
+
+        # Next 2*J*K elements are ψϕ0 and ϕ0ψ
+
+        ϕ0 = ψ_ind[J+1,1,K+1]
+        for j1=1:J
+            for l1 = 1:L
+                for k1=1:K
+                    λ1 = ψ_ind[j1,l1,k1]
+
+                    Iiso = ref+k1+K*(j1-1)
+                    Icoeff = λ1+Nf*(ϕ0-1)
+                    Mat[Iiso, Icoeff] = 1
+
+                    Iiso = ref+J*K+k1+K*(j1-1)
+                    Icoeff = ϕ0+Nf*(λ1-1)
+                    Mat[Iiso, Icoeff] = 1
+                end
+            end
+        end
+        ref += 2*J*K
+
+        if Omega
+            Ω0 = ψ_ind[J+1,2,K+1]
+            for j1=1:J
+                for l1 = 1:L
+                    for k1=1:K
+                        λ1 = ψ_ind[j1,l1,k1]
+
+                        Iiso = ref+k1+K*(j1-1)
+                        Icoeff = λ1+Nf*(Ω0-1)
+                        Mat[Iiso, Icoeff] = 1
+
+                        Iiso = ref+J*K+k1+K*(j1-1)
+                        Icoeff = Ω0+Nf*(λ1-1)
+                        Mat[Iiso, Icoeff] = 1
+                    end
+                end
+            end
+            ref += 2*J*K
+
+            Ω3 = ψ_ind[J+1,3,K+1]
+            for j1=1:J
+                for l1 = 1:L
+                    for k1=1:K
+                        λ1 = ψ_ind[j1,l1,k1]
+
+                        Iiso = ref+k1+K*(j1-1)
+                        Icoeff = λ1+Nf*(Ω3-1)
+                        Mat[Iiso, Icoeff] = 1
+
+                        Iiso = ref+J*K+k1+K*(j1-1)
+                        Icoeff = Ω3+Nf*(λ1-1)
+                        Mat[Iiso, Icoeff] = 1
+                    end
+                end
+            end
+            ref += 2*J*K
+        end
+
+        # take care of the L independent subblocks
+        for m1=1:NnoL
+            for m2=1:NnoL
+                Iiso = NisoL + m1 + NnoL*(m2-1)
+                λ1 = NnoLind[m1]
+                λ2 = NnoLind[m2]
                 Icoeff = λ1+Nf*(λ2-1)
                 Mat[Iiso, Icoeff] = 1
             end
         end
 
-        # # If the Omega filter exists, add more terms
-        # if Omega
-        #     # Next J elements are λΩ, then J elements Ωλ
-        #     for j = 1:Nj
-        #         for l = 1:Nl
-        #             λ      = ψ_ind[j,l]
-        #             Iiso   = I0+j
-        #             Icoeff = λ+Nf*(Ω_ind-1)  # λΩ
-        #             Mat[Iiso, Icoeff] = 1
-        #
-        #             Iiso   = I0+Nj+j
-        #             Icoeff = Ω_ind+Nf*(λ-1)  # Ωλ
-        #             Mat[Iiso, Icoeff] = 1
-        #         end
-        #     end
-        #     # Next 3 elements are ϕΩ, Ωϕ, ΩΩ
-        #     Iiso   = I0+Nj+Nj
-        #     Mat[Iiso+1, ϕ_ind+Nf*(Ω_ind-1)] = 1
-        #     Mat[Iiso+2, Ω_ind+Nf*(ϕ_ind-1)] = 1
-        #     Mat[Iiso+3, Ω_ind+Nf*(Ω_ind-1)] = 1
-        # end
-        #
         return sparse(Mat)
     end
 
@@ -1294,7 +1486,7 @@ module DHC_2DUtils
                 zarr[f_i] .= 0
             end
         end
-        append!(out_coeff, S1[:])
+        append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
 
         # we stored the abs()^2, so take sqrt (this is faster to do all at once)
         im_rd_0_1 .= sqrt.(im_rd_0_1)
@@ -1309,6 +1501,7 @@ module DHC_2DUtils
         #append!(out_coeff, S12)
 
         ## Traditional second order
+        Mat2 = filter_hash["S2_iso_mat"]
         for f1 = 1:Nf
             thisim = fft(im_rd_0_1[:,:,:,f1])  # Could try rfft here
             # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
@@ -1320,7 +1513,7 @@ module DHC_2DUtils
                 S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny*Nz)
             end
         end
-        append!(out_coeff, S2)
+        append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
 
         return out_coeff
     end
@@ -1570,7 +1763,7 @@ module DHC_2DUtils
 
 ## Filter bank utilities
 
-    function fink_filter_bank(c, L; nx=256, wd=2, pc=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1)
+    function fink_filter_bank_AKS(c, L; nx=256, wd=2, pc=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1)
         #c     - sets the scale sampling rate (1 is dyadic, 2 is half dyadic)
         #L     - number of angular bins (usually 8*pc or 16*pc)
         #wd    - width of the wavelets (default 1, wd=2 for a double covering)
@@ -1595,8 +1788,10 @@ module DHC_2DUtils
         filt      = zeros(nx, nx, J*L+(Omega ? 2 : 1))
         psi_index = zeros(Int32, J, L)
         psi_ind_in= zeros(Int32, J*L+(Omega ? 2 : 1), 2)
+        psi_ind_L = zeros(Int32, J*L+(Omega ? 2 : 1))
         theta     = zeros(Float64, L)
         j_value   = zeros(Float64, J)
+        info=Dict{String,Any}()
 
         # -------- compute the required wd
         j_rad_exp = zeros(J)
@@ -1670,6 +1865,7 @@ module DHC_2DUtils
                     filt[ind, f_ind] = F_radial .* F_angular[rmask]
                     psi_index[j_ind,l+1] = f_ind
                     psi_ind_in[f_ind,:] = [j_ind-1,l]
+                    psi_ind_L[f_ind] = 1
                 end
             end
         end
@@ -1698,9 +1894,21 @@ module DHC_2DUtils
         phi_index  = J*L+1
         filt[:,:,phi_index] .= fftshift(phi_cen)
         psi_ind_in[phi_index,:] = [J,0]
+        psi_ind_L[phi_index] = 0
+
+        if Omega     # append a filter containing the rest (outside Nyquist)
+            filter_power += filt[:,:,phi_index].^2
+            edge_power    = 1.0 .- filter_power
+            zind          = findall(edge_power .< 1E-15)
+            edge_power[zind]     .= 0.0  # set small numbers to zero
+            Omega_index           = J*L+2
+            info["Omega_index"]   = Omega_index
+            filt[:,:,Omega_index] = sqrt.(edge_power)
+            psi_ind_in[Omega_index,:] = [J,1]
+            psi_ind_L[Omega_index] = 0
+        end
 
         # -------- metadata dictionary
-        info=Dict{String,Any}()
         info["npix"]         = nx
         info["j_value"]      = j_value
         info["theta_value"]  = theta
@@ -1711,17 +1919,7 @@ module DHC_2DUtils
         info["wd"]           = wd_j
         info["wd_cutoff"]    = wd_cutoff
         info["fs_center_r"]  = j_rad_exp
-
-        if Omega     # append a filter containing the rest (outside Nyquist)
-            filter_power += filt[:,:,phi_index].^2
-            edge_power    = 1.0 .- filter_power
-            zind          = findall(edge_power .< 1E-15)
-            edge_power[zind]     .= 0.0  # set small numbers to zero
-            Omega_index           = J*L+2
-            info["Omega_index"]   = Omega_index
-            filt[:,:,Omega_index] = sqrt.(edge_power)
-        end
-
+        info["psi_ind_L"]    = psi_ind_L
 
         return filt, info
     end
