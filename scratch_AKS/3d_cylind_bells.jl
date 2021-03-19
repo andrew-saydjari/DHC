@@ -1713,6 +1713,7 @@ function fink_filter_bank_3dizer_AKS(hash, cz; nz=256, pcz=1, Omega3d=false)
     info["filt_index"]      = filtind
     info["filt_value"]      = filtval
     info["pcz"]             = pcz
+    info["Omega3d"]        = Omega3d
 
     # -------- compute matrix that projects iso coeffs, add to hash
     S1_iso_mat = S1_iso_matrix3d(info)
@@ -1927,7 +1928,7 @@ function S1_iso_matrix3d_AKS(fhash)
     # AKS 2021-Feb-22
 
     # Does hash contain Omega filter?
-    Omega   = haskey(fhash, "Omega_index")
+    Omega   = haskey(fhash, "Omega_index") & fhash["Omega3d"]
 
     # unpack fhash
     Nl      = length(fhash["theta_value"])
@@ -1959,32 +1960,35 @@ function S1_iso_matrix3d_AKS(fhash)
         Mat[j+(k-1)*Nstep, λ] = 1
     end
 
-    if (haskey(fhash, "Omega_index") & fhash["Omega_3d"])
-    j = Nj+1
-    l = 2
-    for k=1:Nk
-        λ = ψ_ind[j,l,k]
-        Mat[j+1+(k-1)*Nstep, λ] = 1
+    if Omega
+        j = Nj+1
+        l = 2
+        for k=1:Nk
+            λ = ψ_ind[j,l,k]
+            Mat[j+1+(k-1)*Nstep, λ] = 1
+        end
     end
 
     ### these are the 3d globals
 
     #phi0
-    λ = ψ_ind[J+1,1,K+1]
+    λ = ψ_ind[Nj+1,1,Nk+1]
     Mat[Niso-2, λ] = 1
 
-    #omega_0
-    λ = ψ_ind[J+1,2,K+1]
-    Mat[Niso-1, λ] = 1
+    if Omega
+        #omega_0
+        λ = ψ_ind[Nj+1,2,Nk+1]
+        Mat[Niso-1, λ] = 1
 
-    # omega_3d
-    λ = ψ_ind[J+1,3,K+1]
-    Mat[Niso, λ] = 1
+        # omega_3d
+        λ = ψ_ind[Nj+1,3,Nk+1]
+        Mat[Niso, λ] = 1
+    end
 
     return sparse(Mat)
 end
 
-function S2_iso_matrix3d(fhash)
+function S2_iso_matrix3d_AKS(fhash)
     # fhash is the filter hash output by fink_filter_hash
     # The output matrix converts an S2 coeff vector to S2iso by
     #   summing over l1,l2 and fixed Δl.
@@ -1993,36 +1997,38 @@ function S2_iso_matrix3d(fhash)
     # AKS 2021-Feb-22
 
     # Does hash contain Omega filter?
-    #Omega   = haskey(fhash, "Omega_index")
-    #if Omega Ω_ind = fhash["Omega_index"] end
+    Omega   = haskey(fhash, "Omega_3d")
 
     # unpack fhash
-    Nl      = length(fhash["theta_value"])
-    Nj      = length(fhash["j_value"])
-    Nk      = length(fhash["k_value"])
-    Nf      = length(fhash["filt_value"])
+    L      = length(fhash["theta_value"])
+    J      = length(fhash["j_value"])
+    K      = length(fhash["k_value"])
+    Nf     = length(fhash["filt_value"])
     ψ_ind   = fhash["psi_index"]
 
     # number of iso coefficients
     #Niso    = Omega ? Nj*Nj*Nl+4*Nj+4 : Nj*Nj*Nl+2*Nj+1
-    Niso    = Nj*Nj*Nk*Nk*Nl+2*Nj*Nk*Nk+Nk*Nk
-    Mat     = zeros(Int32, Niso, Nf*Nf)
+    NisoL   = J*J*K*K*L+2*J*K*K+2*J*K
+    NnoL    = K+1
+    Mat     = zeros(Int32, NisoL+NnoL^2, Nf*Nf)
+
+    NnoLind = J*K*L+1:J*K*L+NnoL
 
     #should probably think about reformatting to (Nj+1) so phi
     #phi cross terms are in the right place
 
     # first J*J*K*K*L elements of iso
-    for j1 = 1:Nj
-        for j2 = 1:Nj
-            for l1 = 1:Nl
-                for l2 = 1:Nl
-                    for k1 = 1:Nk
-                        for k2 = 1:Nk
-                            DeltaL = mod(l1-l2, Nl)
+    for j1 = 1:J
+        for j2 = 1:J
+            for l1 = 1:L
+                for l2 = 1:L
+                    for k1 = 1:K
+                        for k2 = 1:K
+                            DeltaL = mod(l1-l2, L)
                             λ1     = ψ_ind[j1,l1,k1]
                             λ2     = ψ_ind[j2,l2,k2]
 
-                            Iiso   = k1+Nk*((k2-1)+Nk*((j1-1)+Nj*((j2-1)+Nj*DeltaL)))
+                            Iiso   = k1+K*((k2-1)+K*((j1-1)+J*((j2-1)+J*DeltaL)))
                             Icoeff = λ1+Nf*(λ2-1)
                             Mat[Iiso, Icoeff] = 1
                         end
@@ -2032,34 +2038,54 @@ function S2_iso_matrix3d(fhash)
         end
     end
 
-    # Next J elements are λϕ, then J elements ϕλ
-    
-    for j = 1:Nj
-        for l = 1:Nl
-            for k1 = 1:Nk
-                for k2 =1:Nk
+    # Next JKK elements are λϕ, then JKK elements ϕλ
+
+    ref = J*J*K*K*L
+
+    for j = 1:J
+        for l = 1:L
+            for k1 = 1:K
+                for k2 =1:K
                     λ      = ψ_ind[j,l,k1]
-                    Iiso   = Nj*Nj*Nk*Nk*Nl+k1+Nk*((k2-1)+Nk*(j-1))
-                    Icoeff = λ+Nf*(ψ_ind[Nj+1,1,k2]-1)  # λϕ
+                    Iiso   = ref + k1+K*((k2-1)+K*(j-1))
+                    Icoeff = λ+Nf*(ψ_ind[J+1,1,k2]-1)  # λϕ
                     Mat[Iiso, Icoeff] = 1
 
-                    Iiso   = Nj*Nj*Nk*Nk*Nl+Nj*Nk*Nk+k1+Nk*((k2-1)+Nk*(j-1))
-                    Icoeff = (ψ_ind[Nj+1,1,k2]-1)+Nf*(λ-1)  # ϕλ
+                    Iiso   = ref+J*K*K+k1+K*((k2-1)+K*(j-1))
+                    Icoeff = (ψ_ind[J+1,1,k2]-1)+Nf*(λ-1)  # ϕλ
                     Mat[Iiso, Icoeff] = 1
                 end
             end
         end
     end
 
-    # Next Nk*Nk elements are ϕ(k)ϕ(k)
-    j = Nj+1
-    l = 1
-    for k1=1:Nk
-        for k2=1:Nk
-            λ1 = ψ_ind[j,l,k1]
-            λ2 = ψ_ind[j,l,k2]
+    ref = J*J*K*K*L+2*J*K*K
 
-            Iiso = Nj*Nj*Nk*Nk*Nl+2*Nj*Nk*Nk+k1+Nk*(k2-1)
+    # Next 2*J*K elements are ψϕ0 and ϕ0ψ
+
+    ϕ0 = ψ_ind[J+1,1,K+1]
+    for j1=1:J
+        for l1 = 1:L
+            for k1=1:K
+                λ1 = ψ_ind[j1,l1,k1]
+
+                Iiso = ref+k1+K*(j1-1)
+                Icoeff = λ1+Nf*(ϕ0-1)
+                Mat[Iiso, Icoeff] = 1
+
+                Iiso = ref+J*K+k1+K*(j1-1)
+                Icoeff = ϕ0+Nf*(λ1-1)
+                Mat[Iiso, Icoeff] = 1
+            end
+        end
+    end
+
+    # take care of the L independent subblocks
+    for m1=1:NnoL
+        for m2=1:NnoL
+            Iiso = NisoL + m1 + NnoL*(m2-1)
+            λ1 = NnoLind[m1]
+            λ2 = NnoLind[m2]
             Icoeff = λ1+Nf*(λ2-1)
             Mat[Iiso, Icoeff] = 1
         end
@@ -2089,6 +2115,11 @@ function S2_iso_matrix3d(fhash)
     #
     return sparse(Mat)
 end
+
+S1_iso_matrix3d_AKS(filt_3d)
+
+S2_iso_matrix3d_AKS(filt_3d)
+
 
 filter_hash = fink_filter_hash(1, 8, nx=256, pc=2)
 filt_3d = fink_filter_bank_3dizer_AKS(filter_hash, 1, nz=256)
