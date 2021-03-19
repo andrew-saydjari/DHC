@@ -1745,32 +1745,6 @@ module DHC_2DUtils
         return [filtind, filtval]
     end
 
-    function fink_filter_box(filt)
-        (ny,nx,Nf) = size(filt)
-
-        # Allocate output arrays
-        filtmms = Array{Int64}(undef,2,2,Nf)
-        filtvals = Array{Any}(undef,Nf)#is this a terrible way to allocate memory?
-
-
-        # Loop over filters and record non-zero values
-        for l=1:Nf
-            f = FFTW.fftshift(filt[:,:,l])
-            ind = findall(f .> 1E-13)
-            ind=getindex.(ind,[1 2])
-            mins=minimum(ind,dims=1)
-            maxs=maximum(ind,dims=1)
-
-            #val = f[ind]
-            #filtind[l] = ind
-            filtmms[:,1,l] = mins
-            filtmms[:,2,l] = maxs
-            filtvals[l]=f[mins[1]:maxs[1],mins[2]:maxs[2]]
-
-        end
-        return [filtmms, filtvals]
-    end
-
     function list_to_box(hash;dim=2)#this modifies the hash
         (Nf,) = size(hash["filt_index"])
         nx=hash["npix"]
