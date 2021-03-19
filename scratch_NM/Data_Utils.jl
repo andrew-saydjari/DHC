@@ -20,6 +20,7 @@ module Data_Utils
     export invert_covmat
     export whitenoiseweights_forlog
     export mldust
+    export dbn_coeffs_calc
 
     function readdust(Nx)
         RGBA_img = load(pwd()*"/scratch_DF/t115_clean_small.png")
@@ -28,7 +29,7 @@ module Data_Utils
     end
 
     #Functions that add simulated noise to the true image and return covariance and std^2 for the simulations
-    function S2_uniweights(im, fhash; high=25, Nsam=10, iso=false, norm=true, smooth=false, smoothval=0.8, coeff_mask=nothing)
+    function S2_uniweights(im, fhash; high=25, Nsam=1000, iso=false, norm=true, smooth=false, smoothval=0.8, coeff_mask=nothing)
         #=
         Noise model: uniform[-high, high]
         =#
@@ -65,7 +66,7 @@ module Data_Utils
     end
 
 
-    function S2_whitenoiseweights(im, fhash; loc=0.0, sig=1.0, Nsam=10, iso=false, norm=true, smooth=false, smoothval=0.8, coeff_mask=nothing)
+    function S2_whitenoiseweights(im, fhash; loc=0.0, sig=1.0, Nsam=1000, iso=false, norm=false, smooth=false, smoothval=0.8, coeff_mask=nothing)
         #=
         Noise model: N(loc, std(sig))
         =#
@@ -102,7 +103,7 @@ module Data_Utils
     end
 
 
-    function S20_whitenoiseweights(im, fhash; loc=0.0, sig=1.0, Nsam=10, iso=false, norm=true, smooth=false, smoothval=0.8, coeff_choice="S20", coeff_mask=nothing)
+    function S20_whitenoiseweights_old(im, fhash; loc=0.0, sig=1.0, Nsam=1000, iso=false, norm=false, smooth=false, smoothval=0.8, coeff_choice="S20", coeff_mask=nothing)
         #=
         Noise model: N(0, std(I))
         Output: std^2 vector, full covariance matrix
@@ -147,7 +148,45 @@ module Data_Utils
         return wt.^(2), cov
     end
 
-    function whitenoiseweights_forlog(oriim, fhash, coeff_choice; loc=0.0, sig=1.0, Nsam=10, iso=false, norm=true, smooth=false, smoothval=0.8, coeff_mask=nothing) #Complete
+    function S20_whitenoiseweights(im, fhash, coeff_choice; loc=0.0, sig=1.0, Nsam=1000, iso=false, norm=false, smooth=false, smoothval=0.8, coeff_mask=nothing)
+        #=
+        Noise model: N(0, std(I))
+        Output: std^2 vector, full covariance matrix
+        coeff_choice is now a dictionary of args to pass to DHC_compute
+        =#
+        if coeff_mask==nothing println("Warning: Running without coeff_mask") end
+
+        (Nx, Ny)  = size(im)
+        if Nx != Ny error("Input image must be square") end
+        (N1iso, Nf)    = size(fhash["S1_iso_mat"])
+
+        # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+        S2   = DHC_compute(im, fhash, norm=norm, iso=iso, coeff_choice)
+
+        Ns    = length(S20)
+        S2arr = zeros(Float64, Ns, Nsam)
+        println("Ns", Ns)
+        for j=1:Nsam
+            noise = reshape(rand(Normal(loc, sig),Nx^2), (Nx, Nx))
+            init = im+noise
+            if smooth init = imfilter(init, Kernel.gaussian(smoothval)) end
+            S2arr[:,j] = DHC_2DUtils.DHC_compute(init, fhash, coeff_choice, norm=norm, iso=iso)
+        end
+        wt = zeros(Float64, Ns)
+        for i=1:Ns
+            wt[i] = std(S2arr[i,:])
+        end
+        msub = S2arr .- mean(S2arr, dims=2)
+        cov = (msub * msub')./(Nsam-1)
+        if coeff_mask!=nothing
+            cov = cov[coeff_mask, coeff_mask]
+            wt = wt[coeff_mask]
+        end
+        println("Output of S20weights: Condition number of diag cov", cond(Diagonal(wt.^(2))))
+        println("Condition Number of covariance", cond(cov))
+        return wt.^(2), cov
+    end
+    function whitenoiseweights_forlog(oriim, fhash, coeff_choice; loc=0.0, sig=1.0, Nsam=10, iso=false, norm=false, smooth=false, smoothval=0.8, coeff_mask=nothing) #Complete
         (Nx, Ny)  = size(oriim)
         if Nx != Ny error("Input image must be square") end
         (N1iso, Nf)    = size(fhash["S1_iso_mat"])
@@ -216,13 +255,13 @@ module Data_Utils
             cov = cov + Diagonal(dstb)
             println("Cond No before inversion", cond(cov))
             icov = inv(cov)
-                        println("Numerical error wrt Id", mean(abs.((cov * icov) - I)))
+            println("Numerical error wrt Id", mean(abs.((cov * icov) - I)))
         end
 
         return icov
     end
 
-    function mldust(nx)
+    function mldust(nx; logbool=true)
 
         # read FITS file with images
         # file in /n/fink2/dfink/mldust/dust10000.fits
@@ -240,8 +279,11 @@ module Data_Utils
         #nx = 48
 
         # rebin it to something smaller and take the log
-
-        im = log.(imresize(Float64.(big), nx, nx, Nslice))
+        if logbool
+            im = log.(imresize(Float64.(big), nx, nx, Nslice)) #Log of SFD images
+        else
+            im = imresize(Float64.(big), nx, nx, Nslice)
+        end
 
         covar = dust_covar_matrix(im)
 
@@ -283,6 +325,27 @@ module Data_Utils
         println("Condition number  ", cond(covar))
         return covar
 
+    end
+
+    function dbn_coeffs_calc(dbnimg, fhash, coeff_choice, coeff_mask, settings)
+        #dbnimg: Either a set of aimges from a dbn or their log
+        (Nf,) = size(fhash["filt_index"])
+        Ncovsamp = size(dbnimg)[3]
+        s20_dbn = zeros(Float64, Ncovsamp, 2+Nf+Nf^2)
+        for idx=1:Ncovsamp
+            if coeff_choice=="S20"
+                s20_dbn[idx, :] = DHC_compute(dbnimg[:, :, idx], fhash, doS2=false, doS20=true, norm=false, iso=false)
+            elseif coeff_choice=="S2"
+                s20_dbn[idx, :] = DHC_compute(dbnimg[:, :, idx], fhash, doS2=true, doS20=false, norm=false, iso=false)
+            else
+                if coeff_choice!="S12" error("Invalid coeff_choice") end
+                s20_dbn[idx, :] = DHC_compute(dbnimg[:, :, idx], fhash, doS2=false, doS20=false, doS12=true, norm=false, iso=false)
+            end
+        end
+
+        s_targ_mean = mean(s20_dbn, dims=1)
+        scov  = (s20_dbn .- s_targ_mean)' * (s20_dbn .- s_targ_mean) ./(Ncovsamp-1)
+        return s_targ_mean[coeff_mask], diag(scov)[coeff_mask], scov[coeff_mask, coeff_mask]
     end
 
 

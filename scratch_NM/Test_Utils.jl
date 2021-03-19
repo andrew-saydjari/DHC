@@ -20,7 +20,7 @@ push!(LOAD_PATH, pwd()*"/scratch_NM")
 using Deriv_Utils_New
 using Data_Utils
 using Visualization
-
+using LossFuncs
 #Remove later
 
 #Jacobian Test Funcs
@@ -220,7 +220,7 @@ function dS20sum_test(fhash) #Adapted from sandbox.jl
     return
 end
 
-function imgreconS2test(Nx, pixmask; norm=norm, bias=0.0, std_added=nothing, std_sim=nothing, sim_smoothed=false, sim_smoothedval=0.8, input_smoothed=false, coeff_choice="S2", invcov="Diagonal", mask=nothing)
+function imgreconS2test(Nx, pixmask; norm=norm, bias=0.0, std_added=nothing, std_sim=nothing, sim_smoothed=false, sim_smoothedval=0.8, input_smoothed=false, coeff_choice="S2", invcov="Diagonal", mask=nothing, lambda=nothing)
     #=
     Experiments handled by this wrapper:
     S2 | S12 | S20
@@ -322,7 +322,12 @@ function imgreconS2test(Nx, pixmask; norm=norm, bias=0.0, std_added=nothing, std
         else#s2icov
             s2icov = invert_covmat(s2cov)
         end
-        recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov, pixmask, "S20", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
+        if lambda==nothing
+            recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov, pixmask, "S20", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
+        else
+            recon_img = Deriv_Utils_New.image_recon_derivsum_regularized(init, fhash, Float64.(s2targ[mask]), s2icov, pixmask, "S20", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]), lambda=0.001)
+        end
+
     else
         if coeff_choice!="S12" error("Not implemented") end
         img = readdust(Nx)
@@ -361,94 +366,6 @@ function imgreconS2test(Nx, pixmask; norm=norm, bias=0.0, std_added=nothing, std
     return img, init, recon_img
 end
 
-function logimgreconS2test(Nx, pixmask; norm=norm, std_added=nothing, std_sim=nothing, sim_smoothed=false, sim_smoothedval=0.8, input_smoothed=false, coeff_choice="S2", invcov="Diagonal", mask=nothing)
-    #=
-    Uses the coefficients of the LOG of the image
-    Experiments handled by this wrapper:
-    S2 | S12 | S20
-    Create covariance using simulated noise + img true (Choice of smoothing or not smoothing)
-    Init that is smoothed or not smoothed
-    Choice of Diagonal | Diagonal+Eps | Full | Full+Eps:
-        +Eps adds an epsilon to the diagonal of the covariance matrix to reduce Cond No
-        Diagonal considers just the standard deviation of the simulated weights and Full adds an epsilon
-    Pixmask: Keeps certain pixels fixed to true values in the image (Not tested using this wrapper yet). False=> Floating pixels.
-    Coeffmask: Of length 2+Nf+Nf^2. Choice of coefficients to be optimized. True=>Optimized
-    =#
-    img = readdust(Nx)
-    oriimg = copy(img)
-    logimg = log.(img)
-    if std_added==nothing
-        std_added = std(oriimg)
-    else
-
-    end
-
-    epsilon=1e-5
-    fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
-    (Nf,) = size(fhash["filt_index"])
-
-    #Std Normal
-    noise = reshape(rand(Normal(0.0, std_added), Nx^2), (Nx, Nx))
-    init = oriimg+noise
-
-    if std_sim==nothing
-        std_sim = std(oriimg)
-    else
-
-    end
-
-    if input_smoothed init = imfilter(init, Kernel.gaussian(0.8)) end
-
-    if coeff_choice=="S2"
-        s2targ = DHC_compute(logimg, fhash, doS2=true, norm=norm, iso=false)
-        #Mask: Default assumes coefficients to be optimized are: All S1 and S2 coefficients larger than 1e-5
-        if mask==nothing
-            mask = (s2targ .>= epsilon)
-            mask[1]=false
-            mask[2]=false
-        else
-            if size(mask)[1]!=(2+Nf+Nf^2) error("Wrong length mask") end
-        end
-    elseif coeff_choice=="S20"
-        s2targ = DHC_compute(logimg, fhash, doS20=true, doS2=false, norm=norm, iso=false)
-        #Mask: Default assumes only S20
-        if mask==nothing
-            mask = trues(2+Nf+Nf^2)
-            mask[1:2+Nf] .= false
-        else
-            if size(mask)[1]!=(2+Nf+Nf^2) error("Wrong length mask") end
-        end
-    else
-        if coeff_choice=="S12"
-            s2targ = DHC_compute(logimg, fhash, doS20=false, doS12=true, doS2=false, norm=norm, iso=false)
-            #Mask
-            if mask==nothing
-                mask = (s2targ .>= 1e-5)
-                mask[1:Nf+2] .= false
-            else
-                if size(mask)[1]!=(2+Nf+Nf^2) error("Wrong length mask") end
-            end
-        end
-    end
-
-
-    sig2, s2cov = whitenoiseweights_forlog(oriimg, fhash, coeff_choice, Nsam=10, loc=0.0, sig=std_sim, smooth=sim_smoothed, smoothval = sim_smoothedval, coeff_mask=mask) #S2_uniweights(img, fhash, Nsam=10, high=high, iso=false, norm=norm)
-    sig2 = sig2[:]
-    println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask), " Size s2targ, type ", typeof(s2targ[mask]), " Size s2w ", typeof(sig2))
-
-    if invcov=="Diagonal"
-        s2icov = invert_covmat(sig2)
-    elseif invcov=="Diagonal+Eps"
-        s2icov = invert_covmat(sig2, 1e-5)
-    elseif invcov=="Full+Eps"
-        s2icov = invert_covmat(s2cov, 1e-5)
-    else#s2icov
-        s2icov = invert_covmat(s2cov)
-    end
-    logrecon_img = Deriv_Utils_New.image_recon_derivsum(log.(init), fhash, Float64.(s2targ[mask]), s2icov, pixmask, coeff_choice, coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
-    recon_img = exp.(logrecon_img)
-    return oriimg, init, recon_img
-end
 
 function logimgreconS2test(Nx, pixmask; norm=norm, std_added=nothing, std_sim=nothing, sim_smoothed=false, sim_smoothedval=0.8, input_smoothed=false, coeff_choice="S2", invcov="Diagonal", mask=nothing)
     #=
@@ -537,6 +454,107 @@ function logimgreconS2test(Nx, pixmask; norm=norm, std_added=nothing, std_sim=no
     logrecon_img = Deriv_Utils_New.image_recon_derivsum(log.(init), fhash, Float64.(s2targ[mask]), s2icov, pixmask, coeff_choice, coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
     recon_img = exp.(logrecon_img)
     return oriimg, init, recon_img
+end#redundant?
+
+function dbn_experiment(true_img, noisy_init, dbn_covar, pixmask; norm=norm, bias=0.0, std_sim=nothing, sim_smoothed=false, sim_smoothedval=0.8, input_smoothed=false, coeff_choice="S2", invcov="Diagonal", mask=nothing, lambda=nothing)
+    #=
+    Experiments handled by this wrapper:
+    S20
+    Regularized vs Non regularized
+    Use externally calculated covariance
+    Choice of Diagonal | Diagonal+Eps | Full | Full+Eps:
+        +Eps adds an epsilon to the diagonal of the covariance matrix to reduce Cond No
+        Diagonal considers just the standard deviation of the simulated weights and Full adds an epsilon
+    Pixmask: Keeps certain pixels fixed to true values in the image (Not tested using this wrapper yet). False=> Floating pixels.
+    Coeffmask: Of length 2+Nf+Nf^2. Choice of coefficients to be optimized. True=>Optimized
+    =#
+
+    (Nx, ) = size(true_img)
+
+    #=
+    Default assumes coefficients to be optimized are: All S20 coefficients
+    =#
+    fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+    (Nf,) = size(fhash["filt_index"])
+    #img = (img .- mean(img))./std(img) #normalized
+
+    #Uniform Added Noise
+    #noise = rand(Nx, Nx).*(2*high) .- high
+    #init = copy(img)+noise
+    #init[1, 2] += 10.0
+    #init[23, 5] -= 25.0
+    #Mask
+    if mask==nothing
+        mask = trues(2+Nf+Nf^2)
+        mask[1:2+Nf] .= false
+    else
+        if size(mask)[1]!=(2+Nf+Nf^2) error("Wrong length mask") end
+    end
+
+    s2targ = DHC_compute(img, fhash, doS2=false, doS20=true, norm=false, iso=false)
+    println("NF=", size(fhash["filt_index"]))
+    println("NF=", size(fhash["filt_index"]), "Sel Coeffs", count((i->(i==true)), mask), size(mask), " Size s2targ, type ", typeof(s2targ[mask]), " Size s2w ", typeof(sig2))
+
+    if invcov=="Diagonal"
+        s2icov = invert_covmat(Diagonal(dbn_covar))
+    elseif invcov=="Diagonal+Eps"
+        s2icov = invert_covmat(Diagonal(dbn_covar), 1e-10)
+    elseif invcov=="Full+Eps"
+        s2icov = invert_covmat(dbn_covar, 1e-10)
+    else#s2icov
+        s2icov = invert_covmat(dbn_covar)
+    end
+    if lambda==nothing
+        recon_img = Deriv_Utils_New.image_recon_derivsum(init, fhash, Float64.(s2targ[mask]), s2icov, pixmask, "S20", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]))
+    else
+        recon_img = Deriv_Utils_New.image_recon_derivsum_regularized(init, fhash, Float64.(s2targ[mask]), s2icov, pixmask, "S20", coeff_mask=mask, optim_settings=Dict([("iterations", 1000), ("norm", norm)]), lambda=0.001)
+    end
+    return img, init, recon_img
+end#redundant?
+
+function reconstruction_wrapper(true_img, noisy_init, fhash, coeff_type, coeff_mask, settings)
+    #=
+    true_img: true_img, even if settings['log']=true, this is the non-log image
+    settings: Dictionary with
+        'target_type': 'ground truth' | 'sfd_dbn'
+        'log': Boolean
+        'GaussianLoss': Boolean
+        'Invcov_matrix': 'Diagonal' | 'Diagonal+Eps' | 'Full' | 'Full+Eps'
+        'Covar_type': 'white_noise' | 'sfd_dbn'
+        'apd': 'non_apd'
+        'white_noise_args': args for white_noise sims if GaussianLoss and Covar_type='white_noise'. :loc...
+        'optim_settings': args for optimization related stuff
+        "lambda": regularization
+
+    =#
+
+    #Add logging utility to save: S_targ, s_cov, all settings, true_img, noisy_init, coeff_mask
+    (Nf,) = size(fhash["filt_index"])
+    (Nx, Ny) = size(true_img)
+    if size(coeff_mask)[1]!=(2+Nf+Nf^2) error("Wrong length mask") end
+
+    #s2targ = DHC_compute(img, fhash, doS2=true, norm=norm, iso=false)
+    if settings["GaussianLoss"]
+        starg, sinvcov = settings["s_targ_mean"], settings["s_invcov"] #meancov_generator(true_img, fhash, coeff_type, coeff_mask, settings) call this outside function with the same dict
+        #BUG: Condense here
+        if !settings["log"] & (settings["apd"]=="non_apd") & (settings["lambda"]==nothing) #check if this workss
+            recon_img = Deriv_Utils_New.image_recon_derivsum(noisy_init, fhash, starg, sinvcov, falses(Nx, Nx), coeff_type, optim_settings=settings["optim_settings"], coeff_mask=coeff_mask)
+        elseif !settings["log"] & (settings["apd"]=="non_apd") #With Regularization
+            recon_img = Deriv_Utils_New.image_recon_derivsum_regularized(noisy_init, fhash, starg, sinvcov, falses(Nx, Nx), coeff_type, optim_settings=settings["optim_settings"], coeff_mask=coeff_mask, lambda=settings["lambda"])
+        elseif settings["log"] & (settings["apd"] == "non_apd") & (settings["lambda"]==nothing)
+            recon_img = exp.(Deriv_Utils_New.image_recon_derivsum(log.(noisy_init), fhash, Float64.(s2targ), sinvcov, falses(Nx, Nx), coeff_type, coeff_mask=coeff_mask, optim_settings=settings["optim_settings"]))
+        elseif settings["log"] & (settings["apd"] == "non_apd")
+            recon_img = exp.(Deriv_Utils_New.image_recon_derivsum_regularized(log.(noisy_init), fhash, Float64.(s2targ), sinvcov, falses(Nx, Nx), coeff_type, coeff_mask=coeff_mask, optim_settings=settings["optim_settings"]), lambda=settings["lambda"])
+        else
+            error("Apd not implemented yet")
+        end
+    else error("Non Gaussian not implemented yet") #NonGaussian
+
+    #Log and save everything in a fits file
+    return recon_img
+    end
+
+
 end
 
 
@@ -769,5 +787,95 @@ img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, bias=mean(im
 mean(abs.(init - img)), mean(abs.(recon - img))
 Visualization.plot_diffscales([img, init, recon, recon - img], ["Ground Truth", "Init (N(0.1<I_gt>, std(I_gt))", "Reconstruction", "Reconstruction - Ground Truth"], fname="scratch_NM/TestPlots/CoeffCombinations_WhiteNoise_Nosmooth/S20_DiagEps_allincl_BiasedWhiteNoise")
 
+#NOTE: What effect does adding a regularizing term have?
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S20", invcov="Diagonal+Eps")
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/3-10_Plots/NoReg_1ksamps.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+
+img, init, recon = imgreconS2test(64, falses((64, 64)), norm=false, sim_smoothed=false, input_smoothed=false, coeff_choice="S20", invcov="Diagonal+Eps", lambda=0.1)
+Visualization.plot_synth_QA(img, init, recon, fname="scratch_NM/3-10_Plots/Reg_1ksamps_0-1.png")
+mean(abs.(init - img)), mean(abs.(recon - img))
+
+
 #NOTE: Using the Gaussian covariance of fits
 im, covar = mldust(64)
+im, covar = mldust(64, logbool=False)
+true_img = im[:, :, 1]
+Nx=64
+noise = rand(Normal(0.0, std(true_img)), Nx, Nx)
+init = true_img + noise
+filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+Ncovsamp = 10000
+(Nf, ) = size(filter_hash["filt_index"])
+s20_dbn = zeros(Float64, Ncovsamp, 2+Nf+Nf^2)
+for idx=1:Ncovsamp
+    s20_dbn[idx, :] = DHC_compute(im[:, :, idx], filter_hash, doS2=false, doS20=true, norm=false, iso=false)
+end
+
+s_targ_mean = mean(s20_dbn, dims=1)
+scov  = (s20_dbn .- s_targ_mean)' * (s20_dbn .- s_targ_mean) ./(Ncovsamp-1)
+
+sfddbn_experiment(im[:, :, 1], init, scov, falses(Nx, Nx), norm=false,) #complete
+
+mean(im[:, :, 1])
+#####################################################################################################
+#Using NEW Reconstruction wrapper and SFD dbn
+
+im, covar = mldust(64, logbool=false)
+true_img = im[:, :, 1]
+Nx=64
+noise = rand(Normal(0.0, std(true_img)), Nx, Nx)
+init = true_img + noise
+filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(Nf, ) = size(filter_hash["filt_index"])
+coeff_mask = falses(2+Nf+Nf^2)
+coeff_mask[Nf+3:end] .= true
+
+coeff_choice = Dict(:doS2=>false, :doS12=>false, :doS20=>true)
+white_noise_args = Dict(:loc=>0.0, :sig=>1.0, :Nsam=>1000, :iso=>false, :norm=>false, :smooth=>false, :smoothval=>0.8) #only if you're using noise based covar
+optim_settings = Dict([("iterations", 1000), ("norm", false)])
+recon_settings = Dict([("target_type", "sfd_dbn"),("covar_type", "sfd_dbn"), ("log", false), ("GaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
+    ("Covar_type", "sfd_dbn"), ("apd", "non_apd"), ("optim_settings", optim_settings), ("lambda", (std(true_img).^(-2))./100)]) #Add constraints
+#'white_noise_args': args for white_noise sims if GaussianLoss and Covar_type='white_noise'. :loc...
+
+s2mean, s2icov = meancov_generator(true_img, filter_hash, coeff_choice, coeff_mask, recon_settings)
+recon_settings["s_targ_mean"] = s2mean
+recon_settings["s_invcov"] = s2icov
+
+recon_img = reconstruction_wrapper(true_img, init, filter_hash, "S20", coeff_mask, recon_settings)
+#Visualization.plot_synth_QA(true_img, init, recon_img, fname="scratch_NM/NewWrapper/sfd_dbntest.png")
+Visualization.plot_diffscales([true_img, init, recon_img, recon_img - true_img], ["GT", "Init", "Reconstruction", "Residual"], fname="scratch_NM/NewWrapper/sfd_dbntest_std-by100.png")
+##############################################################################################################################
+using StatsBase
+
+image = readdust(256)
+apdimg_fixed = apodizer(image)
+apdimg = apodizer_ori(image, 1, 1, 255)
+mean(image)
+mean(apdimg_fixed)
+
+heatmap(image)
+heatmap(apdimg)
+
+image = readdust(64)
+apdimg = apodizer(image, 1, 1, 63)
+
+heatmap(image)
+heatmap(apdimg)
+
+
+apdimg_new = apodizer_new(image)
+heatmap(apdimg_new)
+mean(image)
+
+mean(apdimg_new)
+mean(apdimg)
+
+#Apodization func check
+image = readdust(64)
+Nx=64
+Amat = wind_2d(Nx)
+datad_w = fweights(Amat);#why semi-col?#BUG: Replace 256 with im_size? #<A>
+meanVal = mean(image,datad_w) #<AF>
+temp2d_a = (image.-meanVal).*wind_2d(Nx).+meanVal #<AF>
+mean(Amat.* (image .- meanVal)) #E-14
