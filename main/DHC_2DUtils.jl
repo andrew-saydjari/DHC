@@ -1763,7 +1763,7 @@ module DHC_2DUtils
 
 ## Filter bank utilities
 
-    function fink_filter_bank_AKS(c, L; nx=256, wd=2, pc=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1)
+    function fink_filter_bank(c, L; nx=256, wd=2, pc=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1)
         #c     - sets the scale sampling rate (1 is dyadic, 2 is half dyadic)
         #L     - number of angular bins (usually 8*pc or 16*pc)
         #wd    - width of the wavelets (default 1, wd=2 for a double covering)
