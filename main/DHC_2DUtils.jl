@@ -107,7 +107,7 @@ module DHC_2DUtils
         return hash
     end
 
-    function fink_filter_bank_3dizer_AKS(hash, cz; nz=256, pcz=1, Omega3d=false)
+    function fink_filter_bank_3dizer(hash, cz; nz=256, pcz=1, Omega3d=false)
         @assert hash["pc"]==2 #can remove later when we add support for pcz=2
         @assert pcz==1
 
@@ -313,7 +313,7 @@ module DHC_2DUtils
         # Does hash contain Omega filter?
         Omega   = haskey(fhash, "Omega_index")
         if Omega Ω_ind = fhash["Omega_index"] end
-        #println(Omega)
+        println(Omega)
 
         # unpack fhash
         Nl      = length(fhash["theta_value"])
