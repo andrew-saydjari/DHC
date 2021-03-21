@@ -313,7 +313,7 @@ module DHC_2DUtils
         # Does hash contain Omega filter?
         Omega   = haskey(fhash, "Omega_index")
         if Omega Ω_ind = fhash["Omega_index"] end
-        println(Omega)
+        #println(Omega)
 
         # unpack fhash
         Nl      = length(fhash["theta_value"])
