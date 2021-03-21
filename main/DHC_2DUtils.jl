@@ -522,7 +522,7 @@ module DHC_2DUtils
         Mat     = zeros(Int32, NisoL+NnoL^2, Nf*Nf)
 
         indexes = 1:Nf
-        mask = filt_3d["psi_ind_L"].==0
+        mask = fhash["psi_ind_L"].==0
         NnoLind = indexes[mask]
 
         #should probably think about reformatting to (Nj+1) so phi
