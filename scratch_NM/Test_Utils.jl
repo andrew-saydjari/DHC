@@ -1,7 +1,6 @@
 using Statistics
 using Plots
 using BenchmarkTools
-using Profile
 using FFTW
 using Statistics
 using Optim
@@ -11,6 +10,7 @@ using Revise
 using Profile
 using LinearAlgebra
 using Distributions
+using FITSIO
 
 push!(LOAD_PATH, pwd()*"/main")
 using DHC_2DUtils
@@ -512,50 +512,7 @@ function dbn_experiment(true_img, noisy_init, dbn_covar, pixmask; norm=norm, bia
     return img, init, recon_img
 end#redundant?
 
-function reconstruction_wrapper(true_img, noisy_init, fhash, coeff_type, coeff_mask, settings)
-    #=
-    true_img: true_img, even if settings['log']=true, this is the non-log image
-    settings: Dictionary with
-        'target_type': 'ground truth' | 'sfd_dbn'
-        'log': Boolean
-        'GaussianLoss': Boolean
-        'Invcov_matrix': 'Diagonal' | 'Diagonal+Eps' | 'Full' | 'Full+Eps'
-        'Covar_type': 'white_noise' | 'sfd_dbn'
-        'apd': 'non_apd'
-        'white_noise_args': args for white_noise sims if GaussianLoss and Covar_type='white_noise'. :loc...
-        'optim_settings': args for optimization related stuff
-        "lambda": regularization
 
-    =#
-
-    #Add logging utility to save: S_targ, s_cov, all settings, true_img, noisy_init, coeff_mask
-    (Nf,) = size(fhash["filt_index"])
-    (Nx, Ny) = size(true_img)
-    if size(coeff_mask)[1]!=(2+Nf+Nf^2) error("Wrong length mask") end
-
-    #s2targ = DHC_compute(img, fhash, doS2=true, norm=norm, iso=false)
-    if settings["GaussianLoss"]
-        starg, sinvcov = settings["s_targ_mean"], settings["s_invcov"] #meancov_generator(true_img, fhash, coeff_type, coeff_mask, settings) call this outside function with the same dict
-        #BUG: Condense here
-        if !settings["log"] & (settings["apd"]=="non_apd") & (settings["lambda"]==nothing) #check if this workss
-            recon_img = Deriv_Utils_New.image_recon_derivsum(noisy_init, fhash, starg, sinvcov, falses(Nx, Nx), coeff_type, optim_settings=settings["optim_settings"], coeff_mask=coeff_mask)
-        elseif !settings["log"] & (settings["apd"]=="non_apd") #With Regularization
-            recon_img = Deriv_Utils_New.image_recon_derivsum_regularized(noisy_init, fhash, starg, sinvcov, falses(Nx, Nx), coeff_type, optim_settings=settings["optim_settings"], coeff_mask=coeff_mask, lambda=settings["lambda"])
-        elseif settings["log"] & (settings["apd"] == "non_apd") & (settings["lambda"]==nothing)
-            recon_img = exp.(Deriv_Utils_New.image_recon_derivsum(log.(noisy_init), fhash, Float64.(s2targ), sinvcov, falses(Nx, Nx), coeff_type, coeff_mask=coeff_mask, optim_settings=settings["optim_settings"]))
-        elseif settings["log"] & (settings["apd"] == "non_apd")
-            recon_img = exp.(Deriv_Utils_New.image_recon_derivsum_regularized(log.(noisy_init), fhash, Float64.(s2targ), sinvcov, falses(Nx, Nx), coeff_type, coeff_mask=coeff_mask, optim_settings=settings["optim_settings"]), lambda=settings["lambda"])
-        else
-            error("Apd not implemented yet")
-        end
-    else error("Non Gaussian not implemented yet") #NonGaussian
-
-    #Log and save everything in a fits file
-    return recon_img
-    end
-
-
-end
 
 
 
@@ -821,7 +778,9 @@ mean(im[:, :, 1])
 #####################################################################################################
 #Using NEW Reconstruction wrapper and SFD dbn
 
-im, covar = mldust(64, logbool=false)
+img, covar = mldust(64, logbool=false)
+
+
 true_img = im[:, :, 1]
 Nx=64
 noise = rand(Normal(0.0, std(true_img)), Nx, Nx)
@@ -831,20 +790,100 @@ filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 coeff_mask = falses(2+Nf+Nf^2)
 coeff_mask[Nf+3:end] .= true
 
-coeff_choice = Dict(:doS2=>false, :doS12=>false, :doS20=>true)
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>false)
 white_noise_args = Dict(:loc=>0.0, :sig=>1.0, :Nsam=>1000, :iso=>false, :norm=>false, :smooth=>false, :smoothval=>0.8) #only if you're using noise based covar
 optim_settings = Dict([("iterations", 1000), ("norm", false)])
-recon_settings = Dict([("target_type", "sfd_dbn"),("covar_type", "sfd_dbn"), ("log", false), ("GaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
-    ("Covar_type", "sfd_dbn"), ("apd", "non_apd"), ("optim_settings", optim_settings), ("lambda", (std(true_img).^(-2))./100)]) #Add constraints
-#'white_noise_args': args for white_noise sims if GaussianLoss and Covar_type='white_noise'. :loc...
+recon_settings = Dict([("target_type", "ground truth"),("covar_type", "white_noise"), ("log", false), ("GaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
+    ("Covar_type", "sfd_dbn"), ("apd", "non_apd"), ("optim_settings", optim_settings), ("lambda", (std(true_img).^(-2))./100), ("white_noise_args", white_nois)]) #Add constraints
+#"white_noise_args": args for white_noise sims if GaussianLoss and Covar_type='white_noise'. :loc...
 
-s2mean, s2icov = meancov_generator(true_img, filter_hash, coeff_choice, coeff_mask, recon_settings)
+s2mean, s2icov = meancov_generator(true_img, filter_hash, dhc_args, coeff_mask, recon_settings)
 recon_settings["s_targ_mean"] = s2mean
 recon_settings["s_invcov"] = s2icov
 
-recon_img = reconstruction_wrapper(true_img, init, filter_hash, "S20", coeff_mask, recon_settings)
+recon_img = reconstruction_wrapper(true_img, init, filter_hash, dhc_args, coeff_mask, recon_settings)
 #Visualization.plot_synth_QA(true_img, init, recon_img, fname="scratch_NM/NewWrapper/sfd_dbntest.png")
 Visualization.plot_diffscales([true_img, init, recon_img, recon_img - true_img], ["GT", "Init", "Reconstruction", "Residual"], fname="scratch_NM/NewWrapper/sfd_dbntest_std-by100.png")
+
+
+@benchmark dhc = DHC_compute_apd(true_img, filter_hash; Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>false)...)
+@benchmark dhc_apd = DHC_compute_apd(true_img, filter_hash; Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true)...)
+
+
+
+fname = "scratch_NM/data/dust10000.fits"
+f = FITS(fname, "r")
+big = read(f[1])
+big64 = imresize(big, 64, 64, 10000)
+img_old, covar = mldust(64, logbool=false)
+mean(big64[:, :, 1])
+bigf64 = imresize(Float64.(big), 64, 64, 10000)
+
+
+
+(_,__,Nslice) = size(big)
+println(Nslice, " slices")
+size(big)
+minimum(big64)
+minimum(im)
+heatmap(big[:, :, 1])
+heatmap(im[:, :, 1])
+##############################################################################################################################
+
+#Using NEW Reconstruction wrapper and SFD dbn
+
+im, covar = mldust(, logbool=false)
+true_img = im[:, :, 1]
+Nx=64
+noise = rand(Normal(0.0, std(true_img)), Nx, Nx)
+init = imfilter(true_img + noise, Kernel.gaussian(0.8))
+filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(Nf, ) = size(filter_hash["filt_index"])
+coeff_mask = falses(2+Nf+Nf^2)
+coeff_mask[Nf+3:end] .= true
+
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true)
+white_noise_args = Dict(:loc=>0.0, :sig=>1.0, :Nsam=>1000, :iso=>false, :norm=>false, :smooth=>false, :smoothval=>0.8) #only if you're using noise based covar
+optim_settings = Dict([("iterations", 100), ("norm", false)])
+recon_settings = Dict([("target_type", "ground truth"),("covar_type", "white_noise"), ("log", false), ("GaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
+ ("apd", "non_apd"), ("optim_settings", optim_settings), ("lambda", 0.0), ("white_noise_args", white_noise_args)]) #Add constraints
+#"white_noise_args": args for white_noise sims if GaussianLoss and Covar_type='white_noise'. :loc...
+
+s2mean, s2icov = meancov_generator(true_img, filter_hash, dhc_args, coeff_mask, recon_settings)
+recon_settings["s_targ_mean"] = s2mean
+recon_settings["s_invcov"] = s2icov
+
+recon_img = reconstruction_wrapper(true_img, init, filter_hash, dhc_args, coeff_mask, recon_settings)
+Visualization.plot_diffscales([true_img, init, recon_img, recon_img - true_img], ["GT", "Init", "Reconstruction", "Residual"], fname="scratch_NM/NewWrapper/sfd_gtwhitenoisecov_lam0_smoothinit.png")
+
+#Old image##############################################################################
+Nx=64
+im = readdust(Nx)
+true_img = im
+
+noise = rand(Normal(0.0, std(true_img)), Nx, Nx)
+init = imfilter(true_img + noise, Kernel.gaussian(0.8))
+filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(Nf, ) = size(filter_hash["filt_index"])
+coeff_mask = falses(2+Nf+Nf^2)
+coeff_mask[Nf+3:end] .= true
+
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>false)
+white_noise_args = Dict(:loc=>0.0, :sig=>1.0, :Nsam=>1000, :iso=>false, :norm=>false, :smooth=>false, :smoothval=>0.8) #only if you're using noise based covar
+optim_settings = Dict([("iterations", 1000), ("norm", false)])
+recon_settings = Dict([("target_type", "ground truth"),("covar_type", "white_noise"), ("log", false), ("GaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
+ ("apd", "non_apd"), ("optim_settings", optim_settings), ("lambda", 0.0), ("white_noise_args", white_noise_args)]) #Add constraints
+#"white_noise_args": args for white_noise sims if GaussianLoss and Covar_type='white_noise'. :loc...
+
+s2mean, s2icov = meancov_generator(true_img, filter_hash, dhc_args, coeff_mask, recon_settings)
+recon_settings["s_targ_mean"] = s2mean
+recon_settings["s_invcov"] = s2icov
+
+recon_img = reconstruction_wrapper(true_img, init, filter_hash, dhc_args, coeff_mask, recon_settings)
+Visualization.plot_diffscales([true_img, init, recon_img, recon_img - true_img], ["GT", "Init", "Reconstruction", "Residual"], fname="scratch_NM/NewWrapper/sfd_gtwhitenoisecov_lam0_smoothinit_apd.png")
+
+
+
 ##############################################################################################################################
 using StatsBase
 
@@ -863,6 +902,7 @@ apdimg = apodizer(image, 1, 1, 63)
 heatmap(image)
 heatmap(apdimg)
 
+big64
 
 apdimg_new = apodizer_new(image)
 heatmap(apdimg_new)
