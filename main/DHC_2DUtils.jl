@@ -27,6 +27,7 @@ module DHC_2DUtils
     export isoMaker
     export apodizer
     export wind_2d
+    export DHC_compute_wrapper
 
 
     function fink_filter_hash(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true)
@@ -546,6 +547,15 @@ module DHC_2DUtils
         return filter
     end
 
+    function DHC_compute_wrapper(image::Array{Float64,2}, filter_hash::Dict;
+        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, apodize=false, norm=true, iso=false, FFTthreads=1, filter_hash2::Dict=filter_hash)
+        if apodize
+            ap_img = apodizer(image)
+        else
+            ap_img = image
+        end
+        return DHC_compute(ap_img, filter_hash, filter_hash2, doS2=doS2, doS12=doS12, doS20=doS20, norm=norm, iso=iso, FFTthreads=FFTthreads)
+    end
 
     function DHC_compute_apd(image::Array{Float64,2}, filter_hash::Dict;
         doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, apodize=false, norm=true, iso=false, FFTthreads=1, filter_hash2::Dict=filter_hash)
@@ -584,16 +594,19 @@ module DHC_2DUtils
         if anyrd im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf) end
 
         if apodize
-            image = apodizer(image)
+            #println("Apodizing")
+            ap_img = apodizer(image)
+        else
+            ap_img = image
         end
         ## 0th Order
-        S0[1]   = mean(image)
-        norm_im = image.-S0[1]
+        S0[1]   = mean(ap_img)
+        norm_im = ap_img .-S0[1]
         S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
         if norm
             norm_im ./= sqrt(Nx*Ny*S0[2])
         else
-            norm_im = copy(image)
+            norm_im = copy(ap_img)
         end
 
         append!(out_coeff,S0[:])

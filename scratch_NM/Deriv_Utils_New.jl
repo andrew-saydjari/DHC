@@ -498,7 +498,7 @@ module Deriv_Utils_New
             temp = P_fft*(Wtot.*Uvec[:,:,f2])
             zarr[f_i] .+= f_v .* temp[f_i]
         end
-        ΣdS20dα = 2 .* real.(P_ifft*zarr) #added here
+        ΣdS20dα = 2* real.(P_ifft*zarr) #added here
 
         return reshape(ΣdS20dα, (Nx^2, 1))
     end
@@ -744,8 +744,11 @@ module Deriv_Utils_New
         #=
         Cases to be handled by this function:
         S20
-        Select pixels masked or all floating
+        Apodized or not
+        Log or Regular: If log then input, targ and cov should have been constructed using log
+        Select pixels masked or all floating--not using for masked currently
         Select coefficients optimized wrt
+        Lambda: regularization
 
         Cases NOT handled by this function:
         Iso
@@ -763,7 +766,7 @@ module Deriv_Utils_New
         if Nf == 0 error("filter hash corrupted") end
 
         println("S20")
-        #pixmask = pixmask[:] #flattened: Nx^2s #DEBUG
+        #pixmask = pixmask[:] #flattened: Nx^2s #DEB
         ori_input = reshape(copy(input), (Nx^2, 1))
 
         if coeff_mask!=nothing
@@ -781,8 +784,8 @@ module Deriv_Utils_New
             coeff_mask[1:Nf+2] .= false #Mask out S0 and S1
         end
 
-
-        function adaptive_apodizer(input_image::Array{Float64, 2})#SPEED
+        #Apodization adjustments
+        function adaptive_apodizer(input_image::Array{Float64, 2})
             if dhc_args[:apodize]
                 apd_image = apodizer(input_image)
             else
@@ -790,11 +793,19 @@ module Deriv_Utils_New
             end
             return apd_image
         end
-
+        #For the derivative term dA*P/dP
         if dhc_args[:apodize]
-            Apmat = wind_2d(Nx)
+            Ap = wind_2d(Nx)
+            cA = sum(Ap)
+            Apflat = reshape(Ap, Nx^2)
+            od_nz_idx = findall(!iszero, Apflat) #findall((x->((x!=0) & (x!=1))), Apflat)
+            #od_zidx = findall(iszero, Apflat)
+            avals = Apflat[od_nz_idx]
+            dA = zeros(Nx^2, Nx^2)
+            dA[:, od_nz_idx] .= ((1.0 .- Apflat) * avals')./cA
+            dA[diagind(dA)] += Apflat
         else
-            Apmat = ones(Nx, Nx)
+            dA = I
         end
 
 
@@ -808,8 +819,7 @@ module Deriv_Utils_New
 
 
         function loss_func20(img_curr::Array{Float64, 2})
-            #size(img_curr) must be (Nx^2, 1)#SPEED: Might be faster if you work with Nx, Nx images instead
-            s_curr = DHC_compute_apd(img_curr,  filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
+            s_curr = DHC_compute_apd(img_curr,  filter_hash, iso=false, norm=tonorm; dhc_args...)[coeff_mask]
             regterm =  0.5*lambda*sum((adaptive_apodizer(img_curr) - adaptive_apodizer(input)).^2)
             lnlik = ( 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean))
             #println("Lnlik size | Reg Size", size(lnlik), size(regterm))
@@ -818,12 +828,11 @@ module Deriv_Utils_New
         end
         #TODO: Need to replace the deriv_sums20 with a deriv_sum wrapper that handles all cases (S12, S20, S2)
         function dloss20(storage_grad::Array{Float64, 2}, img_curr::Array{Float64, 2})
-            #storage_grad, img_curr must be (Nx^2, 1)
             s_curr = DHC_compute_apd(img_curr, filter_hash, norm=tonorm, iso=false; dhc_args...)[coeff_mask]
             diff = s_curr - s_targ_mean
             wt = reshape(convert(Array{Float64, 2}, transpose(diff) * s_targ_invcov), (Nf, Nf))
             apdimg_curr = adaptive_apodizer(img_curr)
-            storage_grad .= Apmat .* (reshape(wst_S20_deriv_sum(apdimg_curr, filter_hash, wt, FFTthreads=FFTthreads), (Nx, Nx)) + lambda.*(apdimg_curr - adaptive_apodizer(input)))
+            storage_grad .= reshape((wst_S20_deriv_sum(apdimg_curr, filter_hash, wt, FFTthreads=FFTthreads)' + reshape(lambda.*(apdimg_curr - adaptive_apodizer(input)), (1, Nx^2))) * dA, (Nx, Nx))
             storage_grad[pixmask] .= 0 # better way to do this by taking pixmask as an argument wst_s2_deriv_sum?
             return
         end
@@ -853,17 +862,18 @@ module Deriv_Utils_New
         #Debugging stuff
         println("Diff check")
         eps = zeros(size(input))
-        row, col = 13, 27 #convert(Int8, Nx/2), convert(Int8, Nx/2)+3
+        row, col = 24, 18 #convert(Int8, Nx/2), convert(Int8, Nx/2)+3
         eps[row, col] = 1e-4
         chisq1 = loss_func20(input+eps./2) #DEB
         chisq0 = loss_func20(input-eps./2) #DEB
         brute  = (chisq1-chisq0)/1e-4
         #df_brute = DHC_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
         clever = zeros(size(input)) #DEB
+        meanval = mean(adaptive_apodizer(input)) ./ mean(wind_2d(Nx))
         _bar = dloss20(clever, input) #DEB
         println("Chisq Derve Check")
         println("Brute:  ",brute)
-        println("Clever: ",clever[row, col]) #DEB
+        println("Clever: ",clever[row, col], " Difference: ", brute - clever[row, col], " Mean ", meanval) #DEB
 
         res = optimize(loss_func20, dloss20, input, ConjugateGradient(), Optim.Options(iterations = numitns_dict, store_trace = true, show_trace = true))
         result_img = Optim.minimizer(res)

@@ -12,6 +12,7 @@ module ReconFuncs
     export reconstruction_wrapper
 
     #Basic Gaussian Loss Function
+    #=
     function LossGaussianS20(img_curr, filter_hash, ori_input, coeff_mask, s_targ_mean, s_invcov, lambda)
         s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=false, doS12=false, doS20=true, norm=false)[coeff_mask]
         regterm =  0.5*lambda*sum((img_curr - ori_input).^2)
@@ -30,7 +31,7 @@ module ReconFuncs
         storage_grad[pixmask, 1] .= 0 # better way to do this by taking pixmask as an argument wst_s2_deriv_sum?
         return
     end
-
+    =#
     function meancov_generator(true_img, fhash, dhc_args, coeff_mask, settings)
         #generates targmean and covariance for Gaussian loss func
         (Nx, Ny) = size(true_img)
@@ -56,16 +57,14 @@ module ReconFuncs
             if !settings["log"]  #Confirm that this handles both the apd and nonapd cases appropriately
                 sig2, cov = S2_whitenoiseweights(true_img, fhash, dhc_args, coeff_mask=coeff_mask; settings["white_noise_args"]...)
             #Messy here because I'm adding noise in true image space but calculating the coeffs of the log of the image. Cant just pass the log image.
-            elseif settings["log"]
+            else #if settings["log"]
                 sig2, cov = whitenoiseweights_forlog(true_img, fhash, dhc_args, coeff_mask=coeff_mask; settings["white_noise_args"]...)
-            else
-                error("Not Implemented yet")
             end
         end
 
         ##Get S_Targ and covariance based on sfd_dbn
         if settings["target_type"]=="sfd_dbn" #if starg is based on sfd_dbn,
-            sfdimg = readsfd(Nx, logbool=settings["log"]) #Return sfd log or not log images, and PIXEL covariance, BUGFix:DON'T ADD APD HERE. APD IS TO BE ADDED EXCLUSIVELY IN DHC_COMPUTE.
+            sfdimg = readsfd(Nx, logbool=settings["log"]) #Return sfd log or regular images, and PIXEL covariance, BUGFix:DON'T ADD APD HERE. APD IS TO BE ADDED EXCLUSIVELY IN DHC_COMPUTE.
             s2targ, sig2, cov = dbn_coeffs_calc(sfdimg, fhash, dhc_args, coeff_mask, settings)
             if (settings["covar_type"]!="sfd_dbn") & (settings["covar_type"]!="white_noise") error("Invalid covar_type") end
         end
@@ -75,7 +74,7 @@ module ReconFuncs
         if settings["Invcov_matrix"]=="Diagonal"
             s2icov = invert_covmat(sig2)
         elseif settings["Invcov_matrix"]=="Diagonal+Eps"
-            s2icov = invert_covmat(sig2, 1e-10)
+            s2icov = invert_covmat(sig2, 1e-10) #DEBUG
         elseif settings["Invcov_matrix"]=="Full+Eps"
             s2icov = invert_covmat(cov, 1e-10)
         else#s2icov
@@ -111,7 +110,7 @@ module ReconFuncs
         #s2targ = DHC_compute(img, fhash, doS2=true, norm=norm, iso=false)
         if settings["GaussianLoss"]
             starg, sinvcov = settings["s_targ_mean"], settings["s_invcov"] #meancov_generator(true_img, fhash, coeff_type, coeff_mask, settings) call this outside function with the same dict
-            #BUG: Condense here.
+
             if !settings["log"]
                 recon_img = Deriv_Utils_New.image_recon_derivsum_regularized(noisy_init, fhash, starg, sinvcov, falses(Nx, Nx), dhc_args, optim_settings=settings["optim_settings"], coeff_mask=coeff_mask, lambda=settings["lambda"])
             elseif settings["log"]
