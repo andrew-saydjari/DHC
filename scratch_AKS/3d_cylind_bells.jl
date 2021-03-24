@@ -10,8 +10,8 @@ using SparseArrays
 using Plots
 theme(:dark)
 
-filter_hash = fink_filter_hash(1, 8, nx=256, pc=1)
-filt_3d = fink_filter_bank_3dizer_AKS(filter_hash, 1, nz=256)
+filter_hash = fink_filter_hash(1, 8, nx=256, pc=2)
+filt_3d = fink_filter_bank_3dizer(filter_hash, 1, nz=256)
 
 plot_filter_bank_QAxy(filt_3d, fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/images/filter_bank_QAxy.png")
 plot_filter_bank_QAxz(filt_3d, fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/images/filter_bank_QAxz.png")
@@ -3050,10 +3050,10 @@ function fink_filter_bank_3dizer_AKS(hash, cz; nz=256, pcz=1, Omega3d=false)
     info["psi_ind_L"]       = psi_ind_L
 
     # -------- compute matrix that projects iso coeffs, add to hash
-    S1_iso_mat = S1_iso_matrix3d(info)
-    info["S1_iso_mat"] = S1_iso_mat
-    S2_iso_mat = S2_iso_matrix3d(info)
-    info["S2_iso_mat"] = S2_iso_mat
+    #S1_iso_mat = S1_iso_matrix3d(info)
+    #info["S1_iso_mat"] = S1_iso_mat
+    #S2_iso_mat = S2_iso_matrix3d(info)
+    #info["S2_iso_mat"] = S2_iso_mat
     #
 
     return info
@@ -3233,3 +3233,321 @@ filt_3d_test[6+1,1,6+1]
 mask = filt_3d["psi_ind_L"].==0
 index1 = collect(1:303)
 index1[mask]
+
+
+filter_hash = fink_filter_hash_AKS(1, 8, nx=256, pc=2, Omega=false)
+filt_3d = fink_filter_bank_3dizer_AKS(filter_hash, 1, nz=256, Omega3d=false)
+
+test = S2_iso_matrix3d_AKS(filt_3d)
+sum(test,dims=1) == ones(1,87025)
+unique(sum(test,dims=2))
+index1 = collect(1:87025)
+mask = sum(test,dims=1).==0
+unique(diff(index1[mask[1,:]],dims=1))
+index1[mask[1,:]]
+
+function S2_iso_matrix3d_AKS(fhash)
+    # fhash is the filter hash output by fink_filter_hash
+    # The output matrix converts an S2 coeff vector to S2iso by
+    #   summing over l1,l2 and fixed Δl.
+    # Matrix is stored in sparse CSC format using SparseArrays.
+    # DPF 2021-Feb-18
+    # AKS 2021-Feb-22
+
+    # Does hash contain Omega filter?
+    Omega   = haskey(fhash, "Omega_3d")
+
+    # unpack fhash
+    L      = length(fhash["theta_value"])
+    J      = length(fhash["j_value"])
+    K      = length(fhash["k_value"])
+    Nf     = length(fhash["filt_value"])
+    ψ_ind   = fhash["psi_index"]
+
+    # number of iso coefficients
+    #Niso    = Omega ? Nj*Nj*Nl+4*Nj+4 : Nj*Nj*Nl+2*Nj+1
+    NisoL   = J*J*K*K*L+2*J*K*K+2*J*K
+    NnoL    = K+1
+    Mat     = zeros(Int32, NisoL+NnoL^2, Nf*Nf)
+
+    NnoLind = J*K*L+1:J*K*L+NnoL
+
+    #should probably think about reformatting to (Nj+1) so phi
+    #phi cross terms are in the right place
+
+    # first J*J*K*K*L elements of iso
+    for j1 = 1:J
+        for j2 = 1:J
+            for l1 = 1:L
+                for l2 = 1:L
+                    for k1 = 1:K
+                        for k2 = 1:K
+                            DeltaL = mod(l1-l2, L)
+                            λ1     = ψ_ind[j1,l1,k1]
+                            λ2     = ψ_ind[j2,l2,k2]
+
+                            Iiso   = k1+K*((k2-1)+K*((j1-1)+J*((j2-1)+J*DeltaL)))
+                            Icoeff = λ1+Nf*(λ2-1)
+                            Mat[Iiso, Icoeff] = 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    # Next JKK elements are λϕ, then JKK elements ϕλ
+
+    ref = J*J*K*K*L
+
+    for j = 1:J
+        for l = 1:L
+            for k1 = 1:K
+                for k2 =1:K
+                    λ      = ψ_ind[j,l,k1]
+                    Iiso   = ref + k1+K*((k2-1)+K*(j-1))
+                    Icoeff = λ+Nf*(ψ_ind[J+1,1,k2]-1)  # λϕ
+                    Mat[Iiso, Icoeff] = 1
+
+                    Iiso   = ref+J*K*K+k1+K*((k2-1)+K*(j-1))
+                    Icoeff = (ψ_ind[J+1,1,k2]-1)+Nf*(λ-1)  # ϕλ
+                    Mat[Iiso, Icoeff] = 1
+                end
+            end
+        end
+    end
+
+    ref = J*J*K*K*L+2*J*K*K
+
+    # Next 2*J*K elements are ψϕ0 and ϕ0ψ
+
+    ϕ0 = ψ_ind[J+1,1,K+1]
+    for j1=1:J
+        for l1 = 1:L
+            for k1=1:K
+                λ1 = ψ_ind[j1,l1,k1]
+
+                Iiso = ref+k1+K*(j1-1)
+                Icoeff = λ1+Nf*(ϕ0-1)
+                Mat[Iiso, Icoeff] = 1
+
+                Iiso = ref+J*K+k1+K*(j1-1)
+                Icoeff = ϕ0+Nf*(λ1-1)
+                Mat[Iiso, Icoeff] = 1
+            end
+        end
+    end
+
+    # take care of the L independent subblocks
+    for m1=1:NnoL
+        for m2=1:NnoL
+            Iiso = NisoL + m1 + NnoL*(m2-1)
+            λ1 = NnoLind[m1]
+            λ2 = NnoLind[m2]
+            Icoeff = λ1+Nf*(λ2-1)
+            Mat[Iiso, Icoeff] = 1
+        end
+    end
+
+    # # If the Omega filter exists, add more terms
+    # if Omega
+    #     # Next J elements are λΩ, then J elements Ωλ
+    #     for j = 1:Nj
+    #         for l = 1:Nl
+    #             λ      = ψ_ind[j,l]
+    #             Iiso   = I0+j
+    #             Icoeff = λ+Nf*(Ω_ind-1)  # λΩ
+    #             Mat[Iiso, Icoeff] = 1
+    #
+    #             Iiso   = I0+Nj+j
+    #             Icoeff = Ω_ind+Nf*(λ-1)  # Ωλ
+    #             Mat[Iiso, Icoeff] = 1
+    #         end
+    #     end
+    #     # Next 3 elements are ϕΩ, Ωϕ, ΩΩ
+    #     Iiso   = I0+Nj+Nj
+    #     Mat[Iiso+1, ϕ_ind+Nf*(Ω_ind-1)] = 1
+    #     Mat[Iiso+2, Ω_ind+Nf*(ϕ_ind-1)] = 1
+    #     Mat[Iiso+3, Ω_ind+Nf*(Ω_ind-1)] = 1
+    # end
+    #
+    return sparse(Mat)
+end
+
+function S2_iso_matrix3d_AKS(fhash)
+    # fhash is the filter hash output by fink_filter_hash
+    # The output matrix converts an S2 coeff vector to S2iso by
+    #   summing over l1,l2 and fixed Δl.
+    # Matrix is stored in sparse CSC format using SparseArrays.
+    # DPF 2021-Feb-18
+    # AKS 2021-Feb-22
+
+    # Does hash contain Omega filter?
+    Omega   = fhash["Omega3d"]
+
+    # unpack fhash
+    L      = length(fhash["theta_value"])
+    J      = length(fhash["j_value"])
+    K      = length(fhash["k_value"])
+    Nf     = length(fhash["filt_value"])
+    ψ_ind   = fhash["psi_index"]
+
+    # number of iso coefficients
+    NisoL   = Omega ? J*J*K*K*L+2*J*K*K+2*J*K*K+6*J*K : J*J*K*K*L+2*J*K*K+2*J*K
+    NnoL    = Omega ? 2*K+3 : K+1
+    Mat     = zeros(Int32, NisoL+NnoL^2, Nf*Nf)
+
+    indexes = 1:Nf
+    mask = filt_3d["psi_ind_L"].==0
+    NnoLind = indexes[mask]
+
+    #should probably think about reformatting to (Nj+1) so phi
+    #phi cross terms are in the right place
+
+    # first J*J*K*K*L elements of iso
+    ref = 0
+    for j1 = 1:J
+        for j2 = 1:J
+            for l1 = 1:L
+                for l2 = 1:L
+                    for k1 = 1:K
+                        for k2 = 1:K
+                            DeltaL = mod(l1-l2, L)
+                            λ1     = ψ_ind[j1,l1,k1]
+                            λ2     = ψ_ind[j2,l2,k2]
+
+                            Iiso   = k1+K*((k2-1)+K*((j1-1)+J*((j2-1)+J*DeltaL)))
+                            Icoeff = λ1+Nf*(λ2-1)
+                            Mat[Iiso, Icoeff] = 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+    ref+=J*J*K*K*L
+
+    # Next JKK elements are λϕ, then JKK elements ϕλ
+
+    for j = 1:J
+        for l = 1:L
+            for k1 = 1:K
+                for k2 =1:K
+                    λ      = ψ_ind[j,l,k1]
+                    Iiso   = ref + k1+K*((k2-1)+K*(j-1))
+                    Icoeff = λ+Nf*(ψ_ind[J+1,1,k2]-1)  # λϕ
+                    Mat[Iiso, Icoeff] = 1
+
+                    Iiso   = ref+J*K*K+k1+K*((k2-1)+K*(j-1))
+                    Icoeff = ψ_ind[J+1,1,k2]+Nf*(λ-1)  # ϕλ
+                    Mat[Iiso, Icoeff] = 1
+                end
+            end
+        end
+    end
+
+    ref += 2*J*K*K
+
+    # Next JKK elements are λΩ, then JKK elements Ωλ
+    if Omega
+        for j = 1:J
+            for l = 1:L
+                for k1 = 1:K
+                    for k2 =1:K
+                        λ      = ψ_ind[j,l,k1]
+                        Iiso   = ref + k1+K*((k2-1)+K*(j-1))
+                        Icoeff = λ+Nf*(ψ_ind[J+1,2,k2]-1)  # λϕ
+                        Mat[Iiso, Icoeff] = 1
+
+                        Iiso   = ref+J*K*K+k1+K*((k2-1)+K*(j-1))
+                        Icoeff = ψ_ind[J+1,2,k2]+Nf*(λ-1)  # ϕλ
+                        Mat[Iiso, Icoeff] = 1
+                    end
+                end
+            end
+        end
+        ref += 2*J*K*K
+    end
+
+    # Next 2*J*K elements are ψϕ0 and ϕ0ψ
+
+    ϕ0 = ψ_ind[J+1,1,K+1]
+    for j1=1:J
+        for l1 = 1:L
+            for k1=1:K
+                λ1 = ψ_ind[j1,l1,k1]
+
+                Iiso = ref+k1+K*(j1-1)
+                Icoeff = λ1+Nf*(ϕ0-1)
+                Mat[Iiso, Icoeff] = 1
+
+                Iiso = ref+J*K+k1+K*(j1-1)
+                Icoeff = ϕ0+Nf*(λ1-1)
+                Mat[Iiso, Icoeff] = 1
+            end
+        end
+    end
+    ref += 2*J*K
+
+    if Omega
+        Ω0 = ψ_ind[J+1,2,K+1]
+        for j1=1:J
+            for l1 = 1:L
+                for k1=1:K
+                    λ1 = ψ_ind[j1,l1,k1]
+
+                    Iiso = ref+k1+K*(j1-1)
+                    Icoeff = λ1+Nf*(Ω0-1)
+                    Mat[Iiso, Icoeff] = 1
+
+                    Iiso = ref+J*K+k1+K*(j1-1)
+                    Icoeff = Ω0+Nf*(λ1-1)
+                    Mat[Iiso, Icoeff] = 1
+                end
+            end
+        end
+        ref += 2*J*K
+
+        Ω3 = ψ_ind[J+1,3,K+1]
+        for j1=1:J
+            for l1 = 1:L
+                for k1=1:K
+                    λ1 = ψ_ind[j1,l1,k1]
+
+                    Iiso = ref+k1+K*(j1-1)
+                    Icoeff = λ1+Nf*(Ω3-1)
+                    Mat[Iiso, Icoeff] = 1
+
+                    Iiso = ref+J*K+k1+K*(j1-1)
+                    Icoeff = Ω3+Nf*(λ1-1)
+                    Mat[Iiso, Icoeff] = 1
+                end
+            end
+        end
+        ref += 2*J*K
+    end
+
+    # take care of the L independent subblocks
+    for m1=1:NnoL
+        for m2=1:NnoL
+            Iiso = NisoL + m1 + NnoL*(m2-1)
+            λ1 = NnoLind[m1]
+            λ2 = NnoLind[m2]
+            Icoeff = λ1+Nf*(λ2-1)
+            Mat[Iiso, Icoeff] = 1
+        end
+    end
+
+    return sparse(Mat)
+end
+
+filter_hash = fink_filter_hash_AKS(1, 8, nx=256, pc=2, Omega=true)
+filt_3d = fink_filter_bank_3dizer_AKS(filter_hash, 1, nz=256, Omega3d=true)
+
+test = S2_iso_matrix3d_AKS(filt_3d)
+sum(test,dims=1) == ones(1,91809)
+unique(sum(test,dims=2))
+index1 = collect(1:91809)
+mask = sum(test,dims=1).==0
+unique(index1[mask[1,:]])
+index1[mask[1,:]]

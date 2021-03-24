@@ -507,7 +507,7 @@ module DHC_2DUtils
         # AKS 2021-Feb-22
 
         # Does hash contain Omega filter?
-        Omega   = haskey(fhash, "Omega3d")
+        Omega   = haskey(fhash, "Omega_index") & fhash["Omega3d"]
 
         # unpack fhash
         L      = length(fhash["theta_value"])
@@ -1424,7 +1424,7 @@ module DHC_2DUtils
         return out_coeff
     end
 
-    function DHC_compute_3d(image::Array{Float64,3}, filter_hash; FFTthreads=2)
+    function DHC_compute_3d(image::Array{Float64,3}, filter_hash; FFTthreads=2, iso=false)
         # Use 2 threads for FFT
         FFTW.set_num_threads(FFTthreads)
 
