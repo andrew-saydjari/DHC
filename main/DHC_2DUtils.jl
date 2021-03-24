@@ -1501,7 +1501,9 @@ module DHC_2DUtils
         #append!(out_coeff, S12)
 
         ## Traditional second order
-        Mat2 = filter_hash["S2_iso_mat"]
+        if iso
+            Mat2 = filter_hash["S2_iso_mat"]
+        end
         for f1 = 1:Nf
             thisim = fft(im_rd_0_1[:,:,:,f1])  # Could try rfft here
             # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
