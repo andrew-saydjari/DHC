@@ -441,9 +441,9 @@ function test_wrapper(Nx)
 end
 
 
-test_wrapper(64)
+test_wrapper(16)
 
-
+#=
 filter_hash = fink_filter_hash(1, 8, nx=64, pc=1, wd=1, Omega=true)
 Nx=64
 true_img = readdust(Nx)
@@ -455,3 +455,4 @@ function test(a, b, c=b; d=3)
 end
 
 test(3, 4, 2, d=2)
+=#

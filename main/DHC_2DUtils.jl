@@ -28,11 +28,17 @@ module DHC_2DUtils
     export apodizer
     export wind_2d
     export DHC_compute_wrapper
+    export transformMaker
+    export DHC_compute_RGB
+    export S1_iso_matrix
+    export S2_iso_matrix
 
 
-    function fink_filter_hash(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true)
+## Filter hash construct core
+
+    function fink_filter_hash(c, L; nx=256, wd=2, pc=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1)
         # -------- compute the filter bank
-        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on)
+        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on, wd_cutoff=wd_cutoff)
 
         # -------- list of non-zero pixels
         flist = fink_filter_list(filt)
@@ -46,6 +52,8 @@ module DHC_2DUtils
         hash["S1_iso_mat"] = S1_iso_mat
         S2_iso_mat = S2_iso_matrix(hash)
         hash["S2_iso_mat"] = S2_iso_mat
+        hash["num_iso_coeff"] = size(S1_iso_mat)[1] + size(S2_iso_mat)[1] + 2
+        hash["num_coeff"] = size(S1_iso_mat)[2] + size(S2_iso_mat)[2] + 2
 
         return hash
     end
@@ -108,6 +116,202 @@ module DHC_2DUtils
         return hash
     end
 
+    function fink_filter_bank_3dizer(hash, cz; nz=256, pcz=1, Omega3d=false)
+        @assert hash["pc"]==2 #can remove later when we add support for pcz=2
+        @assert pcz==1
+
+        # -------- set parameters
+        nx = convert(Int64,hash["npix"])
+        n2d = size(hash["filt_value"])[1]
+        dz = nz/2-1
+        J = size(hash["j_value"])[1]
+        L = size(hash["theta_value"])[1]
+        psi_ind_L2d = hash["psi_ind_L"]
+
+        im_scale = convert(Int8,log2(nz))
+        # -------- number of bins in radial direction (size scales)
+        K = (im_scale-3)*cz + 1
+        normj = 1/sqrt(cz)
+
+        Omega2d = haskey(hash, "Omega_index")
+
+        if Omega2d
+            tot_num_filt = n2d*K + 3
+        else
+            tot_num_filt = n2d*K + 1
+        end
+
+        # -------- allocate output array of zeros
+        J_L_K     = zeros(Int32, tot_num_filt,3)
+        psi_ind_L = zeros(Int32, tot_num_filt)
+        psi_index = zeros(Int32, J+1, L, K+1)
+        k_value   = zeros(Float64, K)
+        logr      = zeros(Float64,nz)
+        filt_temp = zeros(Float64,nx,nx,nz)
+        F_z       = zeros(Float64,nx,nx,nz)
+        #F_p       = zeros(Float64,nx,nx,nz)
+
+        filtind = fill(CartesianIndex{3}[], tot_num_filt)
+        filtval = fill(Float64[], tot_num_filt)
+
+        for z = 1:convert(Int64,dz+1)
+            sz = mod(z+dz,nz)-dz-1
+            z2 = sz^2
+            logr[z] = 0.5*log2(max(1,z2))
+        end
+
+        @inbounds for k_ind = 1:K
+            k = (k_ind-1)/cz
+            k_value[k_ind] = k  # store for later
+            krad  = im_scale-k-2
+            Δk    = abs.(logr.-krad)
+            kmask = (Δk .<= 1)
+            k_count = count(kmask)
+            k_vals = findall(kmask)
+
+            # -------- radial part
+            #I have somehow dropped a factor of sqrt(2) which has been reinserted as a 0.5... fix my brain
+            @views F_z[:,:,kmask].= reshape(cos.(Δk[kmask] .* (π/2)),1,1,k_count)
+            @inbounds for index = 1:n2d
+                p_ind = hash["filt_index"][index]
+                p_filt = hash["filt_value"][index]
+                #F_p[p_ind,:] .= p_filt
+                f_ind    = k_ind + (index-1)*K
+                @views filt_tmp = p_filt.*F_z[p_ind,kmask]
+                #temp_ind = findall((F_p .> 1E-13) .& (F_z .> 1E-13))
+                #@views filt_tmp = F_p[temp_ind].*F_z[temp_ind]
+                ind = findall(filt_tmp .> 1E-13)
+                @views filtind[f_ind] = map(x->CartesianIndex(p_ind[x[1]][1],p_ind[x[1]][2],k_vals[x[2]]),ind)
+                #filtind[f_ind] = temp_ind[ind]
+                @views filtval[f_ind] = filt_tmp[ind]
+                @views J_L_K[f_ind,:] = [hash["J_L"][index,1],hash["J_L"][index,2],k_ind-1]
+                psi_index[hash["J_L"][index,1]+1,hash["J_L"][index,2]+1,k_ind] = f_ind
+                psi_ind_L[f_ind] = psi_ind_L2d[index]
+            end
+        end
+
+        filter_power = zeros(nx,nx,nz)
+        center_power = zeros(nx,nx,nz)
+        for j = 1:J
+            for l = 1:L
+                for k = 1:K
+                    index = psi_index[j,l,k]
+                    filter_power[filtind[index]] .+= filtval[index].^2
+                end
+            end
+        end
+
+        for k = 1:K
+            index = psi_index[J+1,1,k]
+            filter_power[filtind[index]] .+= filtval[index].^2
+        end
+
+        #### ------- This is phi0 containing the plane
+        # phi contains power near k=0 not yet accounted for
+        # for plane half-covered (pcz=1), add other half-plane
+
+        if pcz == 1
+            filter_power .+= circshift(filter_power[:,:,end:-1:1],(0,0,1))
+        end
+
+        center_power = fftshift(filter_power)
+        phi_cen = zeros(nx, nx, nz)
+        phi_cen[:,:,nz÷2:nz÷2+2] = center_power[:,:,nz÷2+3].*ones(1,1,3)
+        phi_cen_shift = fftshift(phi_cen)
+        ind = findall(phi_cen_shift .> 1E-13)
+        val = phi_cen_shift[ind]
+
+        # -------- before adding ϕ to filter bank, renormalize ψ if pc=1
+        if pcz==1 filtval[1:n2d*K] .*= sqrt(2.0) end  # double power for half coverage
+
+        # -------- add result to filter array
+        filtind[n2d*K + 1] = ind
+        filtval[n2d*K + 1] = sqrt.(val)
+        J_L_K[n2d*K + 1,:] = [J+1,0,K+1]
+        psi_index[J+1,1,K+1] = n2d*K + 1
+        psi_ind_L[n2d*K + 1] = 0
+
+        if Omega3d
+            #### ------- This is omega0 containing the plane
+
+            omega0 = zeros(nx, nx, nz)
+            omega0[:,:,nz÷2:nz÷2+2] .= ones(nx,nx,3)
+            omega0 .-= phi_cen
+
+            omega0_shift = fftshift(omega0)
+            ind = findall(omega0_shift .> 1E-13)
+            val = omega0_shift[ind]
+
+            # -------- add result to filter array
+            filtind[n2d*K + 2] = ind
+            filtval[n2d*K + 2] = sqrt.(val)
+            J_L_K[n2d*K + 2,:] = [J+1,1,K+1]
+            psi_index[J+1,2,K+1] = n2d*K + 2
+            psi_ind_L[n2d*K + 2] = 0
+
+            #### ------- This is omega3 around the edges
+
+            filter_power = zeros(nx,nx,nz)
+            center_power = zeros(nx,nx,nz)
+            for index = 1:n2d*K + 2
+                filter_power[filtind[index]] .+= filtval[index].^2
+            end
+
+            if pcz == 1
+                filter_power .+= circshift(filter_power[:,:,end:-1:1],(0,0,1))
+            end
+
+            center_power = ones(nx,nx,nz) .- filter_power
+            ind = findall(center_power .> 1E-13)
+            val = center_power[ind]
+
+            # -------- add result to filter array
+            filtind[n2d*K + 3] = ind
+            filtval[n2d*K + 3] = sqrt.(val)
+            J_L_K[n2d*K + 3,:] = [J+1,2,K+1]
+            psi_index[J+1,3,K+1] = n2d*K + 3
+            psi_ind_L[n2d*K + 3] = 0
+        end
+
+        # -------- metadata dictionary
+        info=Dict()
+        info["npix"]         = hash["npix"]
+        info["j_value"]      = hash["j_value"]
+        info["theta_value"]  = hash["theta_value"]
+        info["2d_psi_index"]    = hash["psi_index"]
+        info["2d_phi_index"]    = hash["phi_index"]
+        info["2d_J_L"]          = hash["J_L"]
+        info["2d_pc"]           = hash["pc"]
+        info["2d_wd"]           = hash["wd"]
+        info["2d_fs_center_r"]  = hash["fs_center_r"]
+        info["2d_filt_index"]   = hash["filt_index"]
+        info["2d_filt_value"]   = hash["filt_value"]
+        if Omega2d
+            info["Omega_index"]   = hash["Omega_index"]
+        end
+
+        info["nz"]              = nz
+        info["cz"]              = cz
+        info["J_L_K"]           = psi_index
+        info["psi_index"]       = psi_index
+        info["k_value"]         = k_value
+        info["filt_index"]      = filtind
+        info["filt_value"]      = filtval
+        info["pcz"]             = pcz
+        info["Omega3d"]        = Omega3d
+        info["psi_ind_L"]       = psi_ind_L
+
+        # -------- compute matrix that projects iso coeffs, add to hash
+        S1_iso_mat = S1_iso_matrix3d(info)
+        info["S1_iso_mat"] = S1_iso_mat
+        S2_iso_mat = S2_iso_matrix3d(info)
+        info["S2_iso_mat"] = S2_iso_mat
+        #
+
+        return info
+    end
+
+## Matrix for transformations
     function S1_iso_matrix(fhash)
         # fhash is the filter hash output by fink_filter_hash
         # The output matrix converts an S1 coeff vector to S1iso by
@@ -145,7 +349,6 @@ module DHC_2DUtils
 
         return sparse(Mat)
     end
-
 
     function S2_iso_matrix(fhash)
         # fhash is the filter hash output by fink_filter_hash
@@ -230,7 +433,372 @@ module DHC_2DUtils
         return sparse(Mat)
     end
 
+    function S1_iso_matrix3d(fhash)
+        # fhash is the filter hash output by fink_filter_hash
+        # The output matrix converts an S1 coeff vector to S1iso by
+        #   summing over l
+        # Matrix is stored in sparse CSC format using SparseArrays.
+        # DPF 2021-Feb-18
+        # AKS 2021-Feb-22
 
+        # Does hash contain Omega filter?
+        Omega   = haskey(fhash, "Omega_index") & fhash["Omega3d"]
+
+        # unpack fhash
+        Nl      = length(fhash["theta_value"])
+        Nj      = length(fhash["j_value"])
+        Nk      = length(fhash["k_value"])
+        Nf      = length(fhash["filt_value"])
+        ψ_ind   = fhash["psi_index"]
+
+        # number of iso coefficients
+        Niso    = Omega ? (Nj+2)*Nk+3 : (Nj+1)*Nk+1
+        Nstep   = Omega ? Nj+2 : Nj+1
+        Mat     = zeros(Int32, Niso, Nf)
+
+        # first J elements of iso
+        for j = 1:Nj
+            for l = 1:Nl
+                for k=1:Nk
+                    λ = ψ_ind[j,l,k]
+                    Mat[j+(k-1)*Nstep, λ] = 1
+                end
+            end
+        end
+
+        #this is currently how I am storing the phi_k, omega_k
+        j = Nj+1
+        l = 1
+        for k=1:Nk
+            λ = ψ_ind[j,l,k]
+            Mat[j+(k-1)*Nstep, λ] = 1
+        end
+
+        if Omega
+            j = Nj+1
+            l = 2
+            for k=1:Nk
+                λ = ψ_ind[j,l,k]
+                Mat[j+1+(k-1)*Nstep, λ] = 1
+            end
+        end
+
+        ### these are the 3d globals
+
+        #phi0
+        λ = ψ_ind[Nj+1,1,Nk+1]
+        if Omega
+            Mat[Niso-2, λ] = 1
+        else
+            Mat[Niso, λ] = 1
+        end
+
+        if Omega
+            #omega_0
+            λ = ψ_ind[Nj+1,2,Nk+1]
+            Mat[Niso-1, λ] = 1
+
+            # omega_3d
+            λ = ψ_ind[Nj+1,3,Nk+1]
+            Mat[Niso, λ] = 1
+        end
+
+        return sparse(Mat)
+    end
+
+    function S2_iso_matrix3d(fhash)
+        # fhash is the filter hash output by fink_filter_hash
+        # The output matrix converts an S2 coeff vector to S2iso by
+        #   summing over l1,l2 and fixed Δl.
+        # Matrix is stored in sparse CSC format using SparseArrays.
+        # DPF 2021-Feb-18
+        # AKS 2021-Feb-22
+
+        # Does hash contain Omega filter?
+        Omega   = haskey(fhash, "Omega_index") & fhash["Omega3d"]
+
+        # unpack fhash
+        L      = length(fhash["theta_value"])
+        J      = length(fhash["j_value"])
+        K      = length(fhash["k_value"])
+        Nf     = length(fhash["filt_value"])
+        ψ_ind   = fhash["psi_index"]
+
+        # number of iso coefficients
+        NisoL   = Omega ? J*J*K*K*L+2*J*K*K+2*J*K*K+6*J*K : J*J*K*K*L+2*J*K*K+2*J*K
+        NnoL    = Omega ? 2*K+3 : K+1
+        Mat     = zeros(Int32, NisoL+NnoL^2, Nf*Nf)
+
+        indexes = 1:Nf
+        mask = fhash["psi_ind_L"].==0
+        NnoLind = indexes[mask]
+
+        #should probably think about reformatting to (Nj+1) so phi
+        #phi cross terms are in the right place
+
+        # first J*J*K*K*L elements of iso
+        ref = 0
+        for j1 = 1:J
+            for j2 = 1:J
+                for l1 = 1:L
+                    for l2 = 1:L
+                        for k1 = 1:K
+                            for k2 = 1:K
+                                DeltaL = mod(l1-l2, L)
+                                λ1     = ψ_ind[j1,l1,k1]
+                                λ2     = ψ_ind[j2,l2,k2]
+
+                                Iiso   = k1+K*((k2-1)+K*((j1-1)+J*((j2-1)+J*DeltaL)))
+                                Icoeff = λ1+Nf*(λ2-1)
+                                Mat[Iiso, Icoeff] = 1
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        ref+=J*J*K*K*L
+
+        # Next JKK elements are λϕ, then JKK elements ϕλ
+
+        for j = 1:J
+            for l = 1:L
+                for k1 = 1:K
+                    for k2 =1:K
+                        λ      = ψ_ind[j,l,k1]
+                        Iiso   = ref + k1+K*((k2-1)+K*(j-1))
+                        Icoeff = λ+Nf*(ψ_ind[J+1,1,k2]-1)  # λϕ
+                        Mat[Iiso, Icoeff] = 1
+
+                        Iiso   = ref+J*K*K+k1+K*((k2-1)+K*(j-1))
+                        Icoeff = ψ_ind[J+1,1,k2]+Nf*(λ-1)  # ϕλ
+                        Mat[Iiso, Icoeff] = 1
+                    end
+                end
+            end
+        end
+
+        ref += 2*J*K*K
+
+        # Next JKK elements are λΩ, then JKK elements Ωλ
+        if Omega
+            for j = 1:J
+                for l = 1:L
+                    for k1 = 1:K
+                        for k2 =1:K
+                            λ      = ψ_ind[j,l,k1]
+                            Iiso   = ref + k1+K*((k2-1)+K*(j-1))
+                            Icoeff = λ+Nf*(ψ_ind[J+1,2,k2]-1)  # λϕ
+                            Mat[Iiso, Icoeff] = 1
+
+                            Iiso   = ref+J*K*K+k1+K*((k2-1)+K*(j-1))
+                            Icoeff = ψ_ind[J+1,2,k2]+Nf*(λ-1)  # ϕλ
+                            Mat[Iiso, Icoeff] = 1
+                        end
+                    end
+                end
+            end
+            ref += 2*J*K*K
+        end
+
+        # Next 2*J*K elements are ψϕ0 and ϕ0ψ
+
+        ϕ0 = ψ_ind[J+1,1,K+1]
+        for j1=1:J
+            for l1 = 1:L
+                for k1=1:K
+                    λ1 = ψ_ind[j1,l1,k1]
+
+                    Iiso = ref+k1+K*(j1-1)
+                    Icoeff = λ1+Nf*(ϕ0-1)
+                    Mat[Iiso, Icoeff] = 1
+
+                    Iiso = ref+J*K+k1+K*(j1-1)
+                    Icoeff = ϕ0+Nf*(λ1-1)
+                    Mat[Iiso, Icoeff] = 1
+                end
+            end
+        end
+        ref += 2*J*K
+
+        if Omega
+            Ω0 = ψ_ind[J+1,2,K+1]
+            for j1=1:J
+                for l1 = 1:L
+                    for k1=1:K
+                        λ1 = ψ_ind[j1,l1,k1]
+
+                        Iiso = ref+k1+K*(j1-1)
+                        Icoeff = λ1+Nf*(Ω0-1)
+                        Mat[Iiso, Icoeff] = 1
+
+                        Iiso = ref+J*K+k1+K*(j1-1)
+                        Icoeff = Ω0+Nf*(λ1-1)
+                        Mat[Iiso, Icoeff] = 1
+                    end
+                end
+            end
+            ref += 2*J*K
+
+            Ω3 = ψ_ind[J+1,3,K+1]
+            for j1=1:J
+                for l1 = 1:L
+                    for k1=1:K
+                        λ1 = ψ_ind[j1,l1,k1]
+
+                        Iiso = ref+k1+K*(j1-1)
+                        Icoeff = λ1+Nf*(Ω3-1)
+                        Mat[Iiso, Icoeff] = 1
+
+                        Iiso = ref+J*K+k1+K*(j1-1)
+                        Icoeff = Ω3+Nf*(λ1-1)
+                        Mat[Iiso, Icoeff] = 1
+                    end
+                end
+            end
+            ref += 2*J*K
+        end
+
+        # take care of the L independent subblocks
+        for m1=1:NnoL
+            for m2=1:NnoL
+                Iiso = NisoL + m1 + NnoL*(m2-1)
+                λ1 = NnoLind[m1]
+                λ2 = NnoLind[m2]
+                Icoeff = λ1+Nf*(λ2-1)
+                Mat[Iiso, Icoeff] = 1
+            end
+        end
+
+        return sparse(Mat)
+    end
+
+    function S1_equiv_matrix(fhash,l_shift)
+            # fhash is the filter hash output by fink_filter_hash
+            # The output matrix converts an S1 coeff vector to S1iso by
+            #   summing over l
+            # Matrix is stored in sparse CSC format using SparseArrays.
+            # DPF 2021-Feb-18
+
+            # Does hash contain Omega filter?
+            Omega   = haskey(fhash, "Omega_index")
+            if Omega Ω_ind = fhash["Omega_index"] end
+
+            # unpack fhash
+            Nl      = length(fhash["theta_value"])
+            Nj      = length(fhash["j_value"])
+            Nf      = length(fhash["filt_value"])
+            ψ_ind   = fhash["psi_index"]
+            ϕ_ind   = fhash["phi_index"]
+
+            # number of iso coefficients
+            Niso    = Omega ? Nj+2 : Nj+1
+            Mat     = zeros(Int32, Nf, Nf)
+
+            # first J elements of iso
+            for j = 1:Nj
+                for l = 1:Nl
+                    λ = ψ_ind[j,l]
+                    λ1 = ψ_ind[j,mod1(l+l_shift,Nl)]
+                    Mat[λ1, λ] = 1
+                end
+            end
+
+            # Next elements are ϕ, Ω
+            Mat[ϕ_ind, ϕ_ind] = 1
+            if Omega Mat[Ω_ind, Ω_ind] = 1 end
+
+            return sparse(Mat)
+    end
+
+    function S2_equiv_matrix(fhash,l_shift)
+        # fhash is the filter hash output by fink_filter_hash
+        # The output matrix converts an S2 coeff vector to S2iso by
+        #   summing over l1,l2 and fixed Δl.
+        # Matrix is stored in sparse CSC format using SparseArrays.
+        # DPF 2021-Feb-18
+
+        # Does hash contain Omega filter?
+        Omega   = haskey(fhash, "Omega_index")
+        if Omega Ω_ind = fhash["Omega_index"] end
+
+        # unpack fhash
+        Nl      = length(fhash["theta_value"])
+        Nj      = length(fhash["j_value"])
+        Nf      = length(fhash["filt_value"])
+        ψ_ind   = fhash["psi_index"]
+        ϕ_ind   = fhash["phi_index"]
+
+        # number of iso coefficients
+        Niso    = Omega ? Nj*Nj*Nl+4*Nj+4 : Nj*Nj*Nl+2*Nj+1
+        Mat     = zeros(Int32, Nf*Nf, Nf*Nf)
+
+        # first J*J*L elements of iso
+        for j1 = 1:Nj
+            for j2 = 1:Nj
+                for l1 = 1:Nl
+                    for l2 = 1:Nl
+                        λ1     = ψ_ind[j1,l1]
+                        λ2     = ψ_ind[j2,l2]
+                        λ1_new     = ψ_ind[j1,mod1(l1+l_shift,Nl)]
+                        λ2_new     = ψ_ind[j2,mod1(l2+l_shift,Nl)]
+
+                        Icoeff = λ1+Nf*(λ2-1)
+                        Icoeff_new = λ1_new+Nf*(λ2_new-1)
+                        Mat[Icoeff_new, Icoeff] = 1
+                    end
+                end
+            end
+        end
+
+        # Next J elements are λϕ, then J elements ϕλ
+        for j = 1:Nj
+            for l = 1:Nl
+                λ      = ψ_ind[j,l]
+                Icoeff = λ+Nf*(ϕ_ind-1)  # λϕ
+
+                λ_new      = ψ_ind[j,mod1(l+l_shift,Nl)]
+                Icoeff_new = λ_new+Nf*(ϕ_ind-1)  # λϕ
+
+                Mat[Icoeff_new, Icoeff] = 1
+
+                Icoeff = ϕ_ind+Nf*(λ-1)  # ϕλ
+                Icoeff_new = ϕ_ind+Nf*(λ_new-1)  # ϕλ
+                Mat[Icoeff_new, Icoeff] = 1
+            end
+        end
+
+        # Next 1 element is ϕϕ
+        Icoeff = ϕ_ind+Nf*(ϕ_ind-1)
+        Mat[Icoeff, Icoeff] = 1
+
+        # If the Omega filter exists, add more terms
+        if Omega
+            # Next J elements are λΩ, then J elements Ωλ
+            for j = 1:Nj
+                for l = 1:Nl
+                    λ      = ψ_ind[j,l]
+                    λ_new      = ψ_ind[j,mod1(l+l_shift,Nl)]
+                    Icoeff = λ+Nf*(Ω_ind-1)  # λΩ
+                    Icoeff_new = λ_new+Nf*(Ω_ind-1)  # λΩ
+                    Mat[Icoeff_new, Icoeff] = 1
+
+                    Iiso   = I0+Nj+j
+                    Icoeff = Ω_ind+Nf*(λ-1)  # Ωλ
+                    Icoeff_new = Ω_ind+Nf*(λ_new-1)  # Ωλ
+                    Mat[Icoeff_new, Icoeff] = 1
+                end
+            end
+            # Next 3 elements are ϕΩ, Ωϕ, ΩΩ
+            Mat[ϕ_ind+Nf*(Ω_ind-1), ϕ_ind+Nf*(Ω_ind-1)] = 1
+            Mat[Ω_ind+Nf*(ϕ_ind-1), Ω_ind+Nf*(ϕ_ind-1)] = 1
+            Mat[Ω_ind+Nf*(Ω_ind-1), Ω_ind+Nf*(Ω_ind-1)] = 1
+        end
+
+        return sparse(Mat)
+    end
+
+## Derivatives
     function wst_S1_deriv(image::Array{Float64,2}, filter_hash::Dict, FFTthreads::Int=1)
 
         # Use nthread threads for FFT -- but for Nx<512 nthread=1 is fastest.  Overhead?
@@ -266,7 +834,6 @@ module DHC_2DUtils
         end
         return dS1dα
     end
-
 
     function wst_S20_deriv(image::Array{Float64,2}, filter_hash::Dict, FFTthreads::Int=1)
 
@@ -326,7 +893,6 @@ module DHC_2DUtils
         return dS20dα
     end
 
-
     function wst_S20_deriv_sum(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64}, FFTthreads::Int=1)
         # Sum over (f1,f2) filter pairs for S20 derivative.  This is much faster
         #   than calling wst_S20_deriv() because the sum can be moved inside the FFT.
@@ -378,6 +944,36 @@ module DHC_2DUtils
         return ΣdS20dα
     end
 
+## Apodization Functions
+
+    function apodizer(data::Array{Float64, 2})
+        (Nx, Ny) = size(data)
+        Amat = wind_2d(Nx)
+        datad_w = fweights(Amat)
+        meanVal = mean(data, datad_w) #<AF>
+        temp2d_a = (data.-meanVal).*Amat.+meanVal #A(F-μ) + μ
+        return temp2d_a
+    end
+
+
+    function wind_2d(nx)
+        dx   = nx/2-1
+        filter = zeros(Float64, nx, nx)
+        A = DSP.tukey(nx, 0.3)
+        itp = extrapolate(interpolate(A,BSpline(Linear())),0)
+        @inbounds for x = 1:nx
+            sx = x-dx-1    # define sx,sy so that no fftshift() needed
+            for y = 1:nx
+                sy = y-dx-1
+                r  = sqrt.((sx).^2 + (sy).^2) + nx/2
+                filter[x,y] = itp(r)
+            end
+        end
+        return filter
+    end
+
+
+## Core compute function
 
     function DHC_compute(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
         doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false, FFTthreads=2)
@@ -503,48 +1099,124 @@ module DHC_2DUtils
 
         return out_coeff
     end
-    #=
-    function apodizer_ori(data,sp1,sp2,im_size)
-        temp2d = data[sp1:sp1+im_size,sp2:sp2+im_size]
-        datad_w = fweights(wind_2d(256));
-        meanVal = mean(temp2d,datad_w)
-        temp2d_a = (temp2d.-meanVal).*wind_2d(256).+meanVal
-        return temp2d_a
-    end
 
-    function apodizer_mod(data,sp1,sp2,im_size)
-        temp2d = data[sp1:sp1+im_size,sp2:sp2+im_size]
-        datad_w = fweights(wind_2d(im_size+1));#why semi-col?
-        meanVal = mean(temp2d,datad_w) #<AF>
-        temp2d_a = (temp2d.-meanVal).*wind_2d(im_size+1).+meanVal #<AF>
-        return temp2d_a
+    function DHC_compute_RGB(image::Array{Float64}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
+        doS20::Bool=true, norm=true, iso=false, FFTthreads=2)
+        # image        - input for WST
+        # filter_hash  - filter hash from fink_filter_hash
+        # filter_hash2 - filters for second order.  Default to same as first order.
+        # doS2         - compute S2 coeffs
+        # doS12        - compute S2 coeffs
+        # doS20        - compute S2 coeffs
+        # norm         - scale to mean zero, unit variance
+        # iso          - sum over angles to obtain isotropic coeffs
 
-    end
-    =#
-    function apodizer(data::Array{Float64, 2})
-        (Nx, Ny) = size(data)
-        Amat = wind_2d(Nx)
-        datad_w = fweights(Amat)
-        meanVal = mean(data, datad_w) #<AF>
-        temp2d_a = (data.-meanVal).*Amat.+meanVal #A(F-μ) + μ
-        return temp2d_a
-    end
+        # Use 2 threads for FFT
+        FFTW.set_num_threads(FFTthreads)
 
+        # array sizes
+        (Nx, Ny, Nc)  = size(image)
+        if Nx != Ny error("Input image must be square") end
+        (Nf, )    = size(filter_hash["filt_index"])
+        if Nf == 0  error("filter hash corrupted") end
+        @assert Nx==filter_hash["npix"] "Filter size should match npix"
+        @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
 
-    function wind_2d(nx)
-        dx   = nx/2-1
-        filter = zeros(Float64, nx, nx)
-        A = DSP.tukey(nx, 0.3)
-        itp = extrapolate(interpolate(A,BSpline(Linear())),0)
-        @inbounds for x = 1:nx
-            sx = x-dx-1    # define sx,sy so that no fftshift() needed
-            for y = 1:nx
-                sy = y-dx-1
-                r  = sqrt.((sx).^2 + (sy).^2) + nx/2
-                filter[x,y] = itp(r)
+        # allocate coeff arrays
+        out_coeff = []
+        S0  = zeros(Float64, Nc*2)
+        S1  = zeros(Float64, Nc*Nf)
+
+        if doS20 S20 = zeros(Float64, Nf, Nf) end  # real space correlatio
+        # anyM2 = doS2 | doS12 | doS20
+        anyrd = doS20 #| doS2             # compute real domain with iFFT
+
+        # allocate image arrays for internal use
+        mean_im = zeros(Float64,1,1,Nc)
+        pwr_im = zeros(Float64,1,1,Nc)
+        norm_im = zeros(Float64,Nx,Ny,Nc)
+        im_fd_0 = zeros(ComplexF64, Nx, Ny, Nc)
+        im_fd_0_sl = zeros(ComplexF64, Nx, Ny)
+
+        if doS20
+            Amat1 = zeros(Nx*Ny, Nf)
+            Amat2 = zeros(Nx*Ny, Nf)
+        end
+
+        if anyrd im_rd_0_1  = Array{Float64, 4}(undef, Nx, Ny, Nf, Nc) end
+
+        ## 0th Order
+        mean_im = mean(image, dims=(1,2))
+        S0[1:Nc]   = dropdims(mean_im,dims=(1,2))
+        norm_im = image.-mean_im
+        pwr_im = sum(norm_im .* norm_im,dims=(1,2))
+        S0[1+Nc:end]   = dropdims(pwr_im,dims=(1,2))./(Nx*Ny)
+        if norm
+            norm_im ./= sqrt.(pwr_im)
+        else
+            norm_im = copy(image)
+        end
+
+        append!(out_coeff,S0[:])
+
+        ## 1st Order
+        im_fd_0 .= fft(norm_im,(1,2))  # total power=1.0
+
+        # unpack filter_hash
+        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val   = filter_hash["filt_value"]
+
+        zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
+
+        # make a FFTW "plan" for an array of the given size and type
+        if anyrd
+            P = plan_ifft(zarr) end  # P is an operator, P*im is ifft(im)
+
+        ## Main 1st Order and Precompute 2nd Order
+        for f = 1:Nf
+            S1tot = 0.0
+            f_i = f_ind[f]  # CartesianIndex list for filter
+            f_v = f_val[f]  # Values for f_i
+            # for (ind, val) in zip(f_i, f_v)   # this is slower!
+            for chan = 1:Nc
+                im_fd_0_sl .= im_fd_0[:,:,chan]
+                if length(f_i) > 0
+                    for i = 1:length(f_i)
+                        ind       = f_i[i]
+                        zval      = f_v[i] * im_fd_0_sl[ind]
+                        S1tot    += abs2(zval)
+                        zarr[ind] = zval        # filter*image in Fourier domain
+                    end
+                    S1[f+(chan-1)*Nf] = S1tot/(Nx*Ny)  # image power
+                    if anyrd
+                        im_rd_0_1[:,:,f,chan] .= abs2.(P*zarr) end
+                    zarr[f_i] .= 0
+                end
             end
         end
-        return filter
+
+        if iso
+            S1M = filter_hash["S1_iso_mat"]
+            M1 = blockdiag(S1M,S1M,S1M)
+        end
+        append!(out_coeff, iso ? M1*S1 : S1)
+
+        # we stored the abs()^2, so take sqrt (this is faster to do all at once)
+        if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
+
+        # Real domain 2nd order
+        if doS20
+            for chan1 = 1:Nc
+                for chan2 = 1:Nc
+                    Amat1 = reshape(im_rd_0_1[:,:,:,chan1], Nx*Ny, Nf)
+                    Amat2 = reshape(im_rd_0_1[:,:,:,chan2], Nx*Ny, Nf)
+                    S20  = Amat1' * Amat2
+                    append!(out_coeff, iso ? filter_hash["S2_iso_mat"]*S20[:] : S20[:])
+                end
+            end
+        end
+
+        return out_coeff
     end
 
     function DHC_compute_wrapper(image::Array{Float64,2}, filter_hash::Dict;
@@ -557,268 +1229,7 @@ module DHC_2DUtils
         return DHC_compute(ap_img, filter_hash, filter_hash2, doS2=doS2, doS12=doS12, doS20=doS20, norm=norm, iso=iso, FFTthreads=FFTthreads)
     end
 
-    function DHC_compute_apd(image::Array{Float64,2}, filter_hash::Dict;
-        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, apodize=false, norm=true, iso=false, FFTthreads=1, filter_hash2::Dict=filter_hash)
-        # image        - input for WST
-        # filter_hash  - filter hash from fink_filter_hash
-        # filter_hash2 - filters for second order.  Default to same as first order.
-        # doS2         - compute S2 coeffs
-        # doS12        - compute S2 coeffs
-        # doS20        - compute S2 coeffs
-        # norm         - scale to mean zero, unit variance
-        # iso          - sum over angles to obtain isotropic coeffs
 
-        # Use 2 threads for FFT
-        FFTW.set_num_threads(FFTthreads)
-        #println(filter_hash2) #DEBUG
-        # array sizes
-        (Nx, Ny)  = size(image)
-        if Nx != Ny error("Input image must be square") end
-        (Nf, )    = size(filter_hash["filt_index"])
-        if Nf == 0  error("filter hash corrupted") end
-        @assert Nx==filter_hash["npix"] "Filter size should match npix"
-        @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
-
-        # allocate coeff arrays
-        out_coeff = []
-        S0  = zeros(Float64, 2)
-        S1  = zeros(Float64, Nf)
-        if doS2  S2  = zeros(Float64, Nf, Nf) end  # traditional 2nd order
-        if doS12 S12 = zeros(Float64, Nf, Nf) end  # Fourier correlation
-        if doS20 S20 = zeros(Float64, Nf, Nf) end  # real space correlation
-        anyM2 = doS2 | doS12 | doS20
-        anyrd = doS2 | doS20             # compute real domain with iFFT
-
-        # allocate image arrays for internal use
-        if doS12 im_fdf_0_1 = zeros(Float64,           Nx, Ny, Nf) end   # this must be zeroed!
-        if anyrd im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf) end
-
-        if apodize
-            #println("Apodizing")
-            ap_img = apodizer(image)
-        else
-            ap_img = image
-        end
-        ## 0th Order
-        S0[1]   = mean(ap_img)
-        norm_im = ap_img .-S0[1]
-        S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
-        if norm
-            norm_im ./= sqrt(Nx*Ny*S0[2])
-        else
-            norm_im = copy(ap_img)
-        end
-
-        append!(out_coeff,S0[:])
-
-        ## 1st Order
-        im_fd_0 = fft(norm_im)  # total power=1.0
-
-        # unpack filter_hash
-        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
-        f_val   = filter_hash["filt_value"]
-
-        zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
-
-        # make a FFTW "plan" for an array of the given size and type
-        if anyrd
-            P = plan_ifft(im_fd_0) end  # P is an operator, P*im is ifft(im)
-
-        ## Main 1st Order and Precompute 2nd Order
-        for f = 1:Nf
-            S1tot = 0.0
-            f_i = f_ind[f]  # CartesianIndex list for filter
-            f_v = f_val[f]  # Values for f_i
-            # for (ind, val) in zip(f_i, f_v)   # this is slower!
-            if length(f_i) > 0
-                for i = 1:length(f_i)
-                    ind       = f_i[i]
-                    zval      = f_v[i] * im_fd_0[ind]
-                    S1tot    += abs2(zval)
-                    zarr[ind] = zval        # filter*image in Fourier domain
-                    if doS12 im_fdf_0_1[ind,f] = abs(zval) end
-                end
-                S1[f] = S1tot/(Nx*Ny)  # image power
-                if anyrd
-                    im_rd_0_1[:,:,f] .= abs2.(P*zarr) end
-                zarr[f_i] .= 0
-            end
-        end
-
-        append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
-
-
-        # we stored the abs()^2, so take sqrt (this is faster to do all at once)
-        if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
-
-        Mat2 = filter_hash["S2_iso_mat"]
-        if doS2
-            f_ind2   = filter_hash2["filt_index"]  # (J, L) array of filters represented as index value pairs
-            f_val2   = filter_hash2["filt_value"]
-
-            ## Traditional second order
-            for f1 = 1:Nf
-                thisim = fft(im_rd_0_1[:,:,f1])  # Could try rfft here
-                # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
-                # Loop over f2 and do second-order convolution
-                for f2 = 1:Nf
-                    f_i = f_ind2[f2]  # CartesianIndex list for filter
-                    f_v = f_val2[f2]  # Values for f_i
-                    # sum im^2 = sum(|fft|^2/npix)
-                    S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)
-                end
-            end
-            append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
-        end
-
-        # Fourier domain 2nd order
-        if doS12
-            Amat = reshape(im_fdf_0_1, Nx*Ny, Nf)
-            S12  = Amat' * Amat
-            append!(out_coeff, iso ? Mat2*S12[:] : S12[:])
-        end
-
-        # Real domain 2nd order
-        if doS20
-            Amat = reshape(im_rd_0_1, Nx*Ny, Nf)
-            S20  = Amat' * Amat
-            append!(out_coeff, iso ? Mat2*S20[:] : S20[:])
-        end
-
-        return out_coeff
-    end
-
-    #=
-    function DHC_compute_apd(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
-        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false, FFTthreads=2, apodize=false)
-        # image        - input for WST
-        # filter_hash  - filter hash from fink_filter_hash
-        # filter_hash2 - filters for second order.  Default to same as first order.
-        # doS2         - compute S2 coeffs
-        # doS12        - compute S2 coeffs
-        # doS20        - compute S2 coeffs
-        # norm         - scale to mean zero, unit variance
-        # iso          - sum over angles to obtain isotropic coeffs
-        #apodize       - Apodize image
-
-        # Use 2 threads for FFT
-        FFTW.set_num_threads(FFTthreads)
-
-        # array sizes
-        (Nx, Ny)  = size(image)
-        if Nx != Ny error("Input image must be square") end
-        (Nf, )    = size(filter_hash["filt_index"])
-        if Nf == 0  error("filter hash corrupted") end
-        @assert Nx==filter_hash["npix"] "Filter size should match npix"
-        @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
-
-        # allocate coeff arrays
-        out_coeff = []
-        S0  = zeros(Float64, 2)
-        S1  = zeros(Float64, Nf)
-        if doS2  S2  = zeros(Float64, Nf, Nf) end  # traditional 2nd order
-        if doS12 S12 = zeros(Float64, Nf, Nf) end  # Fourier correlation
-        if doS20 S20 = zeros(Float64, Nf, Nf) end  # real space correlation
-        anyM2 = doS2 | doS12 | doS20
-        anyrd = doS2 | doS20             # compute real domain with iFFT
-
-        # allocate image arrays for internal use
-        if doS12 im_fdf_0_1 = zeros(Float64,           Nx, Ny, Nf) end   # this must be zeroed!
-        if anyrd im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf) end
-
-        if apodize
-            image = apodizer(image)
-        end
-
-        ## 0th Order
-        S0[1]   = mean(image)
-        norm_im = image.-S0[1]
-        S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
-        if norm
-            norm_im ./= sqrt(Nx*Ny*S0[2])
-        else
-            norm_im = copy(image)
-        end
-
-        append!(out_coeff,S0[:])
-
-        ## 1st Order
-        im_fd_0 = fft(norm_im)  # total power=1.0
-
-        # unpack filter_hash
-        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
-        f_val   = filter_hash["filt_value"]
-
-        zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
-
-        # make a FFTW "plan" for an array of the given size and type
-        if anyrd
-            P = plan_ifft(im_fd_0) end  # P is an operator, P*im is ifft(im)
-
-        ## Main 1st Order and Precompute 2nd Order
-        for f = 1:Nf
-            S1tot = 0.0
-            f_i = f_ind[f]  # CartesianIndex list for filter
-            f_v = f_val[f]  # Values for f_i
-            # for (ind, val) in zip(f_i, f_v)   # this is slower!
-            if length(f_i) > 0
-                for i = 1:length(f_i)
-                    ind       = f_i[i]
-                    zval      = f_v[i] * im_fd_0[ind]
-                    S1tot    += abs2(zval)
-                    zarr[ind] = zval        # filter*image in Fourier domain
-                    if doS12 im_fdf_0_1[ind,f] = abs(zval) end
-                end
-                S1[f] = S1tot/(Nx*Ny)  # image power
-                if anyrd
-                    im_rd_0_1[:,:,f] .= abs2.(P*zarr) end
-                zarr[f_i] .= 0
-            end
-        end
-
-        append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
-
-
-        # we stored the abs()^2, so take sqrt (this is faster to do all at once)
-        if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
-
-        Mat2 = filter_hash["S2_iso_mat"]
-        if doS2
-            f_ind2   = filter_hash2["filt_index"]  # (J, L) array of filters represented as index value pairs
-            f_val2   = filter_hash2["filt_value"]
-
-            ## Traditional second order
-            for f1 = 1:Nf
-                thisim = fft(im_rd_0_1[:,:,f1])  # Could try rfft here
-                # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
-                # Loop over f2 and do second-order convolution
-                for f2 = 1:Nf
-                    f_i = f_ind2[f2]  # CartesianIndex list for filter
-                    f_v = f_val2[f2]  # Values for f_i
-                    # sum im^2 = sum(|fft|^2/npix)
-                    S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)
-                end
-            end
-            append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
-        end
-
-        # Fourier domain 2nd order
-        if doS12
-            Amat = reshape(im_fdf_0_1, Nx*Ny, Nf)
-            S12  = Amat' * Amat
-            append!(out_coeff, iso ? Mat2*S12[:] : S12[:])
-        end
-
-        # Real domain 2nd order
-        if doS20
-            Amat = reshape(im_rd_0_1, Nx*Ny, Nf)
-            S20  = Amat' * Amat
-            append!(out_coeff, iso ? Mat2*S20[:] : S20[:])
-        end
-
-        return out_coeff
-    end
-    =#
     function DHC_compute_gpu_fake(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
         doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false,batch_mode::Bool=false,opt_memory::Bool=false,max_memory::Int64=0)
 
@@ -1061,101 +1472,7 @@ module DHC_2DUtils
         return out_coeff
     end
 
-    function fink_filter_bank_3dizer(hash, cz; nz=256)
-        # -------- set parameters
-        nx = convert(Int64,hash["npix"])
-        n2d = size(hash["filt_value"])[1]
-        dz = nz/2-1
-        J = size(hash["j_value"])[1]
-        L = size(hash["theta_value"])[1]
-
-        im_scale = convert(Int8,log2(nz))
-        # -------- number of bins in radial direction (size scales)
-        K = (im_scale-2)*cz
-
-        # -------- allocate output array of zeros
-        J_L_K     = zeros(Int32, n2d*K,3)
-        psi_index = zeros(Int32, J+1, L, K)
-        k_value   = zeros(Float64, K)
-        logr      = zeros(Float64,nz)
-        filt_temp = zeros(Float64,nx,nx,nz)
-        F_z       = zeros(Float64,nx,nx,nz)
-        #F_p       = zeros(Float64,nx,nx,nz)
-
-        filtind = fill(CartesianIndex{3}[], K*n2d)
-        filtval = fill(Float64[], K*n2d)
-
-        for z = 1:convert(Int64,dz+1)
-            sz = mod(z+dz,nz)-dz-1
-            z2 = sz^2
-            logr[z] = 0.5*log2(max(1,z2))
-        end
-
-        @inbounds for k_ind = 1:K
-            k = k_ind/cz
-            k_value[k_ind] = k  # store for later
-            krad  = im_scale-k-1
-            Δk    = abs.(logr.-krad)
-            kmask = (Δk .<= 1/cz)
-            k_count = count(kmask)
-            k_vals = findall(kmask)
-
-            # -------- radial part
-            #I have somehow dropped a factor of sqrt(2) which has been reinserted as a 0.5... fix my brain
-            @views F_z[:,:,kmask].= reshape(1/sqrt(2).*cos.(Δk[kmask] .* (cz*π/2)),1,1,k_count)
-            @inbounds for index = 1:n2d
-                p_ind = hash["filt_index"][index]
-                p_filt = hash["filt_value"][index]
-                #F_p[p_ind,:] .= p_filt
-                f_ind    = k_ind + (index-1)*K
-                @views filt_tmp = p_filt.*F_z[p_ind,kmask]
-                #temp_ind = findall((F_p .> 1E-13) .& (F_z .> 1E-13))
-                #@views filt_tmp = F_p[temp_ind].*F_z[temp_ind]
-                ind = findall(filt_tmp .> 1E-13)
-                @views filtind[f_ind] = map(x->CartesianIndex(p_ind[x[1]][1],p_ind[x[1]][2],k_vals[x[2]]),ind)
-                #filtind[f_ind] = temp_ind[ind]
-                @views filtval[f_ind] = filt_tmp[ind]
-                @views J_L_K[f_ind,:] = [hash["J_L"][index,1],hash["J_L"][index,2],k_ind-1]
-                psi_index[hash["J_L"][index,1]+1,hash["J_L"][index,2]+1,k_ind] = f_ind
-
-            end
-        end
-
-        # -------- metadata dictionary
-        info=Dict()
-        info["npix"]         = hash["npix"]
-        info["j_value"]      = hash["j_value"]
-        info["theta_value"]  = hash["theta_value"]
-        info["2d_psi_index"]    = hash["psi_index"]
-        info["2d_phi_index"]    = hash["phi_index"]
-        info["2d_J_L"]          = hash["J_L"]
-        info["2d_pc"]           = hash["pc"]
-        info["2d_wd"]           = hash["wd"]
-        info["2d_fs_center_r"]  = hash["fs_center_r"]
-        info["2d_filt_index"]   = hash["filt_index"]
-        info["2d_filt_value"]   = hash["filt_value"]
-
-        info["nz"]              = nz
-        info["cz"]              = cz
-        info["J_L_K"]           = psi_index
-        info["psi_index"]       = psi_index
-        info["k_value"]         = k_value
-        info["filt_index"]      = filtind
-        info["filt_value"]      = filtval
-
-        # -------- compute matrix that projects iso coeffs, add to hash
-        S1_iso_mat = S1_iso_matrix3d(info)
-        info["S1_iso_mat"] = S1_iso_mat
-        S2_iso_mat = S2_iso_matrix3d(info)
-        info["S2_iso_mat"] = S2_iso_mat
-
-        #
-
-        return info
-    end
-
-
-    function DHC_compute_3d(image::Array{Float64,3}, filter_hash; FFTthreads=2)
+    function DHC_compute_3d(image::Array{Float64,3}, filter_hash; FFTthreads=2, iso=false)
         # Use 2 threads for FFT
         FFTW.set_num_threads(FFTthreads)
 
@@ -1217,7 +1534,7 @@ module DHC_2DUtils
                 zarr[f_i] .= 0
             end
         end
-        append!(out_coeff, S1[:])
+        append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
 
         # we stored the abs()^2, so take sqrt (this is faster to do all at once)
         im_rd_0_1 .= sqrt.(im_rd_0_1)
@@ -1232,6 +1549,9 @@ module DHC_2DUtils
         #append!(out_coeff, S12)
 
         ## Traditional second order
+        if iso
+            Mat2 = filter_hash["S2_iso_mat"]
+        end
         for f1 = 1:Nf
             thisim = fft(im_rd_0_1[:,:,:,f1])  # Could try rfft here
             # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
@@ -1243,7 +1563,7 @@ module DHC_2DUtils
                 S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny*Nz)
             end
         end
-        append!(out_coeff, S2)
+        append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
 
         return out_coeff
     end
@@ -1472,168 +1792,162 @@ module DHC_2DUtils
         return out_coeff
     end
 
-    function S1_iso_matrix3d(fhash)
-        # fhash is the filter hash output by fink_filter_hash
-        # The output matrix converts an S1 coeff vector to S1iso by
-        #   summing over l
-        # Matrix is stored in sparse CSC format using SparseArrays.
-        # DPF 2021-Feb-18
-        # AKS 2021-Feb-22
+    #Can be deleted soon -- just here for testing atm
 
-        # Does hash contain Omega filter?
-        #Omega   = haskey(fhash, "Omega_index")
-        #if Omega Ω_ind = fhash["Omega_index"] end
+    function DHC_compute_apd(image::Array{Float64,2}, filter_hash::Dict;
+        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, apodize=false, norm=true, iso=false, FFTthreads=1, filter_hash2::Dict=filter_hash)
+        # image        - input for WST
+        # filter_hash  - filter hash from fink_filter_hash
+        # filter_hash2 - filters for second order.  Default to same as first order.
+        # doS2         - compute S2 coeffs
+        # doS12        - compute S2 coeffs
+        # doS20        - compute S2 coeffs
+        # norm         - scale to mean zero, unit variance
+        # iso          - sum over angles to obtain isotropic coeffs
 
-        # unpack fhash
-        Nl      = length(fhash["theta_value"])
-        Nj      = length(fhash["j_value"])
-        Nk      = length(fhash["k_value"])
-        Nf      = length(fhash["filt_value"])
-        ψ_ind   = fhash["psi_index"]
-        #ϕ_ind   = fhash["phi_index"]
+        # Use 2 threads for FFT
+        FFTW.set_num_threads(FFTthreads)
+        #println(filter_hash2) #DEBUG
+        # array sizes
+        (Nx, Ny)  = size(image)
+        if Nx != Ny error("Input image must be square") end
+        (Nf, )    = size(filter_hash["filt_index"])
+        if Nf == 0  error("filter hash corrupted") end
+        @assert Nx==filter_hash["npix"] "Filter size should match npix"
+        @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
 
-        # number of iso coefficients
-        #Niso    = Omega ? Nj+2 : Nj+1
-        Niso    = (Nj+1)*Nk
-        Mat     = zeros(Int32, Niso, Nf)
+        # allocate coeff arrays
+        out_coeff = []
+        S0  = zeros(Float64, 2)
+        S1  = zeros(Float64, Nf)
+        if doS2  S2  = zeros(Float64, Nf, Nf) end  # traditional 2nd order
+        if doS12 S12 = zeros(Float64, Nf, Nf) end  # Fourier correlation
+        if doS20 S20 = zeros(Float64, Nf, Nf) end  # real space correlation
+        anyM2 = doS2 | doS12 | doS20
+        anyrd = doS2 | doS20             # compute real domain with iFFT
 
-        # first J elements of iso
-        for j = 1:Nj
-            for l = 1:Nl
-                for k=1:Nk
-                    λ = ψ_ind[j,l,k]
-                    Mat[j+(k-1)*Nj, λ] = 1
+        # allocate image arrays for internal use
+        if doS12 im_fdf_0_1 = zeros(Float64,           Nx, Ny, Nf) end   # this must be zeroed!
+        if anyrd im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf) end
+
+        if apodize
+            #println("Apodizing")
+            ap_img = apodizer(image)
+        else
+            ap_img = image
+        end
+        ## 0th Order
+        S0[1]   = mean(ap_img)
+        norm_im = ap_img .-S0[1]
+        S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
+        if norm
+            norm_im ./= sqrt(Nx*Ny*S0[2])
+        else
+            norm_im = copy(ap_img)
+        end
+
+        append!(out_coeff,S0[:])
+
+        ## 1st Order
+        im_fd_0 = fft(norm_im)  # total power=1.0
+
+        # unpack filter_hash
+        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val   = filter_hash["filt_value"]
+
+        zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
+
+        # make a FFTW "plan" for an array of the given size and type
+        if anyrd
+            P = plan_ifft(im_fd_0) end  # P is an operator, P*im is ifft(im)
+
+        ## Main 1st Order and Precompute 2nd Order
+        for f = 1:Nf
+            S1tot = 0.0
+            f_i = f_ind[f]  # CartesianIndex list for filter
+            f_v = f_val[f]  # Values for f_i
+            # for (ind, val) in zip(f_i, f_v)   # this is slower!
+            if length(f_i) > 0
+                for i = 1:length(f_i)
+                    ind       = f_i[i]
+                    zval      = f_v[i] * im_fd_0[ind]
+                    S1tot    += abs2(zval)
+                    zarr[ind] = zval        # filter*image in Fourier domain
+                    if doS12 im_fdf_0_1[ind,f] = abs(zval) end
                 end
+                S1[f] = S1tot/(Nx*Ny)  # image power
+                if anyrd
+                    im_rd_0_1[:,:,f] .= abs2.(P*zarr) end
+                zarr[f_i] .= 0
             end
         end
 
-        j = Nj+1
-        l = 1
-        for k=1:Nk
-            λ = ψ_ind[j,l,k]
-            Mat[j+(k-1)*Nj, λ] = 1
+        append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
+
+
+        # we stored the abs()^2, so take sqrt (this is faster to do all at once)
+        if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
+
+        Mat2 = filter_hash["S2_iso_mat"]
+        if doS2
+            f_ind2   = filter_hash2["filt_index"]  # (J, L) array of filters represented as index value pairs
+            f_val2   = filter_hash2["filt_value"]
+
+            ## Traditional second order
+            for f1 = 1:Nf
+                thisim = fft(im_rd_0_1[:,:,f1])  # Could try rfft here
+                # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
+                # Loop over f2 and do second-order convolution
+                for f2 = 1:Nf
+                    f_i = f_ind2[f2]  # CartesianIndex list for filter
+                    f_v = f_val2[f2]  # Values for f_i
+                    # sum im^2 = sum(|fft|^2/npix)
+                    S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)
+                end
+            end
+            append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
         end
 
-        return sparse(Mat)
+        # Fourier domain 2nd order
+        if doS12
+            Amat = reshape(im_fdf_0_1, Nx*Ny, Nf)
+            S12  = Amat' * Amat
+            append!(out_coeff, iso ? Mat2*S12[:] : S12[:])
+        end
+
+        # Real domain 2nd order
+        if doS20
+            Amat = reshape(im_rd_0_1, Nx*Ny, Nf)
+            S20  = Amat' * Amat
+            append!(out_coeff, iso ? Mat2*S20[:] : S20[:])
+        end
+
+        return out_coeff
     end
+    
 
+## Post processing
 
-    function S2_iso_matrix3d(fhash)
-        # fhash is the filter hash output by fink_filter_hash
-        # The output matrix converts an S2 coeff vector to S2iso by
-        #   summing over l1,l2 and fixed Δl.
-        # Matrix is stored in sparse CSC format using SparseArrays.
-        # DPF 2021-Feb-18
-        # AKS 2021-Feb-22
-
-        # Does hash contain Omega filter?
-        #Omega   = haskey(fhash, "Omega_index")
-        #if Omega Ω_ind = fhash["Omega_index"] end
-
-        # unpack fhash
-        Nl      = length(fhash["theta_value"])
-        Nj      = length(fhash["j_value"])
-        Nk      = length(fhash["k_value"])
-        Nf      = length(fhash["filt_value"])
-        ψ_ind   = fhash["psi_index"]
-        #ϕ_ind   = fhash["phi_index"]
-
-        # number of iso coefficients
-        #Niso    = Omega ? Nj*Nj*Nl+4*Nj+4 : Nj*Nj*Nl+2*Nj+1
-        Niso    = Nj*Nj*Nk*Nk*Nl+2*Nj*Nk*Nk+Nk*Nk
-        Mat     = zeros(Int32, Niso, Nf*Nf)
-
-        #should probably think about reformatting to (Nj+1) so phi
-        #phi cross terms are in the right place
-
-        # first J*J*K*K*L elements of iso
-        for j1 = 1:Nj
-            for j2 = 1:Nj
-                for l1 = 1:Nl
-                    for l2 = 1:Nl
-                        for k1 = 1:Nk
-                            for k2 = 1:Nk
-                                DeltaL = mod(l1-l2, Nl)
-                                λ1     = ψ_ind[j1,l1,k1]
-                                λ2     = ψ_ind[j2,l2,k2]
-
-                                Iiso   = k1+Nk*((k2-1)+Nk*((j1-1)+Nj*((j2-1)+Nj*DeltaL)))
-                                Icoeff = λ1+Nf*(λ2-1)
-                                Mat[Iiso, Icoeff] = 1
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        # Next J elements are λϕ, then J elements ϕλ
-        for j = 1:Nj
-            for l = 1:Nl
-                for k1 = 1:Nk
-                    for k2 =1:Nk
-                        λ      = ψ_ind[j,l,k1]
-                        Iiso   = Nj*Nj*Nk*Nk*Nl+k1+Nk*((k2-1)+Nk*(j-1))
-                        Icoeff = λ+Nf*(ψ_ind[Nj+1,1,k2]-1)  # λϕ
-                        Mat[Iiso, Icoeff] = 1
-
-                        Iiso   = Nj*Nj*Nk*Nk*Nl+Nj*Nk*Nk+k1+Nk*((k2-1)+Nk*(j-1))
-                        Icoeff = (ψ_ind[Nj+1,1,k2]-1)+Nf*(λ-1)  # ϕλ
-                        Mat[Iiso, Icoeff] = 1
-                    end
-                end
-            end
-        end
-
-        # Next Nk*Nk elements are ϕ(k)ϕ(k)
-        j = Nj+1
-        l = 1
-        for k1=1:Nk
-            for k2=1:Nk
-                λ1 = ψ_ind[j,l,k1]
-                λ2 = ψ_ind[j,l,k2]
-
-                Iiso = Nj*Nj*Nk*Nk*Nl+2*Nj*Nk*Nk+k1+Nk*(k2-1)
-                Icoeff = λ1+Nf*(λ2-1)
-                Mat[Iiso, Icoeff] = 1
-            end
-        end
-
-        # # If the Omega filter exists, add more terms
-        # if Omega
-        #     # Next J elements are λΩ, then J elements Ωλ
-        #     for j = 1:Nj
-        #         for l = 1:Nl
-        #             λ      = ψ_ind[j,l]
-        #             Iiso   = I0+j
-        #             Icoeff = λ+Nf*(Ω_ind-1)  # λΩ
-        #             Mat[Iiso, Icoeff] = 1
-        #
-        #             Iiso   = I0+Nj+j
-        #             Icoeff = Ω_ind+Nf*(λ-1)  # Ωλ
-        #             Mat[Iiso, Icoeff] = 1
-        #         end
-        #     end
-        #     # Next 3 elements are ϕΩ, Ωϕ, ΩΩ
-        #     Iiso   = I0+Nj+Nj
-        #     Mat[Iiso+1, ϕ_ind+Nf*(Ω_ind-1)] = 1
-        #     Mat[Iiso+2, Ω_ind+Nf*(ϕ_ind-1)] = 1
-        #     Mat[Iiso+3, Ω_ind+Nf*(Ω_ind-1)] = 1
-        # end
-        #
-        return sparse(Mat)
-    end
-
-
-    function isoMaker(coeff, S1Mat, S2Mat)
+    function transformMaker(coeff, S1Mat, S2Mat; Nc=1)
         NS1 = size(S1Mat)[2]
         NS2 = size(S2Mat)[2]
-        S1iso = transpose(S1Mat*transpose(coeff[:,2+1:2+NS1]))
-        S2iso = transpose(S2Mat*transpose(coeff[:,2+NS1+1:2+NS1+NS2]))
-        return hcat(coeff[:,1:2],S1iso,S2iso)
+        if Nc==1
+            S0iso = coeff[:,1:2]
+            S1iso = transpose(S1Mat*transpose(coeff[:,2+1:2+NS1]))
+            S2iso = transpose(S2Mat*transpose(coeff[:,2+NS1+1:2+NS1+NS2]))
+        else
+            S0iso = coeff[:,1:2*Nc]
+            S1MatChan = blockdiag(collect(Iterators.repeated(S1Mat,Nc))...)
+            S2MatChan = blockdiag(collect(Iterators.repeated(S2Mat,Nc*Nc))...)
+            S1iso = transpose(S1MatChan*transpose(coeff[:,2*Nc+1:2*Nc+Nc*NS1]))
+            S2iso = transpose(S2MatChan*transpose(coeff[:,2*Nc+Nc*NS1+1:end]))
+        end
+        return hcat(S0iso,S1iso,S2iso)
     end
 
-    function fink_filter_bank(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true)
+## Filter bank utilities
+
+    function fink_filter_bank(c, L; nx=256, wd=2, pc=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1)
         #c     - sets the scale sampling rate (1 is dyadic, 2 is half dyadic)
         #L     - number of angular bins (usually 8*pc or 16*pc)
         #wd    - width of the wavelets (default 1, wd=2 for a double covering)
@@ -1651,24 +1965,27 @@ module DHC_2DUtils
 
         im_scale = convert(Int8,log2(nx))
         # -------- number of bins in radial direction (size scales)
-        J = (im_scale-2)*c
+        J = (im_scale-3)*c + 1
+        normj = 1/sqrt(c)
 
         # -------- allocate output array of zeros
         filt      = zeros(nx, nx, J*L+(Omega ? 2 : 1))
         psi_index = zeros(Int32, J, L)
         psi_ind_in= zeros(Int32, J*L+(Omega ? 2 : 1), 2)
+        psi_ind_L = zeros(Int32, J*L+(Omega ? 2 : 1))
         theta     = zeros(Float64, L)
         j_value   = zeros(Float64, J)
+        info=Dict{String,Any}()
 
         # -------- compute the required wd
         j_rad_exp = zeros(J)
         for j_ind = 1:J
-            j = j_ind/c
-            jrad  = im_scale-j-1
+            j = (j_ind-1)/c
+            jrad  = im_scale-j-2
             j_rad_exp[j_ind] = 2^(jrad)
         end
 
-        wd_j = max.(ceil.(L./(pc.*π.*j_rad_exp)),wd)
+        wd_j = max.(ceil.(wd_cutoff.*L./(pc.*π.*j_rad_exp)),wd)
 
         if !safety_on
             wd_j.=wd
@@ -1682,7 +1999,7 @@ module DHC_2DUtils
             logr = zeros(nx, nx)
 
             wdθ  = wd*dθ
-            norm = 1.0/sqrt(wd)
+            norm = 1.0/(sqrt(wd))
             # -------- loop over l
             for l = 0:L-1
                 θ_l        = dθ*l+θ_sh
@@ -1716,15 +2033,15 @@ module DHC_2DUtils
             # -------- loop over j for the radial part
             #    for (j_ind, j) in enumerate(1/c:1/c:im_scale-2)
                 j_ind_w_wd = findall(wd_j.==wd)
-                for j_ind = j_ind_w_wd
-                    j = j_ind/c
-                    j_value[j_ind] = j  # store for later
-                    jrad  = im_scale-j-1
+                for j_ind in j_ind_w_wd
+                    j = (j_ind-1)/c
+                    j_value[j_ind] = 1+j  # store for later
+                    jrad  = im_scale-j-2
                     Δj    = abs.(logr[angmask].-jrad)
-                    rmask = (Δj .<= 1/c)
+                    rmask = (Δj .<= 1) #deprecating the 1/c to 1, constant width
 
             # -------- radial part
-                    F_radial = cos.(Δj[rmask] .* (c*π/2))
+                    F_radial = normj .* cos.(Δj[rmask] .* (π/2)) #deprecating c*π/2 to π/2
                     ind      = angmask[rmask]
             #      Let's have these be (J,L) if you reshape...
             #        f_ind    = (j_ind-1)*L+l+1
@@ -1732,6 +2049,7 @@ module DHC_2DUtils
                     filt[ind, f_ind] = F_radial .* F_angular[rmask]
                     psi_index[j_ind,l+1] = f_ind
                     psi_ind_in[f_ind,:] = [j_ind-1,l]
+                    psi_ind_L[f_ind] = 1
                 end
             end
         end
@@ -1760,18 +2078,7 @@ module DHC_2DUtils
         phi_index  = J*L+1
         filt[:,:,phi_index] .= fftshift(phi_cen)
         psi_ind_in[phi_index,:] = [J,0]
-
-        # -------- metadata dictionary
-        info=Dict{String,Any}()
-        info["npix"]         = nx
-        info["j_value"]      = j_value
-        info["theta_value"]  = theta
-        info["psi_index"]    = psi_index
-        info["phi_index"]    = phi_index
-        info["J_L"]          = psi_ind_in
-        info["pc"]           = pc
-        info["wd"]           = wd_j
-        info["fs_center_r"]  = j_rad_exp
+        psi_ind_L[phi_index] = 0
 
         if Omega     # append a filter containing the rest (outside Nyquist)
             filter_power += filt[:,:,phi_index].^2
@@ -1781,8 +2088,22 @@ module DHC_2DUtils
             Omega_index           = J*L+2
             info["Omega_index"]   = Omega_index
             filt[:,:,Omega_index] = sqrt.(edge_power)
+            psi_ind_in[Omega_index,:] = [J,1]
+            psi_ind_L[Omega_index] = 0
         end
 
+        # -------- metadata dictionary
+        info["npix"]         = nx
+        info["j_value"]      = j_value
+        info["theta_value"]  = theta
+        info["psi_index"]    = psi_index
+        info["phi_index"]    = phi_index
+        info["J_L"]          = psi_ind_in
+        info["pc"]           = pc
+        info["wd"]           = wd_j
+        info["wd_cutoff"]    = wd_cutoff
+        info["fs_center_r"]  = j_rad_exp
+        info["psi_ind_L"]    = psi_ind_L
 
         return filt, info
     end
@@ -1804,32 +2125,6 @@ module DHC_2DUtils
             filtval[l] = val
         end
         return [filtind, filtval]
-    end
-
-    function fink_filter_box(filt)
-        (ny,nx,Nf) = size(filt)
-
-        # Allocate output arrays
-        filtmms = Array{Int64}(undef,2,2,Nf)
-        filtvals = Array{Any}(undef,Nf)#is this a terrible way to allocate memory?
-
-
-        # Loop over filters and record non-zero values
-        for l=1:Nf
-            f = FFTW.fftshift(filt[:,:,l])
-            ind = findall(f .> 1E-13)
-            ind=getindex.(ind,[1 2])
-            mins=minimum(ind,dims=1)
-            maxs=maximum(ind,dims=1)
-
-            #val = f[ind]
-            #filtind[l] = ind
-            filtmms[:,1,l] = mins
-            filtmms[:,2,l] = maxs
-            filtvals[l]=f[mins[1]:maxs[1],mins[2]:maxs[2]]
-
-        end
-        return [filtmms, filtvals]
     end
 
     function list_to_box(hash;dim=2)#this modifies the hash

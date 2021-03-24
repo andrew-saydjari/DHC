@@ -1,6 +1,15 @@
 
 module DHC_tests
 
+    using FFTW
+    using Plots
+    using Measures
+    theme(:dark)
+
+    export plot_filter_bank_QA
+    export plot_filter_bank_QAxy
+    export plot_filter_bank_QAxz
+
     function plot_filter_bank_QA(filt, info; fname="filter_bank_QA.png")
 
         # -------- define plot1 to append plot to a list
@@ -31,7 +40,7 @@ module DHC_tests
 
         # -------- initialize array of plots
         ps   = []
-        ind  = info["filter_index"]
+        ind  = info["psi_index"]
         jval = info["j_value"]
         J    = length(jval)
         L    = length(info["theta_value"])
@@ -52,27 +61,28 @@ module DHC_tests
             fac = max(1,2.0^(5-j))
             # real part of config space of 3rd filter
             plot1(ps, fftshift(real(ifft(filt[:,:,ind[j_ind,3]]))),
-                  bin=fac, label=string("j=",j_ind," ℓ=",3-1))
+                  bin=fac, label=string("j=",jval[j_ind]," ℓ=",3-1))
 
             # sum all filters to form (partial) ring
             ring = dropdims(sum(filt[:,:,ind[j_ind,:]].^2, dims=3), dims=3)
             plot1(ps, fftshift(ring[:,:,1]), clim=(0,1),
-                  bin=bfac, label=string("j=",j_ind," ℓ=",0,":",L-1))
+                  bin=bfac, label=string("j=",jval[j_ind]," ℓ=",0,":",L-1))
         end
 
         wavepow = fftshift(dropdims(sum(filt[:,:,ind].^2, dims=(3,4)), dims=(3,4)))
-        plot1(ps, wavepow, clim=(-0.1,1), label=string("j=1:",J," ℓ=0:",L-1))
+        plot1(ps, wavepow, label=string("j=1:",jval[end]," ℓ=0:",L-1)) #clim=(-0.1,1)
 
         if info["pc"]==1
+            wavepow ./= 2
             wavepow += circshift(wavepow[end:-1:1,end:-1:1],(1,1))
         end
-        plot1(ps, wavepow, clim=(-0.1,1), bin=32, label="missing power")
+        plot1(ps, wavepow, bin=32, label="missing power") #clim=(-0.1,1)
         phi = filt[:,:,info["phi_index"]]
         phi_shift = fftshift(phi)
-        plot1(ps, phi_shift.^2, clim=(-0.1,1), bin=32, label="ϕ")
+        plot1(ps, phi_shift.^2, bin=32, label="ϕ") #clim=(-0.1,1)
         disc = wavepow+(phi_shift.^2)
         plot1(ps, fftshift(real(ifft(phi))), label="ϕ")
-        plot1(ps, disc, clim=(-0.1,1), bin=32, label="all")
+        plot1(ps, disc, bin=32, label="all") #clim=(-0.1,1)
 
         myplot = plot(ps..., layout=(7,5), size=(1400,2000))
         savefig(myplot, fname)
@@ -143,7 +153,7 @@ module DHC_tests
                     filt[index[ind]] = value[ind]
                     #temp = dropdims(sum(filt,dims=3),dims=3)
                     temp = filt[:,:,kfs]
-                    plot1(ps, fftshift(temp[:,:]), clim=(0,1),
+                    plot1(ps, fftshift(temp[:,:]),
                           bin=bfac, label=label)
                 end
                 fac = max(1,2.0^(5-j))
@@ -165,7 +175,7 @@ module DHC_tests
                     filt[index[indx]] .+= value[indx].^2
                 end
                 ring = filt[:,:,kfs]
-                plot1(ps, fftshift(ring[:,:]), clim=(0,1),
+                plot1(ps, fftshift(ring[:,:]),
                       bin=bfac, label=string("j=",j_ind," ℓ=",0,":",L-1," k=",k_ind))
             end
         end
@@ -176,9 +186,10 @@ module DHC_tests
         end
 
         wavepow = fftshift(dropdims(sum(filt, dims=3), dims=3))
-        plot1(ps, wavepow, clim=(-0.1,1), label=string("j=1:",J," ℓ=0:",L-1," K=1:",K),color=:black)
+        plot1(ps, wavepow, label=string("j=1:",J," ℓ=0:",L-1," K=1:",K),color=:white)
 
         if hash["2d_pc"]==1
+            wavepow ./= 2
             wavepow += circshift(wavepow[end:-1:1,end:-1:1],(1,1))
         end
         plot1(ps, wavepow, #clim=(0,K),
