@@ -65,8 +65,12 @@ module ReconFuncs
         ##Get S_Targ and covariance based on sfd_dbn
         if settings["target_type"]=="sfd_dbn" #if starg is based on sfd_dbn,
             sfdimg = readsfd(Nx, logbool=settings["log"]) #Return sfd log or regular images, and PIXEL covariance, BUGFix:DON'T ADD APD HERE. APD IS TO BE ADDED EXCLUSIVELY IN DHC_COMPUTE.
-            s2targ, sig2, cov = dbn_coeffs_calc(sfdimg, fhash, dhc_args, coeff_mask, settings)
             if (settings["covar_type"]!="sfd_dbn") & (settings["covar_type"]!="white_noise") error("Invalid covar_type") end
+        end
+
+        if settings["covar_type"]=="sfd_dbn"
+            sfdimg = Data_Utils.readsfd(Nx, logbool=settings["log"]) #Return sfd log or regular images, and PIXEL covariance, BUGFix:DON'T ADD APD HERE. APD IS TO BE ADDED EXCLUSIVELY IN DHC_COMPUTE.
+            s2targ, sig2, cov = dbn_coeffs_calc(sfdimg, fhash, dhc_args, coeff_mask, settings)
         end
 
         #At this point you have an s2targ and a sig2 / cov from either the true images coeffs or a dbn
@@ -114,7 +118,7 @@ module ReconFuncs
             if !settings["log"]
                 recon_img = Deriv_Utils_New.image_recon_derivsum_regularized(noisy_init, fhash, starg, sinvcov, falses(Nx, Nx), dhc_args, optim_settings=settings["optim_settings"], coeff_mask=coeff_mask, lambda=settings["lambda"])
             elseif settings["log"]
-                recon_img = exp.(Deriv_Utils_New.image_recon_derivsum_regularized(log.(noisy_init), fhash, Float64.(s2targ), sinvcov, falses(Nx, Nx), dhc_args, coeff_mask=coeff_mask, optim_settings=settings["optim_settings"]), lambda=settings["lambda"])
+                recon_img = exp.(Deriv_Utils_New.image_recon_derivsum_regularized(log.(noisy_init), fhash, Float64.(starg), sinvcov, falses(Nx, Nx), dhc_args, coeff_mask=coeff_mask, optim_settings=settings["optim_settings"], lambda=settings["lambda"]))
             else
                 error("??")
             end

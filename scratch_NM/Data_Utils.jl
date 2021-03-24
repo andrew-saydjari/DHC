@@ -114,7 +114,7 @@ module Data_Utils
         (N1iso, Nf)    = size(fhash["S1_iso_mat"])
         logim = log.(oriim)
 
-        S2 = DHC_compute_apd(logim, fhash, dhc_args..., norm=norm, iso=iso)
+        S2 = DHC_compute_apd(logim, fhash; dhc_args..., norm=norm, iso=iso)
 
         Ns    = length(S2)
         S2arr = zeros(Float64, Ns, Nsam)
@@ -169,11 +169,11 @@ module Data_Utils
     end
 
 
-    function readsfd(nx, logbool=false)
+    function readsfd(nx; logbool=false)
         # read FITS file with images
         # file in /n/fink2/dfink/mldust/dust10000.fits
         #     OR  /n/fink2/dfink/mldust/dust100000.fits
-        println("fn check")
+        #println("fn check")
         fname = "scratch_NM/data/dust10000.fits"
         f = FITS(fname, "r")
         big = read(f[1])
