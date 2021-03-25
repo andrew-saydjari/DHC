@@ -1,6 +1,7 @@
 module ReconFuncs
     using Statistics
     using LinearAlgebra
+    using FileIO
 
     using DHC_2DUtils
     using Data_Utils
@@ -65,6 +66,7 @@ module ReconFuncs
         ##Get S_Targ and covariance based on sfd_dbn
         if settings["target_type"]=="sfd_dbn" #if starg is based on sfd_dbn,
             sfdimg = readsfd(Nx, logbool=settings["log"]) #Return sfd log or regular images, and PIXEL covariance, BUGFix:DON'T ADD APD HERE. APD IS TO BE ADDED EXCLUSIVELY IN DHC_COMPUTE.
+            s2targ, _, _ = dbn_coeffs_calc(sfdimg, fhash, dhc_args, coeff_mask, settings)
             if (settings["covar_type"]!="sfd_dbn") & (settings["covar_type"]!="white_noise") error("Invalid covar_type") end
         end
 
@@ -124,7 +126,14 @@ module ReconFuncs
             end
         else error("Non Gaussian not implemented yet") #NonGaussian
 
-        #Log and save everything in a fits file
+        #Log and save everything
+        if isfile(settings["fname_save"]) & (settings["safemode"])
+            error("Overwriting file")
+        else
+            if !settings["safemode"] println("Overwriting existing files") end
+            save(settings["fname_save"], Dict("true_img"=>true_img, "init"=>noisy_init, "recon"=>recon_img, "dict"=>settings))
+        end
+
         return recon_img
         end
 

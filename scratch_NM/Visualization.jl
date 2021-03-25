@@ -32,17 +32,29 @@ module Visualization
 
         # -------- initialize array of plots
         ps   = []
-        clim  = (0,200)
-        clim2 = (0,200).-100
+        clim  = (minimum(ImTrue), maximum(ImTrue))
+        resit = ImInit-ImTrue
+        resir = ImInit-ImSynth
+        resrt = ImSynth-ImTrue
+        clim2 = (minimum([minimum(resit), minimum(resir), minimum(resrt)]), maximum([maximum(resit), maximum(resir), maximum(resrt)]))
+        println(clim, clim2)
 
         # -------- 6 panel QA plot
+
         plot1(ps, ImTrue, clim=clim, label="True")
         plot1(ps, ImSynth, clim=clim, label="Synth")
         plot1(ps, ImInit, clim=clim, label="Init")
-        plot1(ps, ImInit-ImTrue, clim=clim2, label="Init-True")
-        plot1(ps, ImInit-ImSynth, clim=clim2, label="Init-Synth")
-        plot1(ps, ImSynth-ImTrue, clim=clim2, label="Synth-True")
-
+        plot1(ps, resit, clim=clim2, label="Init-True")
+        plot1(ps, resir, clim=clim2, label="Init-Synth")
+        plot1(ps, resrt, clim=clim2, label="Synth-True")
+        #=
+        heatmap(ImTrue, clim=clim, label="True")
+        heatmap(ImSynth, clim=clim, label="Synth")
+        heatmap(ImInit, clim=clim, label="Init")
+        heatmap(resit, clim=clim2, label="Init-True")
+        heatmap(resir, clim=clim2, label="Init-Synth")
+        heatmap(resrt, clim=clim2, label="Synth-True")
+        =#
         myplot = plot(ps..., layout=(3,2), size=(1400,2000))
         savefig(myplot, fname)
     end
