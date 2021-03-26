@@ -2,6 +2,7 @@ module ReconFuncs
     using Statistics
     using LinearAlgebra
     using FileIO
+    using Optim
 
     using DHC_2DUtils
     using Data_Utils
@@ -41,7 +42,7 @@ module ReconFuncs
         #Add apd case above
 
         ##Get S_Targ using true image
-        if settings["target_type"]=="ground truth" #if starg is based on true coeff
+        if settings["target_type"]=="ground_truth" #if starg is based on true coeff
             s2targ = convert(Array{Float64,1}, DHC_compute_apd(preproc_img, fhash, norm=false, iso=false; dhc_args...)[coeff_mask])
             #=if coeff_type=="S2" #BUGFix: Wrap coeff_type into a dictionary and pass to DHC_COMPUTE
                 s2targ = DHC_compute(preproc_img, fhash, doS2=true, doS20=false, norm=false, iso=false)[coeff_mask]
@@ -66,13 +67,13 @@ module ReconFuncs
         ##Get S_Targ and covariance based on sfd_dbn
         if settings["target_type"]=="sfd_dbn" #if starg is based on sfd_dbn,
             sfdimg = readsfd(Nx, logbool=settings["log"]) #Return sfd log or regular images, and PIXEL covariance, BUGFix:DON'T ADD APD HERE. APD IS TO BE ADDED EXCLUSIVELY IN DHC_COMPUTE.
-            s2targ, _, _ = dbn_coeffs_calc(sfdimg, fhash, dhc_args, coeff_mask, settings)
+            s2targ, _, _ = dbn_coeffs_calc(sfdimg, fhash, dhc_args, coeff_mask)
             if (settings["covar_type"]!="sfd_dbn") & (settings["covar_type"]!="white_noise") error("Invalid covar_type") end
         end
 
         if settings["covar_type"]=="sfd_dbn"
             sfdimg = Data_Utils.readsfd(Nx, logbool=settings["log"]) #Return sfd log or regular images, and PIXEL covariance, BUGFix:DON'T ADD APD HERE. APD IS TO BE ADDED EXCLUSIVELY IN DHC_COMPUTE.
-            s2targ, sig2, cov = dbn_coeffs_calc(sfdimg, fhash, dhc_args, coeff_mask, settings)
+            s2targ, sig2, cov = dbn_coeffs_calc(sfdimg, fhash, dhc_args, coeff_mask)
         end
 
         #At this point you have an s2targ and a sig2 / cov from either the true images coeffs or a dbn
@@ -118,27 +119,25 @@ module ReconFuncs
             starg, sinvcov = settings["s_targ_mean"], settings["s_invcov"] #meancov_generator(true_img, fhash, coeff_type, coeff_mask, settings) call this outside function with the same dict
 
             if !settings["log"]
-                recon_img = Deriv_Utils_New.image_recon_derivsum_regularized(noisy_init, fhash, starg, sinvcov, falses(Nx, Nx), dhc_args, optim_settings=settings["optim_settings"], coeff_mask=coeff_mask, lambda=settings["lambda"])
+                res, recon_img = Deriv_Utils_New.image_recon_derivsum_regularized(noisy_init, fhash, starg, sinvcov, falses(Nx, Nx), dhc_args, optim_settings=settings["optim_settings"], coeff_mask=coeff_mask, lambda=settings["lambda"])
             elseif settings["log"]
-                recon_img = exp.(Deriv_Utils_New.image_recon_derivsum_regularized(log.(noisy_init), fhash, Float64.(starg), sinvcov, falses(Nx, Nx), dhc_args, coeff_mask=coeff_mask, optim_settings=settings["optim_settings"], lambda=settings["lambda"]))
+                res, recon_img = Deriv_Utils_New.image_recon_derivsum_regularized(log.(noisy_init), fhash, Float64.(starg), sinvcov, falses(Nx, Nx), dhc_args, coeff_mask=coeff_mask, optim_settings=settings["optim_settings"], lambda=settings["lambda"])
+                recon_img = exp.(recon_img)
             else
                 error("??")
             end
         else error("Non Gaussian not implemented yet") #NonGaussian
+        end
 
         #Log and save everything
         if isfile(settings["fname_save"]) & (settings["safemode"])
             error("Overwriting file")
         else
             if !settings["safemode"] println("Overwriting existing files") end
-            save(settings["fname_save"], Dict("true_img"=>true_img, "init"=>noisy_init, "recon"=>recon_img, "dict"=>settings))
+            save(settings["fname_save"], Dict("true_img"=>true_img, "init"=>noisy_init, "recon"=>recon_img, "dict"=>settings, "trace"=>Optim.trace(res)))
         end
-
-        return recon_img
-        end
-
+        return res, recon_img
 
     end
-
 
 end

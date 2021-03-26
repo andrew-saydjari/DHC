@@ -1220,13 +1220,17 @@ module DHC_2DUtils
     end
 
     function DHC_compute_wrapper(image::Array{Float64,2}, filter_hash::Dict;
-        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, apodize=false, norm=true, iso=false, FFTthreads=1, filter_hash2::Dict=filter_hash)
+        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, apodize=false, norm=true, iso=false, FFTthreads=1, filter_hash2::Dict=filter_hash, coeff_mask=nothing)
         if apodize
             ap_img = apodizer(image)
         else
             ap_img = image
         end
-        return DHC_compute(ap_img, filter_hash, filter_hash2, doS2=doS2, doS12=doS12, doS20=doS20, norm=norm, iso=iso, FFTthreads=FFTthreads)
+        if coeff_mask==nothing
+            return DHC_compute(ap_img, filter_hash, filter_hash2, doS2=doS2, doS12=doS12, doS20=doS20, norm=norm, iso=iso, FFTthreads=FFTthreads)
+        else
+            return DHC_compute(ap_img, filter_hash, filter_hash2, doS2=doS2, doS12=doS12, doS20=doS20, norm=norm, iso=iso, FFTthreads=FFTthreads)[coeff_mask]
+        end
     end
 
 
@@ -1924,7 +1928,7 @@ module DHC_2DUtils
 
         return out_coeff
     end
-    
+
 
 ## Post processing
 

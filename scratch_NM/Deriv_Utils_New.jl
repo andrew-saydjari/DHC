@@ -877,7 +877,7 @@ module Deriv_Utils_New
 
         res = optimize(loss_func20, dloss20, input, ConjugateGradient(), Optim.Options(iterations = numitns_dict, store_trace = true, show_trace = true))
         result_img = Optim.minimizer(res)
-        return reshape(result_img, (Nx, Nx))
+        return res, reshape(result_img, (Nx, Nx))
     end
 
     #=
