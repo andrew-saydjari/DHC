@@ -816,7 +816,7 @@ module Deriv_Utils_New
         #Optimization Hyperparameters
         tonorm = get(optim_settings, "norm", false)
         numitns_dict = get(optim_settings, "iterations", 100)
-
+        minmethod = get(optim_settings, "minmethod", ConjugateGradient())
 
         function loss_func20(img_curr::Array{Float64, 2})
             s_curr = DHC_compute_apd(img_curr,  filter_hash, iso=false, norm=tonorm; dhc_args...)[coeff_mask]
@@ -875,7 +875,7 @@ module Deriv_Utils_New
         println("Brute:  ",brute)
         println("Clever: ",clever[row, col], " Difference: ", brute - clever[row, col], " Mean ", meanval) #DEB
 
-        res = optimize(loss_func20, dloss20, input, ConjugateGradient(), Optim.Options(iterations = numitns_dict, store_trace = true, show_trace = true))
+        res = optimize(loss_func20, dloss20, input, minmethod, Optim.Options(iterations = numitns_dict, store_trace = true, show_trace = true))
         result_img = Optim.minimizer(res)
         return res, reshape(result_img, (Nx, Nx))
     end
