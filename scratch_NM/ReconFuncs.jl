@@ -73,7 +73,7 @@ module ReconFuncs
 
         if settings["covar_type"]=="sfd_dbn"
             sfdimg = Data_Utils.readsfd(Nx, logbool=settings["log"]) #Return sfd log or regular images, and PIXEL covariance, BUGFix:DON'T ADD APD HERE. APD IS TO BE ADDED EXCLUSIVELY IN DHC_COMPUTE.
-            s2targ, sig2, cov = dbn_coeffs_calc(sfdimg, fhash, dhc_args, coeff_mask)
+            _, sig2, cov = dbn_coeffs_calc(sfdimg, fhash, dhc_args, coeff_mask)
         end
 
         #At this point you have an s2targ and a sig2 / cov from either the true images coeffs or a dbn

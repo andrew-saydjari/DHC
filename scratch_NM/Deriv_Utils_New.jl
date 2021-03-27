@@ -818,6 +818,7 @@ module Deriv_Utils_New
         numitns_dict = get(optim_settings, "iterations", 100)
         minmethod = get(optim_settings, "minmethod", ConjugateGradient())
 
+
         function loss_func20(img_curr::Array{Float64, 2})
             s_curr = DHC_compute_apd(img_curr,  filter_hash, iso=false, norm=tonorm; dhc_args...)[coeff_mask]
             regterm =  0.5*lambda*sum((adaptive_apodizer(img_curr) - adaptive_apodizer(input)).^2)
@@ -836,6 +837,7 @@ module Deriv_Utils_New
             storage_grad[pixmask] .= 0 # better way to do this by taking pixmask as an argument wst_s2_deriv_sum?
             return
         end
+
         #=
         function loss_func20(img_curr::Array{Float64, 1})
             #size(img_curr) must be (Nx^2, 1)#SPEED: Might be faster if you work with Nx, Nx images instead
@@ -874,9 +876,10 @@ module Deriv_Utils_New
         println("Chisq Derve Check")
         println("Brute:  ",brute)
         println("Clever: ",clever[row, col], " Difference: ", brute - clever[row, col], " Mean ", meanval) #DEB
-
+        println("Initial Loss ", loss_func20(input))
         res = optimize(loss_func20, dloss20, input, minmethod, Optim.Options(iterations = numitns_dict, store_trace = true, show_trace = true))
         result_img = Optim.minimizer(res)
+        println("Final Loss ", loss_func20(result_img))
         return res, reshape(result_img, (Nx, Nx))
     end
 
