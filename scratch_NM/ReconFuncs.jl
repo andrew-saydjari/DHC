@@ -34,12 +34,12 @@ module ReconFuncs
         return
     end
     =#
-    function meancov_generator(true_img, fhash, dhc_args, coeff_mask, settings)
+    function meancov_generator(true_img, fhash, dhc_args, coeff_mask, settings; safety=nothing)
         #generates targmean and covariance for Gaussian loss func
         (Nx, Ny) = size(true_img)
         preproc_img = copy(true_img)
         if settings["log"] preproc_img = log.(true_img) end
-        #Add apd case above
+
 
         ##Get S_Targ using true image
         if settings["target_type"]=="ground_truth" #if starg is based on true coeff
@@ -53,7 +53,9 @@ module ReconFuncs
                 s2targ = DHC_compute(preproc_img, fhash, doS2=false, doS20=false, doS12=true, norm=false, iso=false)[coeff_mask]
             end=#
         end
-
+        if safety!=nothing
+            println(s2targ .- safety)
+        end
         ##Get covariance based on true+noise #BUG:???
         if settings["covar_type"]=="white_noise" #if covariance is based on true+noise simulated coeff
             if !settings["log"]  #Confirm that this handles both the apd and nonapd cases appropriately
@@ -87,7 +89,9 @@ module ReconFuncs
         else#s2icov
             s2icov = invert_covmat(cov)
         end
-
+        if safety!=nothing
+            println("End ", s2targ .- safety)
+        end
         return s2targ, s2icov
     end
 
