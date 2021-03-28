@@ -460,4 +460,6 @@ end
 test(3, 4, 2, d=2)
 =#
 
-##3-25
+##3-28
+Nx=16
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
