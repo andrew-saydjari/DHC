@@ -431,17 +431,20 @@ dls20 = Deriv_Utils_New.wst_S20_deriv_sum(true_img, filter_hash, mywts, FFTthrea
 
 #3/24###########################################################################
 #test wrapper
-
-function test_wrapper(Nx)
+Nx=16
+fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(Nf, ) = size(fhash["filt_index"])
+coeff_mask = falses(2+Nf+Nf^2)
+coeff_mask[Nf+3:end] .= true
+function test_wrapper(Nx, filter_hash, coeff_mask)
     true_img = readdust(Nx)
-    filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
-    swrap = DHC_compute_wrapper(true_img, filter_hash)
-    sapd = DHC_compute_apd(true_img, filter_hash)
+    swrap = DHC_compute_wrapper(true_img, filter_hash, coeff_mask=coeff_mask)
+    sapd = DHC_compute_apd(true_img, filter_hash)[coeff_mask]
     print("Mean Abs Diff ", mean(abs.(swrap - sapd)))
 end
 
 
-test_wrapper(16)
+test_wrapper(16, fhash, coeff_mask)
 
 #=
 filter_hash = fink_filter_hash(1, 8, nx=64, pc=1, wd=1, Omega=true)

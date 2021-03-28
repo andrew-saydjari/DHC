@@ -1221,6 +1221,9 @@ module DHC_2DUtils
 
     function DHC_compute_wrapper(image::Array{Float64,2}, filter_hash::Dict;
         doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, apodize=false, norm=true, iso=false, FFTthreads=1, filter_hash2::Dict=filter_hash, coeff_mask=nothing)
+        Nf = size(filter_hash["filt_index"])[1]
+        @assert !iso "Iso not implemented yet"
+        @assert length(coeff_mask)==(2+Nf+Nf^2) "Coeff_mask must have length 2+Nf+Nf^2"
         if apodize
             ap_img = apodizer(image)
         else
