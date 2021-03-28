@@ -32,7 +32,8 @@ module DHC_2DUtils
     export DHC_compute_RGB
     export S1_iso_matrix
     export S2_iso_matrix
-
+    export S1_equiv_matrix
+    export S2_equiv_matrix
 
 ## Filter hash construct core
 
