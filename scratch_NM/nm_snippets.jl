@@ -458,4 +458,89 @@ function derivtestS1S2(Nx)
     #plot!(blarg[2,3,:])
     #plot(diff)
     return
+
+end
+
+
+#OLD Stuff
+function S2_whitenoiseweights(im, fhash; loc=0.0, sig=1.0, Nsam=1000, iso=false, norm=false, smooth=false, smoothval=0.8, coeff_mask=nothing)
+    #=
+    Noise model: N(loc, std(sig))
+    =#
+
+    (Nx, Ny)  = size(im)
+    if Nx != Ny error("Input image must be square") end
+    (N1iso, Nf)    = size(fhash["S1_iso_mat"])
+
+    # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+
+    S2   = DHC_compute(im, fhash, doS2=true, doS20=false, norm=norm, iso=iso)
+    Ns    = length(S2)
+    S2arr = zeros(Float64, Ns, Nsam)
+    println("Ns", Ns)
+    for j=1:Nsam
+        noise = reshape(rand(Normal(loc, sig),Nx^2), (Nx, Nx))
+        init = im+noise
+        if smooth init = imfilter(init, Kernel.gaussian(smoothval)) end
+        S2arr[:,j] = DHC_2DUtils.DHC_compute(init, fhash, doS2=true, doS20=false, norm=norm, iso=iso)
+    end
+    wt = zeros(Float64, Ns)
+    for i=1:Ns
+        wt[i] = std(S2arr[i,:])
+    end
+    msub = S2arr .- mean(S2arr, dims=2)
+    cov = (msub * msub')./(Nsam-1)
+    if coeff_mask!=nothing
+        cov = cov[coeff_mask, coeff_mask]
+        wt = wt[coeff_mask]
+    end
+    println("Output of S2 weights: Condition number of diag cov", cond(Diagonal(wt.^(2))))
+    println("Condition Number of covariance", cond(cov))
+    return wt.^(2), cov
+end
+
+
+function S20_whitenoiseweights_old(im, fhash; loc=0.0, sig=1.0, Nsam=1000, iso=false, norm=false, smooth=false, smoothval=0.8, coeff_choice="S20", coeff_mask=nothing)
+    #=
+    Noise model: N(0, std(I))
+    Output: std^2 vector, full covariance matrix
+    =#
+    if coeff_mask==nothing println("Warning: Running without coeff_mask") end
+
+    (Nx, Ny)  = size(im)
+    if Nx != Ny error("Input image must be square") end
+    (N1iso, Nf)    = size(fhash["S1_iso_mat"])
+
+    # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+    if coeff_choice=="S12"
+        S20   = DHC_compute(im, fhash, doS2=false, doS20=false, doS12=true, norm=norm, iso=iso)
+    else #S20
+        S20   = DHC_compute(im, fhash, doS2=false, doS20=true, norm=norm, iso=iso)
+    end
+    Ns    = length(S20)
+    S2arr = zeros(Float64, Ns, Nsam)
+    println("Ns", Ns)
+    for j=1:Nsam
+        noise = reshape(rand(Normal(loc, sig),Nx^2), (Nx, Nx))
+        init = im+noise
+        if smooth init = imfilter(init, Kernel.gaussian(smoothval)) end
+        if coeff_choice=="S12"
+            S2arr[:,j] = DHC_2DUtils.DHC_compute(init, fhash, doS2=false, doS20=false, doS12=true, norm=norm, iso=iso)
+        else #S20
+            S2arr[:,j] = DHC_2DUtils.DHC_compute(init, fhash, doS2=false, doS20=true, norm=norm, iso=iso)
+        end
+    end
+    wt = zeros(Float64, Ns)
+    for i=1:Ns
+        wt[i] = std(S2arr[i,:])
+    end
+    msub = S2arr .- mean(S2arr, dims=2)
+    cov = (msub * msub')./(Nsam-1)
+    if coeff_mask!=nothing
+        cov = cov[coeff_mask, coeff_mask]
+        wt = wt[coeff_mask]
+    end
+    println("Output of S20weights: Condition number of diag cov", cond(Diagonal(wt.^(2))))
+    println("Condition Number of covariance", cond(cov))
+    return wt.^(2), cov
 end
