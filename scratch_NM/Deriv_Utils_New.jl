@@ -742,6 +742,7 @@ module Deriv_Utils_New
 
         if coeff_mask!=nothing
             if (!dhc_args[:iso]) & (count((i->i==true), coeff_mask[1:Nf+2])!=0) error("Code assumes S1 coeffs and S0 are masked out") end #wrap
+            if (dhc_args[:iso]) & (count((i->i==true), coeff_mask[1:N1iso+2])!=0) error("Code assumes S1iso coeffs and S0 are masked out") end
             #if length(coeff_mask)!= (2+Nf + Nf^2) error("Wrong dim mask") end #wrap
             if size(s_targ_mean)[1]!=count((i->(i==true)), coeff_mask) error("s_targ_mean should only contain coeffs to be optimized") end
             if size(s_targ_invcov)[1]!=count((i->(i==true)), coeff_mask) error("s_targ_invcov should only have coeffs to be optimized") end
@@ -783,9 +784,9 @@ module Deriv_Utils_New
         minmethod = get(optim_settings, "minmethod", ConjugateGradient())
 
         if (dhc_args[:doS20]) & (dhc_args[:iso])
-            iso2nf2mask = zeros(Nf^2)
+            iso2nf2mask = zeros(Int64, Nf^2)
             M20 = filter_hash["S2_iso_mat"]
-            for id=1:Nf^2 iso2nf2mask[M20.colptr[ind]] .= M20.rowval[ind] end
+            for id=1:Nf^2 iso2nf2mask[M20.colptr[id]] = M20.rowval[id] end
             coeff_masks20 = coeff_mask[3+N1iso:end]
         else# (dhc_args[:doS20]) & (!dhc_args[:iso])
             coeff_masks20 = coeff_mask[3+Nf:end]
@@ -793,7 +794,7 @@ module Deriv_Utils_New
 
         function augment_weights(inpwt::Array{Float64})
             if (dhc_args[:doS20]) & (dhc_args[:iso]) #wt (Nc) -> |S2_iso| -> |Nf^2|
-                w_s2iso = zeros(size(filter_hash["S2_iso_mat"][1]))
+                w_s2iso = zeros(size(filter_hash["S2_iso_mat"])[1])
                 w_s2iso[coeff_masks20] .= inpwt
                 w_nf2 = zeros(Nf^2)
                 w_nf2 .= w_s2iso[iso2nf2mask]

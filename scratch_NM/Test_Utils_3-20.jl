@@ -509,3 +509,39 @@ Visualization.plot_synth_QA(apodizer(true_img), apodizer(init), apodizer(recon_i
 
 println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
 println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
+
+
+#S20 + Iso check
+#S20+NoIsoChecking that you didnt break old code
+fname_save = "scratch_NM/NewWrapper/IsoTests/s20_iso"
+Nx=64
+im = readsfd(Nx)
+true_img = im[:, :, 1]
+
+noise = rand(Normal(0.0, std(true_img)), Nx, Nx)
+init = true_img + noise
+#heatmap(init)
+#heatmap(true_img)
+
+filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nf) = size(filter_hash["S2_iso_mat"])
+coeff_mask = falses(2+S1iso+S2iso)
+coeff_mask[S1iso+3:end] .= true
+
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>true) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+white_noise_args = Dict(:loc=>0.0, :sig=>std(true_img), :Nsam=>1000, :norm=>false, :smooth=>false, :smoothval=>0.8) #Iso #only if you're using noise based covar
+optim_settings = Dict([("iterations", 10), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("target_type", "ground_truth"), ("covar_type", "white_noise"), ("log", false), ("GaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
+  ("optim_settings", optim_settings), ("lambda", std(apodizer(true_img)).^(-2)), ("white_noise_args", white_noise_args)]) #Add constraints
+regs_true = DHC_compute_wrapper(true_img, filter_hash; norm=false, dhc_args...)[coeff_mask]
+s2mean, s2icov = meancov_generator(true_img, filter_hash, dhc_args, coeff_mask, recon_settings, safety=regs_true)
+#Check
+#s2mean - s_true
+
+recon_settings["s_targ_mean"] = s2mean
+recon_settings["s_invcov"] = s2icov
+recon_settings["safemode"] = false
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+resobj, recon_img = reconstruction_wrapper(true_img, init, filter_hash, dhc_args, coeff_mask, recon_settings)
