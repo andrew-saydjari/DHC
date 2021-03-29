@@ -16,35 +16,6 @@ module Deriv_Utils_New
     push!(LOAD_PATH, pwd()*"/main")
     using DHC_2DUtils
 
-    function DHC_compute_wrapper(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
-        doS0::Bool=false, doS1::Bool=false, doS2::Bool=false, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false, FFTthreads=2) #TODO: Test for all isolated cases
-        if !(doS0 |  doS1 | doS2 | doS12 | doS20) error("At least one coefficient set must be returned") end
-        #Ensure exactly one of the S2s are queried: do I need this?
-        #atleast_one = doS2 | doS12 | doS20 #uneven number
-        #only_one = (!(doS2 & doS20)) & (!(doS2 & doS12)) & (!(doS20 & doS12))
-        #if (atleast_one & !only_one) error("Currently not implemented") end
-
-        coeffs = DHC_compute(image, filter_hash, filter_hash2,
-            doS2=doS2, doS12=doS12, doS20=doS20, norm=norm, iso=iso, FFTthreads=FFTthreads) #returns with S0 and S1 by default. None of the others are incl by default.
-        #coeffs: <S0> <S1> <whichever of the S2 types were queried>
-        #Now, only need to select between the S1 / S0 types
-        (N1iso, Nf)    = size(filter_hash["S1_iso_mat"])
-        mask = trues(len(coeffs))
-        if doS0 & doS1
-
-        elseif !doS0 & doS1
-            mask[1] = false
-            mask[2] = false
-        elseif !doS1 & doS0
-            S1_start=3
-            S1_end = S1_start + (iso ? N1iso : Nf) - 1
-            mask[S1_start:S1_end] .= false
-        else
-            S1_end = S1_start + (iso ? N1iso : Nf) - 1
-            mask[1:S1_end] .=false
-        end #NOT TESTED YET
-
-    end
 
 
 
@@ -745,19 +716,19 @@ module Deriv_Utils_New
         Cases to be handled by this function:
         S20
         Apodized or not
+        Iso
         Log or Regular: If log then input, targ and cov should have been constructed using log
         Select pixels masked or all floating--not using for masked currently
         Select coefficients optimized wrt
         Lambda: regularization
 
         Cases NOT handled by this function:
-        Iso
         Only S1
         Non-Gaussian loss function
         Using the S0 params (mean and variance) in the loss function
         DHC_compute with norm=true
         =#
-        (Nf,) = size(filter_hash["filt_index"])
+        (N1iso, Nf) = size(filter_hash["S1_iso_mat"])
         println("Coeff mask:", (coeff_mask!=nothing))
 
         (Nx, Ny)  = size(input)
@@ -770,18 +741,12 @@ module Deriv_Utils_New
         ori_input = reshape(copy(input), (Nx^2, 1))
 
         if coeff_mask!=nothing
-            if count((i->i==true), coeff_mask[1:Nf+2])!=0 println("Warning: S1 coeffs being double counted / S0 aren't 0") end #wrap
-            if length(coeff_mask)!= (2+Nf + Nf^2) error("Wrong dim mask") end #wrap
+            if (!dhc_args[:iso]) & (count((i->i==true), coeff_mask[1:Nf+2])!=0) error("Code assumes S1 coeffs and S0 are masked out") end #wrap
+            #if length(coeff_mask)!= (2+Nf + Nf^2) error("Wrong dim mask") end #wrap
             if size(s_targ_mean)[1]!=count((i->(i==true)), coeff_mask) error("s_targ_mean should only contain coeffs to be optimized") end
             if size(s_targ_invcov)[1]!=count((i->(i==true)), coeff_mask) error("s_targ_invcov should only have coeffs to be optimized") end
         else #No mask: all coeffs (default: Only S20 coeffs will be optim wrt.)
-            #Currently assuming inputs have mean, var params in case that's something we wanna optimize at some point
-            if size(s_targ_mean)[1]!=(Nf^2) error("s_targ_mean should only contain coeffs to be optimized") end
-            if (size(s_targ_invcov)!=(Nf^2, Nf^2))  error("s_targ_invcov of wrong size") end #(s_targ_invcov!=I) &
-            #At this point both have dims |S1+S2|
-            #Create coeff_mask subsetting 3:end
-            coeff_mask = fill(true, 2+Nf+Nf^2)
-            coeff_mask[1:Nf+2] .= false #Mask out S0 and S1
+            error("You must supply a coeff_mask")
         end
 
         #Apodization adjustments
@@ -793,7 +758,7 @@ module Deriv_Utils_New
             end
             return apd_image
         end
-        #For the derivative term dA*P/dP
+        #For the Jacobian dA*P/dP
         if dhc_args[:apodize]
             Ap = wind_2d(Nx)
             cA = sum(Ap)
@@ -809,59 +774,58 @@ module Deriv_Utils_New
         end
 
 
-        num_freecoeff = count((i->(i==true)), coeff_mask) #Nf^2 if argument coeff_mask was empty
+        num_freecoeff = count((i->(i==true)), coeff_mask)
 
         #After this all cases have a coeffmask, and s_targ_mean and s_targ_invcov have the shapes of the coefficients that we want to select.
-
         #Optimization Hyperparameters
-        tonorm = get(optim_settings, "norm", false)
+        tonorm = false
         numitns_dict = get(optim_settings, "iterations", 100)
         minmethod = get(optim_settings, "minmethod", ConjugateGradient())
 
+        if (dhc_args[:doS20]) & (dhc_args[:iso])
+            iso2nf2mask = zeros(Nf^2)
+            M20 = filter_hash["S2_iso_mat"]
+            for id=1:Nf^2 iso2nf2mask[M20.colptr[ind]] .= M20.rowval[ind] end
+            coeff_masks20 = coeff_mask[3+N1iso:end]
+        else# (dhc_args[:doS20]) & (!dhc_args[:iso])
+            coeff_masks20 = coeff_mask[3+Nf:end]
+        end
+
+        function augment_weights(inpwt::Array{Float64})
+            if (dhc_args[:doS20]) & (dhc_args[:iso]) #wt (Nc) -> |S2_iso| -> |Nf^2|
+                w_s2iso = zeros(size(filter_hash["S2_iso_mat"][1]))
+                w_s2iso[coeff_masks20] .= inpwt
+                w_nf2 = zeros(Nf^2)
+                w_nf2 .= w_s2iso[iso2nf2mask]
+                return reshape(w_nf2, (Nf, Nf))
+            else#if (dhc_args[:doS20]) & (!dhc_args[:iso])
+                w_nf2 = zeros(Nf^2)
+                w_nf2[coeff_masks20] .= inpwt
+                return reshape(w_nf2, (Nf, Nf))
+            end
+        end
 
         function loss_func20(img_curr::Array{Float64, 2})
-            s_curr = DHC_compute_apd(img_curr,  filter_hash, iso=false, norm=tonorm; dhc_args...)[coeff_mask]
+            s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
             regterm =  0.5*lambda*sum((adaptive_apodizer(img_curr) - adaptive_apodizer(input)).^2)
             lnlik = ( 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean))
-            #println("Lnlik size | Reg Size", size(lnlik), size(regterm))
-            neglogloss = lnlik[1] + regterm #BUG:??
+            neglogloss = lnlik[1] + regterm
             return neglogloss
         end
         #TODO: Need to replace the deriv_sums20 with a deriv_sum wrapper that handles all cases (S12, S20, S2)
+
         function dloss20(storage_grad::Array{Float64, 2}, img_curr::Array{Float64, 2})
-            s_curr = DHC_compute_apd(img_curr, filter_hash, norm=tonorm, iso=false; dhc_args...)[coeff_mask]
+            s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
             diff = s_curr - s_targ_mean
-            wt = reshape(convert(Array{Float64, 2}, transpose(diff) * s_targ_invcov), (Nf, Nf))
+            #Add branches here
+            wt = augment_weights(convert(Array{Float64,1}, reshape(transpose(diff) * s_targ_invcov, (length(diff),))))
             apdimg_curr = adaptive_apodizer(img_curr)
             storage_grad .= reshape((wst_S20_deriv_sum(apdimg_curr, filter_hash, wt, FFTthreads=FFTthreads)' + reshape(lambda.*(apdimg_curr - adaptive_apodizer(input)), (1, Nx^2))) * dA, (Nx, Nx))
             storage_grad[pixmask] .= 0 # better way to do this by taking pixmask as an argument wst_s2_deriv_sum?
             return
         end
 
-        #=
-        function loss_func20(img_curr::Array{Float64, 1})
-            #size(img_curr) must be (Nx^2, 1)#SPEED: Might be faster if you work with Nx, Nx images instead
-            s_curr = DHC_compute_apd(reshape(img_curr, (Nx, Nx)),  filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
-            regterm =  0.5*lambda*sum((adaptive_apodizer(reshape(img_curr, (Nx, Nx))) - adaptive_apodizer(input)).^2)
-            lnlik = ( 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean))
-            #println("Lnlik size | Reg Size", size(lnlik), size(regterm))
-            neglogloss = lnlik[1] + regterm
-            return neglogloss
-        end
-        #TODO: Need to replace the deriv_sums20 with a deriv_sum wrapper that handles all cases (S12, S20, S2)
-        function dloss20(storage_grad, img_curr)
-            #storage_grad, img_curr must be (Nx^2, 1)
-            s_curr = DHC_compute_apd(reshape(img_curr, (Nx, Nx)), filter_hash, norm=tonorm, iso=false; dhc_args...)[coeff_mask]
-            diff = s_curr - s_targ_mean
-            wt = reshape(convert(Array{Float64, 2}, transpose(diff) * s_targ_invcov), (Nf, Nf))
-            apdimg_curr = adaptive_apodizer(reshape(img_curr, (Nx, Nx)))
-            dterm = Apmat .* (reshape(wst_S20_deriv_sum(apdimg_curr, filter_hash, wt, FFTthreads=FFTthreads), (Nx, Nx)) + lambda.*(apdimg_curr - adaptive_apodizer(input)))
-            storage_grad .= reshape(dterm, (Nx^2, 1))
-            storage_grad[pixmask, 1] .= 0 # better way to do this by taking pixmask as an argument wst_s2_deriv_sum?
-            return
-        end
-        =#
-        #Debugging stuff
+
         println("Diff check")
         eps = zeros(size(input))
         row, col = 24, 18 #convert(Int8, Nx/2), convert(Int8, Nx/2)+3

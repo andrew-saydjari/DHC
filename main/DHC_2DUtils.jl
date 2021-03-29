@@ -1221,20 +1221,18 @@ module DHC_2DUtils
     end
 
     function DHC_compute_wrapper(image::Array{Float64,2}, filter_hash::Dict;
-        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, apodize=false, norm=true, iso=false, FFTthreads=1, filter_hash2::Dict=filter_hash, coeff_mask=nothing)
+        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, apodize=false, norm=false, iso=false, FFTthreads=1, filter_hash2::Dict=filter_hash)
         Nf = size(filter_hash["filt_index"])[1]
-        @assert !iso "Iso not implemented yet"
-        @assert length(coeff_mask)==(2+Nf+Nf^2) "Coeff_mask must have length 2+Nf+Nf^2"
+        #Not using coeff_mask here after all. ASSUMES ANY ONE of doS12, doS2 and doS20 are true, when using coeff_mask
+        #@assert !iso "Iso not implemented yet"
+
         if apodize
             ap_img = apodizer(image)
         else
             ap_img = image
         end
-        if coeff_mask==nothing
-            return DHC_compute(ap_img, filter_hash, filter_hash2, doS2=doS2, doS12=doS12, doS20=doS20, norm=norm, iso=iso, FFTthreads=FFTthreads)
-        else
-            return DHC_compute(ap_img, filter_hash, filter_hash2, doS2=doS2, doS12=doS12, doS20=doS20, norm=norm, iso=iso, FFTthreads=FFTthreads)[coeff_mask]
-        end
+
+        return DHC_compute(ap_img, filter_hash, filter_hash2, doS2=doS2, doS12=doS12, doS20=doS20, norm=norm, iso=iso, FFTthreads=FFTthreads)
     end
 
 

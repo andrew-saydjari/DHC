@@ -67,7 +67,7 @@ module Data_Utils
     end
 
 
-    function S2_whitenoiseweights(im, fhash, dhc_args; loc=0.0, sig=1.0, Nsam=1000, iso=false, norm=false, smooth=false, smoothval=0.8, coeff_mask=nothing)
+    function S2_whitenoiseweights(im, fhash, dhc_args; loc=0.0, sig=1.0, Nsam=1000, norm=false, smooth=false, smoothval=0.8, coeff_mask=nothing)
         #=
         Noise model: N(0, std(I))
         Output: std^2 vector, full covariance matrix
@@ -80,7 +80,7 @@ module Data_Utils
         (N1iso, Nf)    = size(fhash["S1_iso_mat"])
 
         # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
-        S2   = DHC_compute_apd(im, fhash, norm=norm, iso=iso; dhc_args...)
+        S2   = DHC_compute_wrapper(im, fhash, norm=norm; dhc_args...)
 
         Ns    = length(S2)
         S2arr = zeros(Float64, Ns, Nsam)
@@ -89,7 +89,7 @@ module Data_Utils
             noise = reshape(rand(Normal(loc, sig),Nx^2), (Nx, Nx))
             init = im+noise
             if smooth init = imfilter(init, Kernel.gaussian(smoothval)) end
-            S2arr[:,j] = DHC_2DUtils.DHC_compute_apd(init, fhash, norm=norm, iso=iso; dhc_args...)
+            S2arr[:,j] = DHC_2DUtils.DHC_compute_wrapper(init, fhash, norm=norm; dhc_args...)
         end
         wt = zeros(Float64, Ns)
         for i=1:Ns
@@ -107,15 +107,14 @@ module Data_Utils
     end
 
 
-    function whitenoiseweights_forlog(oriim, fhash, dhc_args; loc=0.0, sig=1.0, Nsam=10, iso=false, norm=false, smooth=false, smoothval=0.8, coeff_mask=nothing)
+    function whitenoiseweights_forlog(oriim, fhash, dhc_args; loc=0.0, sig=1.0, Nsam=10, norm=false, smooth=false, smoothval=0.8, coeff_mask=nothing)
         (Nx, Ny)  = size(oriim)
         if norm error("Not supposed to be run with norm true") end
-        if iso error("Not implemented") end
         if Nx != Ny error("Input image must be square") end
         (N1iso, Nf)    = size(fhash["S1_iso_mat"])
         logim = log.(oriim)
 
-        S2 = DHC_compute_apd(logim, fhash; dhc_args..., norm=norm, iso=iso)
+        S2 = DHC_compute_wrapper(logim, fhash; dhc_args..., norm=norm) #Iso
 
         Ns    = length(S2)
         S2arr = zeros(Float64, Ns, Nsam)
@@ -125,7 +124,7 @@ module Data_Utils
             init = oriim+noise
             if smooth init = imfilter(init, Kernel.gaussian(smoothval)) end
             loginit = log.(init)
-            S2arr[:, j]   = DHC_compute_apd(loginit, fhash, norm=norm, iso=iso; dhc_args...)
+            S2arr[:, j]   = DHC_compute_wrapper(loginit, fhash, norm=norm; dhc_args...) #Iso
         end
         wt = zeros(Float64, Ns)
         for i=1:Ns
@@ -265,7 +264,7 @@ module Data_Utils
         Ncovsamp = size(dbnimg)[3]
         s20_dbn = zeros(Float64, Ncovsamp, 2+Nf+Nf^2)
         for idx=1:Ncovsamp
-            s20_dbn[idx, :] = DHC_compute_apd(dbnimg[:, :, idx], fhash, norm=false, iso=false; dhc_args...)
+            s20_dbn[idx, :] = DHC_compute_apd(dbnimg[:, :, idx], fhash, norm=false; dhc_args...)
         end
 
         s_targ_mean = mean(s20_dbn, dims=1)

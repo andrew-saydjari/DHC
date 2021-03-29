@@ -213,10 +213,10 @@ init = imfilter(true_img + noise, Kernel.gaussian(1.0))
 
 filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (Nf, ) = size(filter_hash["filt_index"])
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true) #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
 coeff_mask = falses(2+Nf+Nf^2)
 coeff_mask[Nf+3:end] .= true
 
-dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true) #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
 white_noise_args = Dict(:loc=>0.0, :sig=>std(true_img)/5.0, :Nsam=>1000, :iso=>false, :norm=>false, :smooth=>true, :smoothval=>1.0) #only if you're using noise based covar
 optim_settings = Dict([("iterations", 1000), ("norm", false)])
 recon_settings = Dict([("target_type", "ground_truth"), ("covar_type", "white_noise"), ("log", true), ("GaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),

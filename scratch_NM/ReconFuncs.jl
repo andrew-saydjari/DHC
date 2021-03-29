@@ -36,14 +36,20 @@ module ReconFuncs
     =#
     function meancov_generator(true_img, fhash, dhc_args, coeff_mask, settings; safety=nothing)
         #generates targmean and covariance for Gaussian loss func
+        (Nf,) = size(fhash["filt_index"])
+        if dhc_args[:iso]
+            @assert length(coeff_mask)==(fhash["num_iso_coeff"]) "Coeff_mask must have length Num_iso_coeff = 2+ S1_iso + S2_iso"
+        else
+            @assert length(coeff_mask)==(2+Nf+Nf^2) "Coeff_mask must have length 2+Nf+Nf^2"
+        end
+
         (Nx, Ny) = size(true_img)
         preproc_img = copy(true_img)
         if settings["log"] preproc_img = log.(true_img) end
 
-
         ##Get S_Targ using true image
         if settings["target_type"]=="ground_truth" #if starg is based on true coeff
-            s2targ = convert(Array{Float64,1}, DHC_compute_apd(preproc_img, fhash, norm=false, iso=false; dhc_args...)[coeff_mask])
+            s2targ = convert(Array{Float64,1}, DHC_compute_wrapper(preproc_img, fhash, norm=false; dhc_args...)[coeff_mask]) #Iso
             #=if coeff_type=="S2" #BUGFix: Wrap coeff_type into a dictionary and pass to DHC_COMPUTE
                 s2targ = DHC_compute(preproc_img, fhash, doS2=true, doS20=false, norm=false, iso=false)[coeff_mask]
             elseif coeff_type=="S20"
@@ -54,7 +60,7 @@ module ReconFuncs
             end=#
         end
         if safety!=nothing
-            println(s2targ .- safety)
+            println("Mean abs Safety check ", mean(abs.(s2targ .- safety)))
         end
         ##Get covariance based on true+noise #BUG:???
         if settings["covar_type"]=="white_noise" #if covariance is based on true+noise simulated coeff
@@ -90,7 +96,7 @@ module ReconFuncs
             s2icov = invert_covmat(cov)
         end
         if safety!=nothing
-            println("End ", s2targ .- safety)
+            println("End ", mean(abs.(s2targ .- safety)))
         end
         return s2targ, s2icov
     end
@@ -116,9 +122,12 @@ module ReconFuncs
         #Add logging utility to save: S_targ, s_cov, all settings, true_img, noisy_init, coeff_mask
         (Nf,) = size(fhash["filt_index"])
         (Nx, Ny) = size(true_img)
-        if size(coeff_mask)[1]!=(2+Nf+Nf^2) error("Wrong length mask") end
+        if dhc_args[:iso]
+            @assert length(coeff_mask)==(fhash["num_iso_coeff"]) "Coeff_mask must have length Num_iso_coeff = 2+ S1_iso + S2_iso"
+        else
+            @assert length(coeff_mask)==(2+Nf+Nf^2) "Coeff_mask must have length 2+Nf+Nf^2"
+        end
 
-        #s2targ = DHC_compute(img, fhash, doS2=true, norm=norm, iso=false)
         if settings["GaussianLoss"]
             starg, sinvcov = settings["s_targ_mean"], settings["s_invcov"] #meancov_generator(true_img, fhash, coeff_type, coeff_mask, settings) call this outside function with the same dict
 
