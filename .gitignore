@@ -40,3 +40,4 @@ junk/
 *.fits
 .nfs00*
 *.jld2
+*.html
