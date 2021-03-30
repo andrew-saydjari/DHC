@@ -260,11 +260,12 @@ module Data_Utils
 
     function dbn_coeffs_calc(dbnimg, fhash, dhc_args, coeff_mask)
         #dbnimg: Either a set of aimges from a dbn or their log
-        (Nf,) = size(fhash["filt_index"])
+        (N1iso,Nf) = size(fhash["S1_iso_mat"])
+        (N2iso,Nfsq) = size(fhash["S2_iso_mat"])
         Ncovsamp = size(dbnimg)[3]
-        s20_dbn = zeros(Float64, Ncovsamp, 2+Nf+Nf^2)
+        s20_dbn = zeros(Float64, Ncovsamp, 2+ (dhc_args[:iso] ? N1iso+N2iso : Nf+Nf^2))
         for idx=1:Ncovsamp
-            s20_dbn[idx, :] = DHC_compute_apd(dbnimg[:, :, idx], fhash, norm=false; dhc_args...)
+            s20_dbn[idx, :] = DHC_compute_wrapper(dbnimg[:, :, idx], fhash, norm=false; dhc_args...)
         end
 
         s_targ_mean = mean(s20_dbn, dims=1)
@@ -274,11 +275,12 @@ module Data_Utils
 
     function get_dbn_coeffs(dbnimg, fhash, dhc_args; coeff_mask=nothing)
         #dbnimg: Either a set of aimges from a dbn or their log
-        (Nf,) = size(fhash["filt_index"])
+        (N1iso,Nf) = size(fhash["S1_iso_mat"])
+        (N2iso,Nfsq) = size(fhash["S2_iso_mat"])
         Ncovsamp = size(dbnimg)[3]
-        s20_dbn = zeros(Float64, Ncovsamp, 2+Nf+Nf^2)
+        s20_dbn = zeros(Float64, Ncovsamp, 2+ (dhc_args[:iso] ? N1iso+N2iso : Nf+Nf^2))
         for idx=1:Ncovsamp
-            s20_dbn[idx, :] = DHC_compute_apd(dbnimg[:, :, idx], fhash, norm=false, iso=false; dhc_args...)
+            s20_dbn[idx, :] = DHC_compute_wrapper(dbnimg[:, :, idx], fhash, norm=false; dhc_args...)
         end
         if coeff_mask!=nothing
             return s20_dbn[:, coeff_mask]

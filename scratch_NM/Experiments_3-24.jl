@@ -919,6 +919,9 @@ altrue = apodizer(gttarget["true_img"])
 alinit = apodizer(gttarget["init"])
 alrecon = apodizer(gttarget["recon"])
 
+println("Mean Abs Res: Init-True = ", mean(abs.(alinit - altrue)), " Recon-True = ", mean(abs.(alrecon - altrue)))
+println("Mean Abs Frac Res", mean(abs.((alinit - altrue)./altrue)), " Recon-True=", mean(abs.((alrecon - altrue)./altrue)))
+
 lam_corr = std(altrue).^(-2)
 lam_old = gttarget["dict"]["lambda"]
 
