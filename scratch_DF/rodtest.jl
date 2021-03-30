@@ -342,3 +342,41 @@ rod_test_plot_S1(Nsam; L=8, wd=1, nx=nx, outname="S1-RMS-NL8-wd1-"*snx*".png")
 rod_test_plot_S1(Nsam; L=8, wd=2, nx=nx, outname="S1-RMS-NL8-wd2-"*snx*".png")
 rod_test_plot_S1(Nsam; L=8, wd=4, nx=nx, outname="S1-RMS-NL8-wd4-"*snx*".png")
 rod_test_plot_S1([1,4,32]; L=16, wd=4, nx=nx, outname="S1-RMS-NL16-wd4-"*snx*".png")
+
+## AKS export
+xval   = collect(0:2.5:180)
+
+fhash = fink_filter_hash(1, 8, wd=2, nx=128, Omega=false)
+Siso_A = rod_test(fhash, 1, nx=128, doS20=false)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd2_N1.h5", "data", Siso_A, deflate=3)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd2_N1.h5", "angles", xval, deflate=3)
+
+fhash = fink_filter_hash(1, 16, wd=2, nx=128, Omega=false)
+Siso_A = rod_test(fhash, 1, nx=128, doS20=false)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L16_wd2_N1.h5", "data", Siso_A, deflate=3)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L16_wd2_N1.h5", "angles", xval, deflate=3)
+
+fhash = fink_filter_hash(1, 16, wd=4, nx=128, Omega=false)
+Siso_A = rod_test(fhash, 1, nx=128, doS20=false)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L16_wd4_N1.h5", "data", Siso_A, deflate=3)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L16_wd4_N1.h5", "angles", xval, deflate=3)
+
+fhash = fink_filter_hash(1, 8, wd=4, nx=128, Omega=false)
+Siso_A = rod_test(fhash, 1, nx=128, doS20=false)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd4_N1.h5", "data", Siso_A, deflate=3)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd4_N1.h5", "angles", xval, deflate=3)
+
+fhash = fink_filter_hash(1, 8, wd=1, nx=128, Omega=false)
+Siso_A = rod_test(fhash, 1, nx=128, doS20=false)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd1_N1.h5", "data", Siso_A, deflate=3)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd1_N1.h5", "angles", xval, deflate=3)
+
+fhash = fink_filter_hash(1, 8, wd=2, nx=128, Omega=false)
+Siso_A = rod_test(fhash, 4, nx=128, doS20=false)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd2_N4.h5", "data", Siso_A, deflate=3)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd2_N4.h5", "angles", xval, deflate=3)
+
+fhash = fink_filter_hash(1, 8, wd=2, nx=128, Omega=false)
+Siso_A = rod_test(fhash, 16, nx=128, doS20=false)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd2_N16.h5", "data", Siso_A, deflate=3)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd2_N16.h5", "angles", xval, deflate=3)
