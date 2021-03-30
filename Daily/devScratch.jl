@@ -95,3 +95,64 @@ summary(etp)
 etp = @inferred ImageTransformations.box_extrapolation(imgfloat, Cubic(Flat(OnGrid())), Flat())
 @test typeof(etp) <: Interpolations.Extrapolation
 summary(etp)
+
+## 2021-03-29
+
+ImageTransformations.box_extrapolation(test_img, Lanczos4OpenCV())
+
+ImageTransformations.box_extrapolation(test_img; method=Lanczos4OpenCV())
+
+out = ImageTransformations.imrotate(test_img,0.3,axes(test_img), Lanczos4OpenCV())
+
+ImageTransformations.box_extrapolation(test_img, Lanczos4OpenCV(), method=Lanczos4OpenCV())
+
+ImageTransformations.box_extrapolation(test_img)
+
+ImageTransformations.box_extrapolation(test_img, Linear())
+
+etp = @inferred ImageTransformations.box_extrapolation(test_img, method=Lanczos4OpenCV())
+
+@test typeof(etp) <: Interpolations.FilledExtrapolation
+
+img = rand(Gray{N0f8}, 2, 2)
+n0f8_str = typestring(N0f8)
+matrixf64_str = typestring(Matrix{Float64})
+
+etp = @inferred ImageTransformations.box_extrapolation(img)
+@test @inferred(ImageTransformations.box_extrapolation(etp)) === etp
+@test summary(etp) == "2×2 extrapolate(interpolate(::Array{Gray{N0f8},2}, BSpline(Linear())), Gray{N0f8}(0.0)) with element type $(ctqual)Gray{$(fpqual)$n0f8_str}"
+@test typeof(etp) <: Interpolations.FilledExtrapolation
+@test etp.fillvalue === Gray{N0f8}(0.0)
+@test etp.itp.coefs === img
+
+
+
+convert(Array{N0f8,2},img) == convert(Array{N0f8,2},etp.itp.coefs)
+
+ImageTransformations.box_extrapolation(test_img, method = BSpline(Quadratic(Flat(OnGrid()))))
+
+ImageTransformations.box_extrapolation(test_img, Cubic(Flat(OnGrid())))
+
+test1 = ImageTransformations.imresize(test_img,Dims((128,128)))
+
+test1 = ImageTransformations.imresize(test_img,(128,128))
+
+test2 = ImageTransformations.imresize(test_img,Dims((128,128)),method=Lanczos4OpenCV())
+
+test1 == test2
+
+heatmap(test_img)
+heatmap(test1)
+heatmap(test2)
+
+A = [1 0; 0 1]
+
+imresize(A, (1, 1))
+
+A = [1 0 0; 0 0 0; 0 0 0]
+
+imresize(A, (0:2, 0:2))
+
+out = ImageTransformations.imrotate(test_img,0.3,axes(test_img), method = Lanczos4OpenCV())
+
+out = ImageTransformations.imrotate(test_img,0.3,axes(test_img), Lanczos4OpenCV())
