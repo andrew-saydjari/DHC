@@ -1962,7 +1962,7 @@ module DHC_2DUtils
         #Omega - true= append Omega filter (all power beyond Nyquist) so the sum of filters is 1.0
 
         # -------- assertion errors to make sure arguments are reasonable
-        @test wd <= L/2
+        #@test wd <= L/2
 
         # -------- set parameters
         dθ   = pc*π/L
