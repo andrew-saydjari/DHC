@@ -1019,3 +1019,461 @@ fname = "scratch_NM/NewWrapper/3-24/GTtargSFDcov_noreg_nosmooth_CG"
 gttarget = load(fname*".jld2")
 println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
 println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
+
+
+##4-1: Generating standardized init images and experiments
+Nx=64
+imall = readsfd(Nx)
+Random.seed!(41)
+
+imlist = [1, 5, 10, 50, 100, 500, 1000, 5000, 10000]
+for imid in imlist
+  fname_save = "scratch_NM/StandardizedExp/Nx64/" * "Data_" * string(imid) * ".jld2"
+  true_img = imall[:, :, imid]
+  stdval = std(true_img)
+  noise = rand(Normal(0.0, stdval), Nx, Nx)
+  init = true_img + noise
+  zind = findall(init.<0)
+  println("Percentage set to 1e-6", 100*length(zind)/length(init))
+  init[zind] .= 1e-6
+  save(fname_save, Dict("true_img"=>true_img, "seed"=>41, "init"=>init, "noise model"=>"White noise, No smoothing. sigma=std(true_img)", "std"=>stdval))
+end
+
+savexp = load("scratch_NM/StandardizedExp/Nx64/Data_5000.jld2")
+heatmap(savexp["true_img"])
+heatmap(savexp["init"])
+
+
+##4-2 Comparing SFD-SFD runs with and without apd
+#Log-Apd-Iso
+fname = "scratch_NM/NewWrapper/3-29/SFDTargSFDCov/log_apd_iso"
+gttarget = load(fname*".jld2")
+#order: A*log*Im
+ltrue = log.(gttarget["true_img"])
+linit = log.(gttarget["init"])
+lrecon =log.(gttarget["recon"])
+
+altrue = apodizer(log.(gttarget["true_img"]))
+alinit = apodizer(log.(gttarget["init"]))
+alrecon = apodizer(log.(gttarget["recon"]))
+
+lam_corr = std(altrue).^(-2)
+lam_old = gttarget["dict"]["lambda"]
+
+#Loss contrib
+s_targ_mean, s_targ_invcov = gttarget["dict"]["s_targ_mean"], gttarget["dict"]["s_invcov"]
+filter_hash = fink_filter_hash(1, 8, nx=64, pc=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+coeff_mask = falses(2+S1iso+S2iso)
+coeff_mask[S1iso+3:end] .= true
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>true)
+length(coeff_mask)
+#init
+s_init = DHC_compute_wrapper(linit, filter_hash; norm=false,  dhc_args...)[coeff_mask]
+s_recon = DHC_compute_wrapper(lrecon, filter_hash; norm=false, dhc_args...)[coeff_mask]
+s_true = DHC_compute_wrapper(ltrue, filter_hash; norm=false, dhc_args...)[coeff_mask]
+ltruecheck = ( 0.5 .* (s_true - s_targ_mean)' * s_targ_invcov * (s_true - s_targ_mean))[1]
+l2true = 0.5*lam_old*sum((alinit - altrue).^2)
+l1init = ( 0.5 .* (s_init - s_targ_mean)' * s_targ_invcov * (s_init - s_targ_mean))[1]
+l2init = 0.5*lam_old*sum((alinit - alinit).^2)
+#True:43.1, 2505
+#Init: 903, 0
+
+#recon
+l1recon = ( 0.5 .* (s_recon - s_targ_mean)' * s_targ_invcov * (s_recon - s_targ_mean))[1]
+l2recon = 0.5*lam_old*sum((alrecon - alinit).^2)
+#228, 184
+
+true_img = gttarget["true_img"]
+init = gttarget["init"]
+recon_img =gttarget["recon"]
+
+
+println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
+println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
+println("RMSE Init-True= ", (mean((init - true_img).^2)).^0.5, " Recon-True=", (mean((recon_img - true_img).^2)).^0.5)
+
+
+##Log-Apd-NoIso
+fname = "scratch_NM/NewWrapper/3-29/SFDTargSFDCov/log_apd_iso"
+gttarget = load(fname*".jld2")
+#order: A*log*Im
+ltrue = log.(gttarget["true_img"])
+linit = log.(gttarget["init"])
+lrecon =log.(gttarget["recon"])
+
+altrue = apodizer(log.(gttarget["true_img"]))
+alinit = apodizer(log.(gttarget["init"]))
+alrecon = apodizer(log.(gttarget["recon"]))
+
+lam_corr = std(altrue).^(-2)
+lam_old = gttarget["dict"]["lambda"]
+
+#Loss contrib
+s_targ_mean, s_targ_invcov = gttarget["dict"]["s_targ_mean"], gttarget["dict"]["s_invcov"]
+filter_hash = fink_filter_hash(1, 8, nx=64, pc=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+coeff_mask = falses(2+S1iso+S2iso)
+coeff_mask[S1iso+3:end] .= true
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>true)
+length(coeff_mask)
+#init
+s_init = DHC_compute_wrapper(linit, filter_hash; norm=false,  dhc_args...)[coeff_mask]
+s_recon = DHC_compute_wrapper(lrecon, filter_hash; norm=false, dhc_args...)[coeff_mask]
+s_true = DHC_compute_wrapper(ltrue, filter_hash; norm=false, dhc_args...)[coeff_mask]
+ltruecheck = ( 0.5 .* (s_true - s_targ_mean)' * s_targ_invcov * (s_true - s_targ_mean))[1]
+l2true = 0.5*lam_old*sum((alinit - altrue).^2)
+l1init = ( 0.5 .* (s_init - s_targ_mean)' * s_targ_invcov * (s_init - s_targ_mean))[1]
+l2init = 0.5*lam_old*sum((alinit - alinit).^2)
+#True:43.1, 2505
+#Init: 903, 0
+
+#recon
+l1recon = ( 0.5 .* (s_recon - s_targ_mean)' * s_targ_invcov * (s_recon - s_targ_mean))[1]
+l2recon = 0.5*lam_old*sum((alrecon - alinit).^2)
+#228, 184
+
+true_img = gttarget["true_img"]
+init = gttarget["init"]
+recon_img =gttarget["recon"]
+
+
+println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
+println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
+println("RMSE Init-True= ", (mean((init - true_img).^2)).^0.5, " Recon-True=", (mean((recon_img - true_img).^2)).^0.5)
+
+
+##Log-Apd-Noiso
+fname = "scratch_NM/StandardizedExp/Nx64/noisy_stdtrue/SFDTargSFDCov/log_apd_noiso/nophi_lamcorr_recon_1000"
+gttarget = load(fname*".jld2")
+(Nf,) = size(filter_hash["filt_index"])
+reshape(gttarget["coeff_mask"][37:end], (Nf, Nf))
+#order: A*log*Im
+ltrue = log.(gttarget["true_img"])
+linit = log.(gttarget["init"])
+lrecon =log.(gttarget["recon"])
+
+altrue = apodizer(log.(gttarget["true_img"]))
+alinit = apodizer(log.(gttarget["init"]))
+alrecon = apodizer(log.(gttarget["recon"]))
+
+lam_corr = std(altrue).^(-2)
+lam_old = gttarget["dict"]["lambda"]
+
+#Loss contrib
+s_targ_mean, s_targ_invcov = gttarget["dict"]["s_targ_mean"], gttarget["dict"]["s_invcov"]
+filter_hash = fink_filter_hash(1, 8, nx=64, pc=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+coeff_mask = falses(2+S1iso+S2iso)
+coeff_mask[S1iso+3:end] .= true
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>true)
+length(coeff_mask)
+#init
+s_init = DHC_compute_wrapper(linit, filter_hash; norm=false,  dhc_args...)[coeff_mask]
+s_recon = DHC_compute_wrapper(lrecon, filter_hash; norm=false, dhc_args...)[coeff_mask]
+s_true = DHC_compute_wrapper(ltrue, filter_hash; norm=false, dhc_args...)[coeff_mask]
+ltruecheck = ( 0.5 .* (s_true - s_targ_mean)' * s_targ_invcov * (s_true - s_targ_mean))[1]
+l2true = 0.5*lam_old*sum((alinit - altrue).^2)
+l1init = ( 0.5 .* (s_init - s_targ_mean)' * s_targ_invcov * (s_init - s_targ_mean))[1]
+l2init = 0.5*lam_old*sum((alinit - alinit).^2)
+#True:43.1, 2505
+#Init: 903, 0
+
+#recon
+l1recon = ( 0.5 .* (s_recon - s_targ_mean)' * s_targ_invcov * (s_recon - s_targ_mean))[1]
+l2recon = 0.5*lam_old*sum((alrecon - alinit).^2)
+#228, 184
+
+true_img = gttarget["true_img"]
+init = gttarget["init"]
+recon_img =gttarget["recon"]
+
+
+println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
+println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
+println("RMSE Init-True= ", (mean((init - true_img).^2)).^0.5, " Recon-True=", (mean((recon_img - true_img).^2)).^0.5)
+
+
+##4-2
+#Log Apd Iso
+fname = "scratch_NM/StandardizedExp/Nx64/noisy_stdtrue/SFDTargSFDCov/log_apd_iso/lamcorr_recon_1000"
+gttarget = load(fname*".jld2")
+#Calc 1dps log
+Nx = size(gttarget["true_img"])[1]
+kbins = collect(1:Nx/2.0)
+
+true_img = gttarget["true_img"]
+init = gttarget["init"]
+recon_img =gttarget["recon"]
+
+
+println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
+println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
+println("RMSE Init-True= ", (mean((init - true_img).^2)).^0.5, " Recon-True=", (mean((recon_img - true_img).^2)).^0.5)
+
+true_lps = calc_1dps(apodizer(log.(gttarget["true_img"])), kbins)
+recon_lps = calc_1dps(apodizer(log.(gttarget["recon"])), kbins)
+init_lps = calc_1dps(apodizer(log.(gttarget["init"])), kbins)
+p = plot(log.(kbins), log.(true_lps), label="True")
+plot!(log.(kbins), log.(recon_lps), label="Recon")
+plot!(log.(kbins), log.(init_lps), label="Init")
+plot!(title="P(k) of Log Image")
+
+
+true_ps = calc_1dps(apodizer(gttarget["true_img"]), kbins)
+recon_ps = calc_1dps(apodizer(gttarget["recon"]), kbins)
+init_ps = calc_1dps(apodizer(gttarget["init"]), kbins)
+p = plot(log.(kbins), log.(true_ps), label="True")
+plot!(log.(kbins), log.(recon_ps), label="Recon")
+plot!(log.(kbins), log.(init_ps), label="Init")
+plot!(title="P(k) of Image")
+
+s_targ_mean, s_targ_invcov = gttarget["dict"]["s_targ_mean"], gttarget["dict"]["s_invcov"]
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>true)
+
+coeff_mask = gttarget["coeff_mask"]
+s_true = DHC_compute_wrapper(log.(gttarget["true_img"]), filter_hash, norm=false; dhc_args...)[coeff_mask]
+s_init = DHC_compute_wrapper(log.(gttarget["init"]), filter_hash, norm=false; dhc_args...)[coeff_mask]
+s_recon = DHC_compute_wrapper(log.(gttarget["recon"]), filter_hash, norm=false; dhc_args...)[coeff_mask]
+ltruecheck = ( 0.5 .* (s_true - s_targ_mean)' * s_targ_invcov * (s_true - s_targ_mean))[1]
+l2true = 0.5*lam_old*sum((alinit - altrue).^2)
+#78.2, 2505
+
+l1init = ( 0.5 .* (s_init - s_targ_mean)' * s_targ_invcov * (s_init - s_targ_mean))[1]
+l2init = 0.5*lam_old*sum((alinit - alinit).^2)
+#2.68e7, 0
+
+l1recon = ( 0.5 .* (s_recon - s_targ_mean)' * s_targ_invcov * (s_recon - s_targ_mean))[1]
+l2recon = 0.5*lam_old*sum((alrecon - alinit).^2)
+#4168, 183.61
+
+
+
+
+#Log, Apd, Noiso
+
+fname = "scratch_NM/StandardizedExp/Nx64/noisy_stdtrue/SFDTargSFDCov/log_apd_noiso/lamcorr_recon_1000"
+gttarget = load(fname*".jld2")
+#Calc 1dps log
+Nx = size(gttarget["true_img"])[1]
+kbins = collect(1:Nx/2.0)
+
+true_img = gttarget["true_img"]
+init = gttarget["init"]
+recon_img =gttarget["recon"]
+
+
+println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
+println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
+println("RMSE Init-True= ", (mean((init - true_img).^2)).^0.5, " Recon-True=", (mean((recon_img - true_img).^2)).^0.5)
+
+true_lps = calc_1dps(apodizer(log.(gttarget["true_img"])), kbins)
+recon_lps = calc_1dps(apodizer(log.(gttarget["recon"])), kbins)
+init_lps = calc_1dps(apodizer(log.(gttarget["init"])), kbins)
+p = plot(log.(kbins), log.(true_lps), label="True")
+plot!(log.(kbins), log.(recon_lps), label="Recon")
+plot!(log.(kbins), log.(init_lps), label="Init")
+plot!(title="P(k) of Log Image: Noiso")
+
+
+true_ps = calc_1dps(apodizer(gttarget["true_img"]), kbins)
+recon_ps = calc_1dps(apodizer(gttarget["recon"]), kbins)
+init_ps = calc_1dps(apodizer(gttarget["init"]), kbins)
+p = plot(log.(kbins), log.(true_ps), label="True")
+plot!(log.(kbins), log.(recon_ps), label="Recon")
+plot!(log.(kbins), log.(init_ps), label="Init")
+plot!(title="P(k) of Image: NoIso")
+
+s_targ_mean, s_targ_invcov = gttarget["dict"]["s_targ_mean"], gttarget["dict"]["s_invcov"]
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>false)
+gttarget["coeff_mask"]
+
+s_true = DHC_compute_wrapper(log.(gttarget["true_img"]), filter_hash, norm=false; dhc_args...)[gttarget["coeff_mask"]]
+s_init = DHC_compute_wrapper(log.(gttarget["init"]), filter_hash, norm=false; dhc_args...)[gttarget["coeff_mask"]]
+s_recon = DHC_compute_wrapper(log.(gttarget["recon"]), filter_hash, norm=false; dhc_args...)[gttarget["coeff_mask"]]
+
+ltruecheck = ( 0.5 .* (s_true - s_targ_mean)' * s_targ_invcov * (s_true - s_targ_mean))[1]
+l2true = 0.5*lam_old*sum((alinit - altrue).^2)
+#648, 2505
+
+l1init = ( 0.5 .* (s_init - s_targ_mean)' * s_targ_invcov * (s_init - s_targ_mean))[1]
+l2init = 0.5*lam_old*sum((alinit - alinit).^2)
+#7.25e7, 0
+
+l1recon = ( 0.5 .* (s_recon - s_targ_mean)' * s_targ_invcov * (s_recon - s_targ_mean))[1]
+l2recon = 0.5*lam_old*sum((alrecon - alinit).^2)
+#2948, 184
+
+sig = (diag(s_targ_invcov)).^(-0.5)
+z_true_targ = (s_true - s_targ_mean)./sig
+z_recon_targ = (s_recon - s_targ_mean)./sig
+z_recon_true = (s_recon - s_true)./sig
+z_init_targ = (s_init - s_targ_mean)./sig
+
+zscores = hcat(z_true_targ, z_recon_targ, z_recon_true)
+Nf = size(filter_hash["filt_index"])[1]
+images = [reshape(z_true_targ, (Nf, Nf)), reshape(z_recon_targ, (Nf, Nf)), reshape(z_recon_true, (Nf, Nf)), reshape(z_init_targ, (Nf, Nf))]
+titles= ["True-Target", "Recon-Target", "Recon-True", "Init-Targ"]
+pl12 = plot(
+        heatmap(images[1], title=titles[1]),
+        heatmap(images[2], title=titles[2]),
+        heatmap(images[3],title= titles[3]),
+        heatmap(images[4],title= titles[4]))
+plot!(suptitle="S20 Z Scores")
+
+
+clim = (minimum(z_true_targ), maximum(z_true_targ))
+pl12 = plot(
+        heatmap(images[1], title=titles[1], clim=clim),
+        heatmap(images[2], title=titles[2], clim=clim),
+        heatmap(images[3],title= titles[3], clim=clim),
+        heatmap(images[4],title= titles[4], clim=clim))
+plot!(suptitle="S20 Z Scores")
+z_recon_targ = reshape(z_recon_targ, (Nf, Nf))
+
+##Covariance
+Nx=64
+dbnimg = readsfd(Nx, logbool=true)
+fname = "scratch_NM/StandardizedExp/Nx64/noisy_stdtrue/SFDTargSFDCov/log_apd_noiso/lamcorr_recon_1000"
+gttarget = load(fname*".jld2")
+fhash = gttarget["filter_hash"]
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>false)
+coeff_mask = gttarget["coeff_mask"]
+smean1, sdiag1, scov1 = dbn_coeffs_calc(dbnimg[:, :, 1:5000], fhash, dhc_args, coeff_mask)
+smean2, sdiag2, scov2 = dbn_coeffs_calc(dbnimg[:, :, 5000:end], fhash, dhc_args, coeff_mask)
+
+dbn1 = get_dbn_coeffs(dbnimg[:, :, 1:5000], fhash, dhc_args, coeff_mask = coeff_mask)
+dbn2 = get_dbn_coeffs(dbnimg[:, :, 5001:end], fhash, dhc_args, coeff_mask= coeff_mask)
+scov1inv = invert_covmat(scov1, 1e-6)
+scov2inv = invert_covmat(scov2, 1e-6)
+
+
+diff = dbn1 .- reshape(smean1, (1, 1156))
+chisq1 = sum((diff * scov1inv) .* diff, dims=2)
+
+
+diff = dbn2 .- reshape(smean2, (1, 1156))
+chisq2 = sum((diff * scov2inv) .* diff, dims=2)
+
+p = histogram(chisq1[:])
+p = histogram(chisq2[:])
+chisqsamp = rand(Distributions.Chisq(1156), 5000)
+histogram!(chisqsamp)
+########################
+
+sd1inv = invert_covmat(sdiag1, 1e-10)
+sd2inv = invert_covmat(sdiag2, 1e-10)
+
+
+diff = dbn1 .- reshape(smean1, (1, 1156))
+chisq1 = sum((diff * sd1inv) .* diff, dims=2)
+
+
+diff = dbn2 .- reshape(smean2, (1, 1156))
+chisq2 = sum((diff * sd2inv) .* diff, dims=2)
+
+p = histogram(chisq1[:], label="Subset1")
+p= histogram(chisq2[:], label="Subset2")
+chisqsamp = rand(Distributions.Chisq(1156), 5000)
+p = histogram(chisqsamp, label="True Chisq")
+
+
+####################################
+Nx=64
+dbnimg = readsfd(Nx, logbool=true)
+meanimg = mean(dbnimg, dims=[1, 2])
+dbnimgms = dbnimg .- meanimg
+dbn1 = get_dbn_coeffs(dbnimgms[:, :, 1:5000], fhash, dhc_args, coeff_mask = coeff_mask)
+dbn2 = get_dbn_coeffs(dbnimgms[:, :, 5001:end], fhash, dhc_args, coeff_mask= coeff_mask)
+smean1, sdiag1, scov1 = dbn_coeffs_calc(dbnimgms[:, :, 1:5000], fhash, dhc_args, coeff_mask)
+smean2, sdiag2, scov2 = dbn_coeffs_calc(dbnimgms[:, :, 5001:end], fhash, dhc_args, coeff_mask)
+
+scov1inv = invert_covmat(scov1, 1e-6)
+scov2inv = invert_covmat(scov2, 1e-6)
+
+diff = dbn1 .- reshape(smean1, (1, 1156))
+chisq1 = sum((diff * scov1inv) .* diff, dims=2)
+
+
+diff = dbn2 .- reshape(smean2, (1, 1156))
+chisq2 = sum((diff * scov2inv) .* diff, dims=2)
+
+p = histogram(chisq1[:])
+p = histogram(chisq2[:])
+chisqsamp = rand(Distributions.Chisq(1156), 5000)
+histogram!(chisqsamp)
+
+#########################################
+diff = dbn1 .- reshape(smean1, (1, 1156))
+chisq12 = sum((diff * scov2inv) .* diff, dims=2)
+
+
+diff = dbn2 .- reshape(smean2, (1, 1156))
+chisq21 = sum((diff * scov1inv) .* diff, dims=2)
+
+p = histogram(chisq1[:], xlims=(0, 5000), label="ChiSq1-1")
+histogram!(chisq12[:], xlims=(0, 5000), label="ChiSq1-2")
+
+p = histogram(chisq2[:], xlims=(0, 5000), label="ChiSq2")
+histogram!(chisq21[:], xlims=(0, 5000), label="ChiSq2-1")
+
+chisqsamp = rand(Distributions.Chisq(1156), 5000)
+histogram!(chisqsamp)
+#########################################
+#Log coeff, log im
+Nx=64
+dbnimg = readsfd(Nx, logbool=true)
+#dbnimgms = dbnimg .- meanimg
+dbn1 = log.(get_dbn_coeffs(dbnimg[:, :, 1:5000], fhash, dhc_args, coeff_mask = coeff_mask))
+dbn2 = log.(get_dbn_coeffs(dbnimg[:, :, 5001:end], fhash, dhc_args, coeff_mask= coeff_mask))
+
+
+#Mean dia, cov
+Ncovsamp = 5000
+s_targ_mean = mean(dbn1, dims=1)
+scov  = (dbn1 .- s_targ_mean)' * (dbn1 .- s_targ_mean) ./(Ncovsamp-1)
+smean1, sdiag1, scov1 = s_targ_mean, diag(scov), scov
+s_targ_mean = mean(dbn2, dims=1)
+scov  = (dbn2 .- s_targ_mean)' * (dbn2 .- s_targ_mean) ./(Ncovsamp-1)
+smean2, sdiag2, scov2 = s_targ_mean, diag(scov), scov
+
+
+scov1inv = invert_covmat(scov1, 1e-8)
+scov2inv = invert_covmat(scov2, 1e-8)
+
+diff = dbn1 .- reshape(smean1, (1, 1156))
+chisq1 = sum((diff * scov1inv) .* diff, dims=2)
+
+
+diff = dbn2 .- reshape(smean2, (1, 1156))
+chisq2 = sum((diff * scov2inv) .* diff, dims=2)
+
+p = histogram(chisq1[:])
+p = histogram(chisq2[:])
+chisqsamp = rand(Distributions.Chisq(1156/2), 5000)
+histogram!(chisqsamp)
+
+
+diff = dbn1 .- reshape(smean1, (1, 1156))
+chisq12 = sum((diff * scov2inv) .* diff, dims=2)
+
+
+diff = dbn2 .- reshape(smean2, (1, 1156))
+chisq21 = sum((diff * scov1inv) .* diff, dims=2)
+
+p = histogram(chisq1[:], label="ChiSq1-1")
+histogram!(chisq12[:], label="ChiSq1-2")
+histogram!(chisqsamp, label="ChiSqExpected")
+
+
+p = histogram(chisq2[:],label="ChiSq2")
+histogram!(chisq21[:],  label="ChiSq2-1")
+histogram!(chisqsamp, label="ChiSqExpected")
+
+
+##Save for MAF
+Nx=64
+dbnimg = readsfd(Nx, logbool=true)

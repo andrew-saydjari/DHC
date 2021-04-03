@@ -21,6 +21,7 @@ module Data_Utils
     export whitenoiseweights_forlog
     export readsfd
     export dbn_coeffs_calc
+    export calc_1dps
     export get_dbn_coeffs
 
     function readdust(Nx)
@@ -287,6 +288,24 @@ module Data_Utils
         else
             return s20_dbn
         end
+    end
+
+    function calc_1dps(image::Array{Float64,2}, kbins::Array{Float64,1})
+        #Assumes uniformly spaced kbins
+        Nx = size(image)[1]
+        fft_zerocenter = fftshift(fft(image))
+        impf = abs2.(fft_zerocenter)
+        x = (collect(1:Nx) * ones(Nx)') .- (Nx/2.0)
+        y = (ones(Nx) * collect(1:Nx)') .- (Nx/2.0)
+        krad  = (x.^2 + y.^2).^0.5
+        meanpk = zeros(size(kbins))
+        kdel = kbins[2] - kbins[1]
+        println(size(meanpk), " ", kdel)
+        for k=1:size(meanpk)[1]
+            filt = findall((krad .>= (kbins[k] - kdel./2.0)) .& (krad .<= (kbins[k] + kdel./2.0)))
+            meanpk[k] = mean(impf[filt])
+        end
+        return meanpk
     end
 
 

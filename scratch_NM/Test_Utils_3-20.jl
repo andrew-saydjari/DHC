@@ -561,7 +561,7 @@ println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-Tr
 
 #S20 + Iso check
 #S20+NoIsoChecking that you didnt break old code
-fname_save = "scratch_NM/NewWrapper/3-29/GTTargSFDCov/log_apd_iso"
+fname_save = "scratch_NM/NewWrapper/3-29/SFDTargSFDCov/log_apd_iso"
 Nx=64
 im = readsfd(Nx)
 true_img = im[:, :, 1]
@@ -574,6 +574,55 @@ init = true_img + noise
 filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (S1iso, Nf) = size(filter_hash["S1_iso_mat"])
 (S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>true) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+if dhc_args[:iso]
+    coeff_mask = falses(2+S1iso+S2iso)
+    coeff_mask[S1iso+3:end] .= true
+else #Not iso
+    coeff_mask = falses(2+Nf+Nf^2)
+    coeff_mask[Nf+3:end] .= true
+end
+
+white_noise_args = Dict(:loc=>0.0, :sig=>std(true_img), :Nsam=>1000, :norm=>false, :smooth=>false, :smoothval=>0.8) #Iso #only if you're using noise based covar
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("target_type", "sfd_dbn"), ("covar_type", "sfd_dbn"), ("log", true), ("GaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
+  ("optim_settings", optim_settings), ("lambda", std(apodizer(log.(true_img))).^(-2)), ("white_noise_args", white_noise_args)]) #Add constraints
+regs_true = DHC_compute_wrapper(log.(true_img), filter_hash; norm=false, dhc_args...)[coeff_mask]
+s2mean, s2icov = meancov_generator(true_img, filter_hash, dhc_args, coeff_mask, recon_settings, safety=nothing)
+#Check
+#s2mean - s_true
+
+recon_settings["s_targ_mean"] = s2mean
+recon_settings["s_invcov"] = s2icov
+recon_settings["safemode"] = false
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+resobj, recon_img = reconstruction_wrapper(true_img, init, filter_hash, dhc_args, coeff_mask, recon_settings)
+
+p= plot([t.value for t in Optim.trace(resobj)])
+plot!(title="Loss: S20 | Targ = S(GT) | Cov = SFD Covariance", xlabel = "No. Iterations", ylabel = "Loss")
+savefig(p, fname_save * "_trace.png")
+
+Visualization.plot_diffscales([apodizer(true_img), apodizer(init), apodizer(recon_img), apodizer(recon_img) - apodizer(true_img)], ["GT", "Init", "Reconstruction", "Residual"], fname=fname_save*".png")
+Visualization.plot_synth_QA(apodizer(true_img), apodizer(init), apodizer(recon_img), fname=fname_save*"_6p.png")
+
+println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
+println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
+
+
+fname_save = "scratch_NM/NewWrapper/3-29/GTTargWNCov/log_apd_iso"
+Nx=64
+im = readsfd(Nx)
+true_img = im[:, :, 1]
+
+noise = rand(Normal(0.0, std(true_img)), Nx, Nx)
+init = true_img + noise
+#heatmap(init)
+#heatmap(true_img)
+
+filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nf) = size(filter_hash["S2_iso_mat"])
 coeff_mask = falses(2+S1iso+S2iso)
 coeff_mask[S1iso+3:end] .= true
 #coeff_mask = falses(2+Nf+Nf^2)
@@ -583,8 +632,8 @@ coeff_mask[S1iso+3:end] .= true
 dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>true) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
 white_noise_args = Dict(:loc=>0.0, :sig=>std(true_img), :Nsam=>1000, :norm=>false, :smooth=>false, :smoothval=>0.8) #Iso #only if you're using noise based covar
 optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
-recon_settings = Dict([("target_type", "ground_truth"), ("covar_type", "sfd_dbn"), ("log", true), ("GaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
-  ("optim_settings", optim_settings), ("lambda", std(apodizer(log.(true_img)).^(-2))), ("white_noise_args", white_noise_args)]) #Add constraints
+recon_settings = Dict([("target_type", "ground_truth"), ("covar_type", "white_noise"), ("log", true), ("GaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
+  ("optim_settings", optim_settings), ("lambda", std(apodizer(true_img)).^(-2)), ("white_noise_args", white_noise_args)]) #Add constraints
 regs_true = DHC_compute_wrapper(log.(true_img), filter_hash; norm=false, dhc_args...)[coeff_mask]
 s2mean, s2icov = meancov_generator(true_img, filter_hash, dhc_args, coeff_mask, recon_settings, safety=regs_true)
 #Check
@@ -599,6 +648,105 @@ resobj, recon_img = reconstruction_wrapper(true_img, init, filter_hash, dhc_args
 
 p= plot([t.value for t in Optim.trace(resobj)])
 plot!(title="Loss: S20 | Targ = S(GT) | Cov = SFD Covariance", xlabel = "No. Iterations", ylabel = "Loss")
+savefig(p, fname_save * "_trace.png")
+
+Visualization.plot_diffscales([apodizer(true_img), apodizer(init), apodizer(recon_img), apodizer(recon_img) - apodizer(true_img)], ["GT", "Init", "Reconstruction", "Residual"], fname=fname_save*".png")
+Visualization.plot_synth_QA(apodizer(true_img), apodizer(init), apodizer(recon_img), fname=fname_save*"_6p.png")
+
+println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
+println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
+
+#S20 + Iso check
+#S20+NoIsoChecking that you didnt break old code
+fname_save = "scratch_NM/NewWrapper/3-29/SFDTargSFDCov/log_apd_iso_exp2"
+Nx=64
+im = readsfd(Nx)
+true_img = im[:, :, 1]
+
+noise = rand(Normal(0.0, std(true_img)), Nx, Nx)
+init = true_img + noise
+#heatmap(init)
+#heatmap(true_img)
+
+filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>true) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+if dhc_args[:iso]
+    coeff_mask = falses(2+S1iso+S2iso)
+    coeff_mask[S1iso+3:end] .= true
+else #Not iso
+    coeff_mask = falses(2+Nf+Nf^2)
+    coeff_mask[Nf+3:end] .= true
+end
+
+white_noise_args = Dict(:loc=>0.0, :sig=>std(true_img), :Nsam=>1000, :norm=>false, :smooth=>false, :smoothval=>0.8) #Iso #only if you're using noise based covar
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("target_type", "sfd_dbn"), ("covar_type", "sfd_dbn"), ("log", true), ("GaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
+  ("optim_settings", optim_settings), ("lambda", 0.00456), ("white_noise_args", white_noise_args)]) #Add constraints
+regs_true = DHC_compute_wrapper(log.(true_img), filter_hash; norm=false, dhc_args...)[coeff_mask]
+s2mean, s2icov = meancov_generator(true_img, filter_hash, dhc_args, coeff_mask, recon_settings, safety=nothing)
+#Check
+#s2mean - s_true
+
+recon_settings["s_targ_mean"] = s2mean
+recon_settings["s_invcov"] = s2icov
+recon_settings["safemode"] = false
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+resobj, recon_img = reconstruction_wrapper(true_img, init, filter_hash, dhc_args, coeff_mask, recon_settings)
+
+p= plot([t.value for t in Optim.trace(resobj)])
+plot!(title="Loss: S20 | Targ = S(SFD) | Cov = SFD Covariance", xlabel = "No. Iterations", ylabel = "Loss")
+savefig(p, fname_save * "_trace.png")
+
+Visualization.plot_diffscales([apodizer(true_img), apodizer(init), apodizer(recon_img), apodizer(recon_img) - apodizer(true_img)], ["GT", "Init", "Reconstruction", "Residual"], fname=fname_save*".png")
+Visualization.plot_synth_QA(apodizer(true_img), apodizer(init), apodizer(recon_img), fname=fname_save*"_6p.png")
+
+println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
+println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
+
+
+##fname_save = "scratch_NM/NewWrapper/3-29/SFDTargSFDCov/log_apd_iso_exp2"
+Nx=64
+im = readsfd(Nx)
+true_img = im[:, :, 1]
+
+noise = rand(Normal(0.0, std(true_img)), Nx, Nx)
+init = true_img + noise
+#heatmap(init)
+#heatmap(true_img)
+
+filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>true) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+if dhc_args[:iso]
+    coeff_mask = falses(2+S1iso+S2iso)
+    coeff_mask[S1iso+3:end] .= true
+else #Not iso
+    coeff_mask = falses(2+Nf+Nf^2)
+    coeff_mask[Nf+3:end] .= true
+end
+
+white_noise_args = Dict(:loc=>0.0, :sig=>std(true_img), :Nsam=>1000, :norm=>false, :smooth=>false, :smoothval=>0.8) #Iso #only if you're using noise based covar
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("target_type", "sfd_dbn"), ("covar_type", "sfd_dbn"), ("log", true), ("GaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
+  ("optim_settings", optim_settings), ("lambda", 0.00456), ("white_noise_args", white_noise_args)]) #Add constraints
+regs_true = DHC_compute_wrapper(log.(true_img), filter_hash; norm=false, dhc_args...)[coeff_mask]
+s2mean, s2icov = meancov_generator(true_img, filter_hash, dhc_args, coeff_mask, recon_settings, safety=nothing)
+#Check
+#s2mean - s_true
+
+recon_settings["s_targ_mean"] = s2mean
+recon_settings["s_invcov"] = s2icov
+recon_settings["safemode"] = false
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+resobj, recon_img = reconstruction_wrapper(true_img, init, filter_hash, dhc_args, coeff_mask, recon_settings)
+
+p= plot([t.value for t in Optim.trace(resobj)])
+plot!(title="Loss: S20 | Targ = S(SFD) | Cov = SFD Covariance", xlabel = "No. Iterations", ylabel = "Loss")
 savefig(p, fname_save * "_trace.png")
 
 Visualization.plot_diffscales([apodizer(true_img), apodizer(init), apodizer(recon_img), apodizer(recon_img) - apodizer(true_img)], ["GT", "Init", "Reconstruction", "Residual"], fname=fname_save*".png")
