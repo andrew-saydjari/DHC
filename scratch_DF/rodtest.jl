@@ -380,3 +380,7 @@ fhash = fink_filter_hash(1, 8, wd=2, nx=128, Omega=false)
 Siso_A = rod_test(fhash, 16, nx=128, doS20=false)
 h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd2_N16.h5", "data", Siso_A, deflate=3)
 h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd2_N16.h5", "angles", xval, deflate=3)
+
+test_image = rod_image(1,1,30*(128/256),0,8,nx=128)
+
+heatmap(test_image,xlims = [46,81],ylims = [46,81])
