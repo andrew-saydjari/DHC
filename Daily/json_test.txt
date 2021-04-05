@@ -1,0 +1,18 @@
+{ else if (spinnerJ1.value == 1 && spinnerL1.value == 1){ 
+	 r.glyph.fill_color = {field: 'j2_l0', transform: color_mapper} 
+	 r.glyph.fill_alpha = 1	 source.data.image=source.data.j2_l0 
+{ else if (spinnerJ1.value == 2 && spinnerL1.value == 1){ 
+	 r.glyph.fill_color = {field: 'j2_l0', transform: color_mapper} 
+	 r.glyph.fill_alpha = 1	 source.data.image=source.data.j2_l0 
+{ else if (spinnerJ1.value == 3 && spinnerL1.value == 1){ 
+	 r.glyph.fill_color = {field: 'j2_l0', transform: color_mapper} 
+	 r.glyph.fill_alpha = 1	 source.data.image=source.data.j2_l0 
+{ else if (spinnerJ1.value == 4 && spinnerL1.value == 1){ 
+	 r.glyph.fill_color = {field: 'j2_l0', transform: color_mapper} 
+	 r.glyph.fill_alpha = 1	 source.data.image=source.data.j2_l0 
+{ else if (spinnerJ1.value == 5 && spinnerL1.value == 1){ 
+	 r.glyph.fill_color = {field: 'j2_l0', transform: color_mapper} 
+	 r.glyph.fill_alpha = 1	 source.data.image=source.data.j2_l0 
+{ else if (spinnerJ1.value == 6 && spinnerL1.value == 1){ 
+	 r.glyph.fill_color = {field: 'j2_l0', transform: color_mapper} 
+	 r.glyph.fill_alpha = 1	 source.data.image=source.data.j2_l0 
