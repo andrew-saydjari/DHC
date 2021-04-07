@@ -1703,7 +1703,7 @@ println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True 
 println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
 
 
-##Log-Log check: Works!
+##Log-Log check: Works
 
 Nx=64
 im = readsfd(Nx)
@@ -1729,20 +1729,20 @@ end
 
 
 white_noise_args = Dict(:loc=>0.0, :sig=>std(true_img), :Nsam=>1000, :norm=>false, :smooth=>false, :smoothval=>0.8) #Iso #only if you're using noise based covar
-optim_settings = Dict([("iterations", 10), ("norm", false), ("minmethod", ConjugateGradient())])
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
 recon_settings = Dict([("target_type", "sfd_dbn"), ("covar_type", "sfd_dbn"), ("log", true), ("GaussianLoss", false),("TransformedGaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
-  ("optim_settings", optim_settings), ("lambda", 0.00456)]) #Add constraints
+  ("optim_settings", optim_settings), ("lambda", std(apodizer(log.(init)))^(-2) )]) #Add constraints
 
 dbnocffs = get_dbn_coeffs(log.(im), filter_hash, dhc_args, coeff_mask = coeff_mask) #removed log from here
 fmean = mean(dbnocffs, dims=1)
 fcov = (dbnocffs .- fmean)' * (dbnocffs .- fmean) ./(size(dbnocffs)[1] -1)
-fcovinv = invert_covmat(fcov, 1e-5)
+fcovinv = invert_covmat(fcov, 1e-6)
 
 recon_settings["transform_func"] = Data_Utils.fnlog
 recon_settings["transform_dfunc"] = Data_Utils.fndlog
 recon_settings["fs_targ_mean"] = fmean[:]
 recon_settings["fs_invcov"] = fcovinv
-recon_settings["safemode"] = true
+recon_settings["safemode"] = false
 fname_save = "scratch_NM/NewWrapper/TransfGaussian/nof_test"
 recon_settings["fname_save"] = fname_save * ".jld2"
 recon_settings["optim_settings"] = optim_settings
