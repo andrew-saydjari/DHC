@@ -196,23 +196,23 @@ function dS1S2sum_combtest(fhash) #Tested for non-iso
     return
 end
 
-function dS20sum_test(fhash) #Adapted from sandbox.jl
+function dS20sum_test(fhash) #MODIFIED from sandbox.jl
     (Nf, )    = size(fhash["filt_index"])
     Nx        = fhash["npix"]
     im = rand(Nx,Nx)
     mywts = rand(Nf*Nf)
 
     # this is symmetrical, but not because S20 is symmetrical!
-    wtgrid = reshape(mywts, Nf, Nf) + reshape(mywts, Nf, Nf)'
+    wtgrid = reshape(mywts, Nf, Nf)
     wtvec  = reshape(wtgrid, Nf*Nf)
 
     # Use new faster code
-    sum1 = Deriv_Utils_New.wst_S20_deriv_sum(im, fhash, wtgrid, FFTthreads=1)
+    sum1 = Deriv_Utils_New.wst_S20_deriv_sum_new(im, fhash, wtgrid, FFTthreads=1)
 
     # Compare to established code
     dS20 = reshape(Deriv_Utils_New.wst_S20_deriv(im, fhash, FFTthreads=1),Nx,Nx,Nf*Nf)
     sum2 = zeros(Float64, Nx, Nx)
-    for i=1:Nf*Nf sum2 += (dS20[:,:,i].*mywts[i]) end
+    for i=1:Nf*Nf sum2 += (dS20[:,:,i].*wtvec[i]) end
     sum2 = reshape(sum2, (Nx^2, 1))
     println("Abs mean", mean(abs.(sum2 - sum1)))
     println("Abs mean", std(sum2 - sum1))
@@ -919,3 +919,10 @@ datad_w = fweights(Amat);#why semi-col?#BUG: Replace 256 with im_size? #<A>
 meanVal = mean(image,datad_w) #<AF>
 temp2d_a = (image.-meanVal).*wind_2d(Nx).+meanVal #<AF>
 mean(Amat.* (image .- meanVal)) #E-14
+
+
+##After modifying dS20 derivsum
+
+filter_hash = fink_filter_hash(1, 8, nx=64, Omega=true)
+
+dS20sum_test(filter_hash)

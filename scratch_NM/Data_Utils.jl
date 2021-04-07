@@ -308,5 +308,13 @@ module Data_Utils
         return meanpk
     end
 
+    #Transforms
+    function fnlog(s::Array{Any,1})
+        return Base.log.(s)
+    end
+
+    function fndlog(s::Array{Any,1})
+        return 1.0 ./s
+    end
 
 end

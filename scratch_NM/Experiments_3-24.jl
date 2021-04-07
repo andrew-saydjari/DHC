@@ -1477,3 +1477,227 @@ histogram!(chisqsamp, label="ChiSqExpected")
 ##Save for MAF
 Nx=64
 dbnimg = readsfd(Nx, logbool=true)
+fname = "scratch_NM/StandardizedExp/Nx64/noisy_stdtrue/SFDTargSFDCov/log_apd_noiso/lamcorr_recon_1000"
+gttarget = load(fname*".jld2")
+fhash = gttarget["filter_hash"]
+Nf = size(fhash["filt_index"])[1]
+coeff_mask = falses(2+Nf+Nf^2)
+coeff_maskS20 = trues((Nf, Nf))
+coeff_mask[3+Nf:end] .= triu(coeff_maskS20)[:]
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>false)
+dbn = get_dbn_coeffs(dbnimg, fhash, dhc_args, coeff_mask= coeff_mask)
+
+
+f = FITS("scratch_NM/dbncoeffs/S20sym_noiso_log.fits", "w")
+write(f, dbn)
+close(f)
+
+
+##Implementing log S20 derivatives
+Nx=64
+im = readsfd(Nx)
+true_img = im[:, :, 1]
+
+noise = rand(Normal(0.0, std(true_img)), Nx, Nx)
+init = true_img + noise
+#heatmap(init)
+#heatmap(true_img)
+
+filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>false) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+if dhc_args[:iso]
+    coeff_mask = falses(2+S1iso+S2iso)
+    coeff_mask[S1iso+3:end] .= true
+else #Not iso
+    coeff_mask = falses(2+Nf+Nf^2)
+    coeff_maskS20 = trues((Nf, Nf))
+    coeff_mask[3+Nf:end] .= true
+end
+
+white_noise_args = Dict(:loc=>0.0, :sig=>std(true_img), :Nsam=>1000, :norm=>false, :smooth=>false, :smoothval=>0.8) #Iso #only if you're using noise based covar
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("target_type", "sfd_dbn"), ("covar_type", "sfd_dbn"), ("log", true), ("GaussianLoss", false),("TransformedGaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
+  ("optim_settings", optim_settings), ("lambda", 0.00456)]) #Add constraints
+
+dbnocffs = log.(get_dbn_coeffs(log.(im), filter_hash, dhc_args, coeff_mask = coeff_mask))
+fmean = mean(dbnocffs, dims=1)
+fcov = (dbnocffs .- fmean)' * (dbnocffs .- fmean) ./(size(dbnocffs)[1] -1)
+fcovinv = invert_covmat(fcov, 1e-8)
+
+recon_settings["fs_targ_mean"] = fmean[:]
+recon_settings["fs_invcov"] = fcovinv
+recon_settings["safemode"] = true
+fname_save = "scratch_NM/NewWrapper/TransfGaussian/test"
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+recon_settings["transform_func"] = Data_Utils.fnlog
+recon_settings["transform_dfunc"] = Data_Utils.fndlog
+resobj, recon_img = reconstruction_wrapper(true_img, init, filter_hash, dhc_args, coeff_mask, recon_settings)
+ar1 = convert(Array{Any, 1}, exp.(rand(2)))
+Data_Utils.fnlog(ar1)
+p= plot([t.value for t in Optim.trace(resobj)])
+plot!(title="Loss: S20 | Targ = S(SFD) | Cov = SFD Covariance", xlabel = "No. Iterations", ylabel = "Loss")
+savefig(p, fname_save * "_trace.png")
+
+Visualization.plot_diffscales([apodizer(true_img), apodizer(init), apodizer(recon_img), apodizer(recon_img) - apodizer(true_img)], ["GT", "Init", "Reconstruction", "Residual"], fname=fname_save*".png")
+Visualization.plot_synth_QA(apodizer(true_img), apodizer(init), apodizer(recon_img), fname=fname_save*"_6p.png")
+
+println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
+println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
+
+
+##########################################################################
+##DEBUG
+tonorm = false
+input = init
+fs_targ_mean = fmean[:]
+fs_targ_invcov = fcovinv
+lambda = 0.004
+Nx=64
+coeff_mask = falses(2+Nf+Nf^2)
+coeff_mask[3+Nf:end] .= true
+if dhc_args[:apodize]
+    Ap = wind_2d(Nx)
+    cA = sum(Ap)
+    Apflat = reshape(Ap, Nx^2)
+    od_nz_idx = findall(!iszero, Apflat) #findall((x->((x!=0) & (x!=1))), Apflat)
+    #od_zidx = findall(iszero, Apflat)
+    avals = Apflat[od_nz_idx]
+    dA = zeros(Nx^2, Nx^2)
+    dA[:, od_nz_idx] .= ((1.0 .- Apflat) * avals')./cA
+    dA[diagind(dA)] += Apflat
+else
+    dA = I
+end
+
+function adaptive_apodizer(input_image::Array{Float64, 2})
+    if dhc_args[:apodize]
+        apd_image = apodizer(input_image)
+    else
+        apd_image = input_image
+    end
+    return apd_image
+end
+
+if (dhc_args[:doS20]) & (dhc_args[:iso])
+    iso2nf2mask = zeros(Int64, Nf^2)
+    M20 = filter_hash["S2_iso_mat"]
+    for id=1:Nf^2 iso2nf2mask[M20.colptr[id]] = M20.rowval[id] end
+    coeff_masks20 = coeff_mask[3+N1iso:end]
+else# (dhc_args[:doS20]) & (!dhc_args[:iso])
+    coeff_masks20 = coeff_mask[3+Nf:end]
+end
+
+function augment_weights(inpwt::Array{Float64})
+    if (dhc_args[:doS20]) & (dhc_args[:iso]) #wt (Nc) -> |S2_iso| -> |Nf^2|
+        w_s2iso = zeros(size(filter_hash["S2_iso_mat"])[1])
+        w_s2iso[coeff_masks20] .= inpwt
+        w_nf2 = zeros(Nf^2)
+        w_nf2 .= w_s2iso[iso2nf2mask]
+        return reshape(w_nf2, (Nf, Nf))
+    else#if (dhc_args[:doS20]) & (!dhc_args[:iso])
+        w_nf2 = zeros(Nf^2)
+        w_nf2[coeff_masks20] .= inpwt
+        return reshape(w_nf2, (Nf, Nf))
+    end
+end
+
+function loss_func20(img_curr::Array{Float64, 2})
+    #println(typeof(DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]))
+    s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask] #Edit
+    regterm =  0.5*lambda*sum((adaptive_apodizer(img_curr) - adaptive_apodizer(input)).^2)
+    println(size(s_curr), size(fs_targ_mean), size(fs_targ_invcov))
+    lnlik = ( 0.5 .* (s_curr - fs_targ_mean)' * fs_targ_invcov * (s_curr - fs_targ_mean))
+    neglogloss = lnlik[1] + regterm
+    return neglogloss
+end
+#TODO: Need to replace the deriv_sums20 with a deriv_sum wrapper that handles all cases (S12, S20, S2)
+
+pixmask=falses(Nx, Nx)
+function dloss20(storage_grad::Array{Float64, 2}, img_curr::Array{Float64, 2})
+    s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
+    diff = s_curr - fs_targ_mean
+    #Add branches here
+    wt1 = convert(Array{Float64,1}, reshape(transpose(diff) * fs_targ_invcov, (length(diff),)))
+    println(size(wt1), typeof(wt1))
+    wt = wt1# .* fill(1.0, length(diff))#(1.0./s_curr)
+    wtaug = augment_weights(wt)
+    #println(wt - wt1)
+    apdimg_curr = adaptive_apodizer(img_curr)
+    storage_grad .= reshape((Deriv_Utils_New.wst_S20_deriv_sum(apdimg_curr, filter_hash, wtaug, FFTthreads=1)' + reshape(lambda.*(apdimg_curr - adaptive_apodizer(input)), (1, Nx^2))) * dA, (Nx, Nx))
+    storage_grad[pixmask] .= 0 # better way to do this by taking pixmask as an argument wst_s2_deriv_sum?
+    return
+end
+
+
+println("Diff check")
+eps = zeros(size(input))
+row, col = 24, 18 #convert(Int8, Nx/2), convert(Int8, Nx/2)+3
+eps[row, col] = 1e-6
+chisq1 = loss_func20(input+eps./2) #DEB
+chisq0 = loss_func20(input-eps./2) #DEB
+brute  = (chisq1-chisq0)/1e-6
+#df_brute = DHC_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
+clever = zeros(size(input)) #DEB
+meanval = mean(adaptive_apodizer(input)) ./ mean(wind_2d(Nx))
+_bar = dloss20(clever, input) #DEB
+println("Chisq Derve Check")
+println("Brute:  ",brute)
+println("Clever: ",clever[row, col], " Difference: ", brute - clever[row, col]) #DEB
+
+#####################################
+##Debug: Check old code
+Nx=64
+im = readsfd(Nx)
+true_img = im[:, :, 1]
+
+noise = rand(Normal(0.0, std(true_img)), Nx, Nx)
+init = true_img + noise
+#heatmap(init)
+#heatmap(true_img)
+
+filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>false) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+if dhc_args[:iso]
+    coeff_mask = falses(2+S1iso+S2iso)
+    coeff_mask[S1iso+3:end] .= true
+else #Not iso
+    coeff_mask = falses(2+Nf+Nf^2)
+    coeff_maskS20 = trues((Nf, Nf))
+    coeff_mask[3+Nf:end] .= triu(coeff_maskS20)[:]
+end
+
+
+white_noise_args = Dict(:loc=>0.0, :sig=>std(true_img), :Nsam=>1000, :norm=>false, :smooth=>false, :smoothval=>0.8) #Iso #only if you're using noise based covar
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("target_type", "sfd_dbn"), ("covar_type", "sfd_dbn"), ("log", true), ("GaussianLoss", true),("TransformedGaussianLoss", false), ("Invcov_matrix", "Diagonal+Eps"),
+  ("optim_settings", optim_settings), ("lambda", 0.00456)]) #Add constraints
+
+dbnocffs = get_dbn_coeffs(log.(im), filter_hash, dhc_args, coeff_mask = coeff_mask) #removed log from here
+fmean = mean(dbnocffs, dims=1)
+fcov = (dbnocffs .- fmean)' * (dbnocffs .- fmean) ./(size(dbnocffs)[1] -1)
+fcovinv = invert_covmat(fcov, 1e-5)
+
+recon_settings["s_targ_mean"] = fmean[:]
+recon_settings["s_invcov"] = fcovinv
+recon_settings["safemode"] = true
+fname_save = "scratch_NM/NewWrapper/TransfGaussian/nof_test"
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+
+resobj, recon_img = reconstruction_wrapper(true_img, init, filter_hash, dhc_args, coeff_mask, recon_settings)
+
+
+p= plot([t.value for t in Optim.trace(resobj)])
+plot!(title="Loss: S20 | Targ = S(SFD) | Cov = SFD Covariance", xlabel = "No. Iterations", ylabel = "Loss")
+savefig(p, fname_save * "_trace.png")
+
+Visualization.plot_diffscales([apodizer(true_img), apodizer(init), apodizer(recon_img), apodizer(recon_img) - apodizer(true_img)], ["GT", "Init", "Reconstruction", "Residual"], fname=fname_save*".png")
+Visualization.plot_synth_QA(apodizer(true_img), apodizer(init), apodizer(recon_img), fname=fname_save*"_6p.png")
+
+println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
+println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))

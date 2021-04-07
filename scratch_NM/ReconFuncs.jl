@@ -89,9 +89,9 @@ module ReconFuncs
         if settings["Invcov_matrix"]=="Diagonal"
             s2icov = invert_covmat(sig2)
         elseif settings["Invcov_matrix"]=="Diagonal+Eps"
-            s2icov = invert_covmat(sig2, 1e-10) #DEBUG
+            s2icov = invert_covmat(sig2, 1e-8) #DEBUG
         elseif settings["Invcov_matrix"]=="Full+Eps"
-            s2icov = invert_covmat(cov, 1e-10)
+            s2icov = invert_covmat(cov, 1e-8)
         else#s2icov
             s2icov = invert_covmat(cov)
         end
@@ -135,6 +135,17 @@ module ReconFuncs
                 res, recon_img = Deriv_Utils_New.image_recon_derivsum_regularized(noisy_init, fhash, starg, sinvcov, falses(Nx, Nx), dhc_args, optim_settings=settings["optim_settings"], coeff_mask=coeff_mask, lambda=settings["lambda"])
             elseif settings["log"]
                 res, recon_img = Deriv_Utils_New.image_recon_derivsum_regularized(log.(noisy_init), fhash, Float64.(starg), sinvcov, falses(Nx, Nx), dhc_args, coeff_mask=coeff_mask, optim_settings=settings["optim_settings"], lambda=settings["lambda"])
+                recon_img = exp.(recon_img)
+            else
+                error("??")
+            end
+        elseif settings["TransformedGaussianLoss"]
+            fstarg, fsinvcov = settings["fs_targ_mean"], settings["fs_invcov"]
+            #HERE!
+            if !settings["log"]
+                res, recon_img = Deriv_Utils_New.image_recon_derivsum_regularized_transformed_gaussian(noisy_init, fhash, fstarg, fsinvcov, falses(Nx, Nx), dhc_args, settings["transform_func"], settings["transform_dfunc"], optim_settings=settings["optim_settings"], coeff_mask=coeff_mask, lambda=settings["lambda"])
+            elseif settings["log"]
+                res, recon_img = Deriv_Utils_New.image_recon_derivsum_regularized_transformed_gaussian(log.(noisy_init), fhash, Float64.(fstarg), fsinvcov, falses(Nx, Nx), dhc_args, settings["transform_func"], settings["transform_dfunc"], coeff_mask=coeff_mask, optim_settings=settings["optim_settings"], lambda=settings["lambda"])
                 recon_img = exp.(recon_img)
             else
                 error("??")
