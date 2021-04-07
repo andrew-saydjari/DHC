@@ -422,8 +422,8 @@ module Deriv_Utils_New
         return dwS1 + dwS2 #Why was another reshape needed here?
 
     end
-
-    function wst_S20_deriv_sum(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64}; FFTthreads::Int=1)
+    #=
+    function wst_S20_deriv_sum_old(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64}; FFTthreads::Int=1)
         # Sum over (f1,f2) filter pairs for S20 derivative.  This is much faster
         #   than calling wst_S20_deriv() because the sum can be moved inside the FFT.
         # Use FFTthreads threads for FFT -- but for Nx<512 FFTthreads=1 is fastest.  Overhead?
@@ -473,8 +473,8 @@ module Deriv_Utils_New
 
         return reshape(ΣdS20dα, (Nx^2, 1))
     end
-
-    function wst_S20_deriv_sum_new(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64}; FFTthreads::Int=1)
+    =#
+    function wst_S20_deriv_sum(image::Array{Float64,2}, filter_hash::Dict, wt::Array{Float64}; FFTthreads::Int=1)
         # Sum over (f1,f2) filter pairs for S20 derivative.  This is much faster
         #   than calling wst_S20_deriv() because the sum can be moved inside the FFT.
         # Use FFTthreads threads for FFT -- but for Nx<512 FFTthreads=1 is fastest.  Overhead?
@@ -1009,10 +1009,11 @@ module Deriv_Utils_New
         println("Diff check")
         eps = zeros(size(input))
         row, col = 24, 18 #convert(Int8, Nx/2), convert(Int8, Nx/2)+3
-        eps[row, col] = 1e-9
+        epsmag = 1e-6
+        eps[row, col] = epsmag
         chisq1 = loss_func20(input+eps./2) #DEB
         chisq0 = loss_func20(input-eps./2) #DEB
-        brute  = (chisq1-chisq0)/1e-9
+        brute  = (chisq1-chisq0)/epsmag
         #df_brute = DHC_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
         clever = zeros(size(input)) #DEB
         meanval = mean(adaptive_apodizer(input)) ./ mean(wind_2d(Nx))

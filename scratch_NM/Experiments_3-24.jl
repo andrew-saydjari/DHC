@@ -1648,7 +1648,7 @@ println("Brute:  ",brute)
 println("Clever: ",clever[row, col], " Difference: ", brute - clever[row, col]) #DEB
 
 #####################################
-##Debug: Check old code
+##Debug: Check old code: Works with triangular mask
 Nx=64
 im = readsfd(Nx)
 true_img = im[:, :, 1]
@@ -1673,7 +1673,7 @@ end
 
 
 white_noise_args = Dict(:loc=>0.0, :sig=>std(true_img), :Nsam=>1000, :norm=>false, :smooth=>false, :smoothval=>0.8) #Iso #only if you're using noise based covar
-optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+optim_settings = Dict([("iterations", 10), ("norm", false), ("minmethod", ConjugateGradient())])
 recon_settings = Dict([("target_type", "sfd_dbn"), ("covar_type", "sfd_dbn"), ("log", true), ("GaussianLoss", true),("TransformedGaussianLoss", false), ("Invcov_matrix", "Diagonal+Eps"),
   ("optim_settings", optim_settings), ("lambda", 0.00456)]) #Add constraints
 
@@ -1684,6 +1684,64 @@ fcovinv = invert_covmat(fcov, 1e-5)
 
 recon_settings["s_targ_mean"] = fmean[:]
 recon_settings["s_invcov"] = fcovinv
+recon_settings["safemode"] = true
+fname_save = "scratch_NM/NewWrapper/TransfGaussian/nof_test"
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+
+resobj, recon_img = reconstruction_wrapper(true_img, init, filter_hash, dhc_args, coeff_mask, recon_settings)
+
+
+p= plot([t.value for t in Optim.trace(resobj)])
+plot!(title="Loss: S20 | Targ = S(SFD) | Cov = SFD Covariance", xlabel = "No. Iterations", ylabel = "Loss")
+savefig(p, fname_save * "_trace.png")
+
+Visualization.plot_diffscales([apodizer(true_img), apodizer(init), apodizer(recon_img), apodizer(recon_img) - apodizer(true_img)], ["GT", "Init", "Reconstruction", "Residual"], fname=fname_save*".png")
+Visualization.plot_synth_QA(apodizer(true_img), apodizer(init), apodizer(recon_img), fname=fname_save*"_6p.png")
+
+println("Mean Abs Res: Init-True = ", mean(abs.(init - true_img)), " Recon-True = ", mean(abs.(recon_img - true_img)))
+println("Mean Abs Frac Res", mean(abs.((init - true_img)./true_img)), " Recon-True=", mean(abs.((recon_img - true_img)./true_img)))
+
+
+##Log-Log check: Works!
+
+Nx=64
+im = readsfd(Nx)
+true_img = im[:, :, 1]
+
+noise = rand(Normal(0.0, std(true_img)), Nx, Nx)
+init = true_img + noise
+#heatmap(init)
+#heatmap(true_img)
+
+filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>true, :iso=>false) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+if dhc_args[:iso]
+    coeff_mask = falses(2+S1iso+S2iso)
+    coeff_mask[S1iso+3:end] .= true
+else #Not iso
+    coeff_mask = falses(2+Nf+Nf^2)
+    coeff_maskS20 = trues((Nf, Nf))
+    coeff_mask[3+Nf:end] .= triu(coeff_maskS20)[:]
+end
+
+
+white_noise_args = Dict(:loc=>0.0, :sig=>std(true_img), :Nsam=>1000, :norm=>false, :smooth=>false, :smoothval=>0.8) #Iso #only if you're using noise based covar
+optim_settings = Dict([("iterations", 10), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("target_type", "sfd_dbn"), ("covar_type", "sfd_dbn"), ("log", true), ("GaussianLoss", false),("TransformedGaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
+  ("optim_settings", optim_settings), ("lambda", 0.00456)]) #Add constraints
+
+dbnocffs = get_dbn_coeffs(log.(im), filter_hash, dhc_args, coeff_mask = coeff_mask) #removed log from here
+fmean = mean(dbnocffs, dims=1)
+fcov = (dbnocffs .- fmean)' * (dbnocffs .- fmean) ./(size(dbnocffs)[1] -1)
+fcovinv = invert_covmat(fcov, 1e-5)
+
+recon_settings["transform_func"] = Data_Utils.fnlog
+recon_settings["transform_dfunc"] = Data_Utils.fndlog
+recon_settings["fs_targ_mean"] = fmean[:]
+recon_settings["fs_invcov"] = fcovinv
 recon_settings["safemode"] = true
 fname_save = "scratch_NM/NewWrapper/TransfGaussian/nof_test"
 recon_settings["fname_save"] = fname_save * ".jld2"

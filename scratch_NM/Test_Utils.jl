@@ -207,7 +207,7 @@ function dS20sum_test(fhash) #MODIFIED from sandbox.jl
     wtvec  = reshape(wtgrid, Nf*Nf)
 
     # Use new faster code
-    sum1 = Deriv_Utils_New.wst_S20_deriv_sum_new(im, fhash, wtgrid, FFTthreads=1)
+    sum1 = Deriv_Utils_New.wst_S20_deriv_sum(im, fhash, wtgrid, FFTthreads=1)
 
     # Compare to established code
     dS20 = reshape(Deriv_Utils_New.wst_S20_deriv(im, fhash, FFTthreads=1),Nx,Nx,Nf*Nf)
