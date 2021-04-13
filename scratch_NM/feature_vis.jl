@@ -28,13 +28,11 @@ using ReconFuncs
 
 
 #S1
-fname_save = "scratch_NM/NewWrapper/FeatureVis/NotIso/meaninit_allS20_noapd"
+fname_save = "scratch_NM/NewWrapper/FeatureVis/NotIso/New"
 Nx=64
 im = readsfd(Nx)
 garbage_true = im[:, :, 34]
 init = fill(mean(im), (Nx, Nx))
-#heatmap(init)
-#heatmap(true_img)
 
 filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
 (S1iso, Nf) = size(filter_hash["S1_iso_mat"])
@@ -46,9 +44,6 @@ if dhc_args[:iso]
 else #Not iso
     coeff_mask = falses(2+Nf+Nf^2)
     coeff_mask[Nf+3:end] .= true
-    #coeffsS20 = falses(Nf, Nf)
-    #coeffsS20[diagind(coeffsS20)] .= true
-    #coeff_mask[Nf+3:end] .= coeffsS20[:]
 end
 
 #white_noise_args = Dict(:loc=>0.0, :sig=>std(true_img), :Nsam=>1000, :norm=>false, :smooth=>false, :smoothval=>0.8) #Iso #only if you're using noise based covar

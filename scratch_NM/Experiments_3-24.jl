@@ -1733,7 +1733,7 @@ optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", Conj
 recon_settings = Dict([("target_type", "sfd_dbn"), ("covar_type", "sfd_dbn"), ("log", true), ("GaussianLoss", false),("TransformedGaussianLoss", true), ("Invcov_matrix", "Diagonal+Eps"),
   ("optim_settings", optim_settings), ("lambda", std(apodizer(log.(init)))^(-2) )]) #Add constraints
 
-dbnocffs = get_dbn_coeffs(log.(im), filter_hash, dhc_args, coeff_mask = coeff_mask) #removed log from here
+dbnocffs = log.(get_dbn_coeffs(log.(im), filter_hash, dhc_args, coeff_mask = coeff_mask)) #removed log from here
 fmean = mean(dbnocffs, dims=1)
 fcov = (dbnocffs .- fmean)' * (dbnocffs .- fmean) ./(size(dbnocffs)[1] -1)
 fcovinv = invert_covmat(fcov, 1e-6)

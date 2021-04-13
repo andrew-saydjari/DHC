@@ -2,7 +2,7 @@ module Visualization
     using Plots
     using Measures
 
-    function plot_synth_QA(ImTrue, ImInit, ImSynth; fname="test2.png")
+    function plot_synth_QA(ImTrue, ImInit, ImSynth; fname=nothing)
 
         # -------- define plot1 to append plot to a list
         function plot1(ps, image; clim=nothing, bin=1.0, fsz=16, label=nothing)
@@ -56,7 +56,9 @@ module Visualization
         heatmap(resrt, clim=clim2, label="Synth-True")
         =#
         myplot = plot(ps..., layout=(3,2), size=(1400,2000))
-        savefig(myplot, fname)
+        if fname!=nothing
+            savefig(myplot, fname)
+        end
     end
 
     function plot_diffscales(images, titles; fname=nothing)

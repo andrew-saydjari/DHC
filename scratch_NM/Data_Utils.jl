@@ -20,6 +20,7 @@ module Data_Utils
     export invert_covmat
     export whitenoiseweights_forlog
     export readsfd
+    export readsfd_fromsrc
     export dbn_coeffs_calc
     export calc_1dps
     export get_dbn_coeffs
@@ -190,6 +191,24 @@ module Data_Utils
         return im
     end
 
+    function readsfd_fromsrc(fname, nx; logbool=false)
+        # read FITS file with images
+        # file in /n/fink2/dfink/mldust/dust10000.fits
+        #     OR  /n/fink2/dfink/mldust/dust100000.fits
+        #println("fn check")
+        f = FITS(fname, "r")
+        big = read(f[1])
+
+        (_,__,Nslice) = size(big)
+        println(Nslice, " slices")
+        if logbool #BUG: Is this consistent with apodization order
+            println("LOG")
+            im = log.(imresize(Float64.(big), nx, nx, Nslice)) #Log of SFD images
+        else
+            im = imresize(Float64.(big), nx, nx, Nslice)
+        end
+        return im
+    end
 
     #=
     function mldust(nx; logbool=true)
@@ -300,7 +319,7 @@ module Data_Utils
         krad  = (x.^2 + y.^2).^0.5
         meanpk = zeros(size(kbins))
         kdel = kbins[2] - kbins[1]
-        println(size(meanpk), " ", kdel)
+        #println(size(meanpk), " ", kdel)
         for k=1:size(meanpk)[1]
             filt = findall((krad .>= (kbins[k] - kdel./2.0)) .& (krad .<= (kbins[k] + kdel./2.0)))
             meanpk[k] = mean(impf[filt])
