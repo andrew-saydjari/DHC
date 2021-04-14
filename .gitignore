@@ -41,3 +41,11 @@ junk/
 .nfs00*
 *.jld2
 *.html
+
+#Logs
+*.e
+*.o
+
+#Trash
+scratch_NM/Trash/*
+

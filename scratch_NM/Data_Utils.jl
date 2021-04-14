@@ -175,7 +175,7 @@ module Data_Utils
         # file in /n/fink2/dfink/mldust/dust10000.fits
         #     OR  /n/fink2/dfink/mldust/dust100000.fits
         #println("fn check")
-        fname = "scratch_NM/data/dust10000.fits"
+        fname = "~/Dust-Project/WST/DHC/scratch_NM/data/dust10000.fits"
         f = FITS(fname, "r")
         big = read(f[1])
 
