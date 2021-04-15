@@ -34,10 +34,10 @@ isobool = false                                               #Iso?
 #Image you want to start with
 Nx=64
 sfdall = readsfd_fromsrc("scratch_NM/data/dust10000.fits", Nx, logbool=false)
-input = sfdall[:, :, 5]
+input = sfdall[:, :, 5]                     #Less of a memory crunch if you just read in the one image you want to start with
 
 filter_hash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
-dhc_args = Dict(:doS2=>false, :doS12=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool)
+dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool)
 lambda = 0.0
 optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
 
@@ -63,6 +63,7 @@ end
 dbncoeffs = get_dbn_coeffs(procdbn, filter_hash, dhc_args, coeff_mask = coeff_mask)
 sigval = std(dbncoeffs, dims=1)
 =#
+
 if logbool
     s_targ_mean = 10.0*DHC_compute_wrapper(log.(input), filter_hash, norm=false; dhc_args...)[coeff_mask]             #target coefficient vector = twice the current wst value
     s_targ_invcov = Diagonal([0.1.^(-2)])

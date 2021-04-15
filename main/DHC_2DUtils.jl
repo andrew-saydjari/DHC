@@ -1219,7 +1219,7 @@ module DHC_2DUtils
     end
 
     function DHC_compute_wrapper(image::Array{Float64,2}, filter_hash::Dict;
-        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, apodize=false, norm=false, iso=false, FFTthreads=1, filter_hash2::Dict=filter_hash, coeff_mask=nothing)
+        doS2::Bool=true, doS20::Bool=false, apodize=false, norm=false, iso=false, FFTthreads=1, filter_hash2::Dict=filter_hash, coeff_mask=nothing)
         Nf = size(filter_hash["filt_index"])[1]
         #Not using coeff_mask here after all. ASSUMES ANY ONE of doS12, doS2 and doS20 are true, when using coeff_mask
         #@assert !iso "Iso not implemented yet"
@@ -1230,7 +1230,7 @@ module DHC_2DUtils
             ap_img = image
         end
 
-        sall = DHC_compute(ap_img, filter_hash, filter_hash2, doS2=doS2, doS12=doS12, doS20=doS20, norm=norm, iso=iso, FFTthreads=FFTthreads)
+        sall = DHC_compute(ap_img, filter_hash, filter_hash2, doS2=doS2, doS20=doS20, norm=norm, iso=iso, FFTthreads=FFTthreads)
         if coeff_mask!=nothing
             @assert length(coeff_mask)==length(sall) "The length of the coeff_mask must match the length of the output coefficients"
             return sall[coeff_mask]
