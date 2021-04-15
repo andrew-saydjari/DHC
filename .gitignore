@@ -41,6 +41,9 @@ junk/
 .nfs00*
 *.jld2
 *.html
+Daily/2021_04_03.ipynb
+Daily/2021_04_04.ipynb
+Daily/2021_04_11int.ipynb
 
 #Logs
 *.e
@@ -48,4 +51,3 @@ junk/
 
 #Trash
 scratch_NM/Trash/*
-

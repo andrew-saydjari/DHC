@@ -384,3 +384,47 @@ h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd2_N16.h5", "angles", xval
 test_image = rod_image(1,1,30*(128/256),0,8,nx=128)
 
 heatmap(test_image,xlims = [46,81],ylims = [46,81])
+
+function rod_test_noniso(filter_hash, Nsam=1; nx=256, doS20=false, doS1=true)
+    # Loop over many rod position angles, return Siso for all
+    Nf      = length(filter_hash["filt_value"])
+    Nj      = length(filter_hash["j_value"])
+    Nl      = length(filter_hash["theta_value"])
+    Npix    = filter_hash["npix"]
+    isomat  = doS1 ? filter_hash["S1_iso_mat"] : filter_hash["S2_iso_mat"]
+    Niso    = size(isomat, 1)
+
+    angmax  = 180.0
+    angstep = 2.5
+    Nang    = Int64(angmax ÷ angstep+1)
+
+    Siso       = zeros(filter_hash["num_coeff"], Nang)
+    dang       = 180/Nl
+    for i = 1:Nang
+        rod1 = zeros(nx,nx)
+        ang = i*angstep
+
+        t = 0.0
+        for k=1:Nsam
+            rod1 = rod_image(1,1,30*(nx/256),ang+dang*k/4,8,nx=nx)
+            rod1 .-= mean(rod1)
+            doS2 = true
+            t   = t.+DHC_compute(rod1, filter_hash, doS2=doS2, doS20=doS20)
+        end
+        t   ./= Nsam
+
+        off2 = 2+Nf
+        Sarr = t
+
+        println(i," of ",Nang,"  Sum of S:  ",sum(Sarr), "  Sum of rod: ",sum(rod1))
+        Siso[:,i] = Sarr
+
+    end
+    println(std(Siso))
+    return Siso
+end
+
+fhash = fink_filter_hash(1, 8, wd=2, nx=128, Omega=false)
+Siso_A = rod_test_noniso(fhash, 1, nx=128, doS20=false)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd2_N1_noISO.h5", "data", Siso_A, deflate=3)
+h5write("../DHC/scratch_AKS/paper_data/rod_stable_L8_wd2_N1_noISO.h5", "angles", xval, deflate=3)

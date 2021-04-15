@@ -956,7 +956,6 @@ module DHC_2DUtils
         return temp2d_a
     end
 
-
     function wind_2d(nx)
         dx   = nx/2-1
         filter = zeros(Float64, nx, nx)
@@ -977,12 +976,11 @@ module DHC_2DUtils
 ## Core compute function
 
     function DHC_compute(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
-        doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false, FFTthreads=2)
+        doS2::Bool=true, doS20::Bool=false, norm=true, iso=false, FFTthreads=2, normS1::Bool=false, normS1iso::Bool=false)
         # image        - input for WST
         # filter_hash  - filter hash from fink_filter_hash
         # filter_hash2 - filters for second order.  Default to same as first order.
         # doS2         - compute S2 coeffs
-        # doS12        - compute S2 coeffs
         # doS20        - compute S2 coeffs
         # norm         - scale to mean zero, unit variance
         # iso          - sum over angles to obtain isotropic coeffs
@@ -997,19 +995,18 @@ module DHC_2DUtils
         if Nf == 0  error("filter hash corrupted") end
         @assert Nx==filter_hash["npix"] "Filter size should match npix"
         @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
+        @assert (normS1 && normS1iso) != 1 "normS1 and normS1iso are mutually exclusive"
 
         # allocate coeff arrays
         out_coeff = []
         S0  = zeros(Float64, 2)
         S1  = zeros(Float64, Nf)
         if doS2  S2  = zeros(Float64, Nf, Nf) end  # traditional 2nd order
-        if doS12 S12 = zeros(Float64, Nf, Nf) end  # Fourier correlation
         if doS20 S20 = zeros(Float64, Nf, Nf) end  # real space correlation
-        anyM2 = doS2 | doS12 | doS20
+        anyM2 = doS2 | doS20
         anyrd = doS2 | doS20             # compute real domain with iFFT
 
         # allocate image arrays for internal use
-        if doS12 im_fdf_0_1 = zeros(Float64,           Nx, Ny, Nf) end   # this must be zeroed!
         if anyrd im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf) end
 
         ## 0th Order
@@ -1049,7 +1046,6 @@ module DHC_2DUtils
                     zval      = f_v[i] * im_fd_0[ind]
                     S1tot    += abs2(zval)
                     zarr[ind] = zval        # filter*image in Fourier domain
-                    if doS12 im_fdf_0_1[ind,f] = abs(zval) end
                 end
                 S1[f] = S1tot/(Nx*Ny)  # image power
                 if anyrd
@@ -1060,6 +1056,9 @@ module DHC_2DUtils
 
         append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
 
+        if normS1iso
+            S1iso = vec(reshape(filter_hash["S1_iso_mat"]*S1,(1,:))*filter_hash["S1_iso_mat"])
+        end
 
         # we stored the abs()^2, so take sqrt (this is faster to do all at once)
         if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
@@ -1072,23 +1071,22 @@ module DHC_2DUtils
             ## Traditional second order
             for f1 = 1:Nf
                 thisim = fft(im_rd_0_1[:,:,f1])  # Could try rfft here
-                # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
                 # Loop over f2 and do second-order convolution
+                if normS1
+                    normS1pwr = S1[f1]
+                elseif normS1iso
+                    normS1pwr = S1iso[f1]
+                else
+                    normS1pwr = 1
+                end
                 for f2 = 1:Nf
                     f_i = f_ind2[f2]  # CartesianIndex list for filter
                     f_v = f_val2[f2]  # Values for f_i
                     # sum im^2 = sum(|fft|^2/npix)
-                    S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)
+                    S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)/normS1pwr
                 end
             end
             append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
-        end
-
-        # Fourier domain 2nd order
-        if doS12
-            Amat = reshape(im_fdf_0_1, Nx*Ny, Nf)
-            S12  = Amat' * Amat
-            append!(out_coeff, iso ? Mat2*S12[:] : S12[:])
         end
 
         # Real domain 2nd order
