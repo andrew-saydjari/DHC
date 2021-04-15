@@ -956,7 +956,6 @@ module DHC_2DUtils
         return temp2d_a
     end
 
-
     function wind_2d(nx)
         dx   = nx/2-1
         filter = zeros(Float64, nx, nx)
@@ -977,7 +976,7 @@ module DHC_2DUtils
 ## Core compute function
 
     function DHC_compute(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
-        doS2::Bool=true, doS20::Bool=false, norm=true, iso=false, FFTthreads=2, normS1::Bool=false)
+        doS2::Bool=true, doS20::Bool=false, norm=true, iso=false, FFTthreads=2, normS1::Bool=false, normS1iso::Bool=false)
         # image        - input for WST
         # filter_hash  - filter hash from fink_filter_hash
         # filter_hash2 - filters for second order.  Default to same as first order.
@@ -996,6 +995,7 @@ module DHC_2DUtils
         if Nf == 0  error("filter hash corrupted") end
         @assert Nx==filter_hash["npix"] "Filter size should match npix"
         @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
+        @assert (normS1 && normS1iso) != 1 "normS1 and normS1iso are mutually exclusive"
 
         # allocate coeff arrays
         out_coeff = []
@@ -1056,6 +1056,9 @@ module DHC_2DUtils
 
         append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
 
+        if normS1iso
+            S1iso = vec(reshape(filter_hash["S1_iso_mat"]*S1,(1,:))*filter_hash["S1_iso_mat"])
+        end
 
         # we stored the abs()^2, so take sqrt (this is faster to do all at once)
         if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
@@ -1071,6 +1074,8 @@ module DHC_2DUtils
                 # Loop over f2 and do second-order convolution
                 if normS1
                     normS1pwr = S1[f1]
+                elseif normS1iso
+                    normS1pwr = S1iso[f1]
                 else
                     normS1pwr = 1
                 end

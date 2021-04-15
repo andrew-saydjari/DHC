@@ -10,7 +10,7 @@ push!(LOAD_PATH, pwd()*"/main")
 using DHC_2DUtils
 
 function DHC_compute_temp(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
-    doS2::Bool=true, doS20::Bool=false, norm=true, iso=false, FFTthreads=2, normS1::Bool=false)
+    doS2::Bool=true, doS20::Bool=false, norm=true, iso=false, FFTthreads=2, normS1::Bool=false, normS1iso::Bool=false)
     # image        - input for WST
     # filter_hash  - filter hash from fink_filter_hash
     # filter_hash2 - filters for second order.  Default to same as first order.
@@ -29,6 +29,7 @@ function DHC_compute_temp(image::Array{Float64,2}, filter_hash::Dict, filter_has
     if Nf == 0  error("filter hash corrupted") end
     @assert Nx==filter_hash["npix"] "Filter size should match npix"
     @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
+    @assert (normS1 && normS1iso) != 1 "normS1 and normS1iso are mutually exclusive"
 
     # allocate coeff arrays
     out_coeff = []
@@ -89,6 +90,9 @@ function DHC_compute_temp(image::Array{Float64,2}, filter_hash::Dict, filter_has
 
     append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
 
+    if normS1iso
+        S1iso = vec(reshape(filter_hash["S1_iso_mat"]*S1,(1,:))*filter_hash["S1_iso_mat"])
+    end
 
     # we stored the abs()^2, so take sqrt (this is faster to do all at once)
     if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
@@ -104,6 +108,8 @@ function DHC_compute_temp(image::Array{Float64,2}, filter_hash::Dict, filter_has
             # Loop over f2 and do second-order convolution
             if normS1
                 normS1pwr = S1[f1]
+            elseif normS1iso
+                normS1pwr = S1iso[f1]
             else
                 normS1pwr = 1
             end
@@ -130,3 +136,7 @@ end
 filter_hash = fink_filter_hash(1,8,nx=256,wd=2)
 
 DHC_compute_temp(rand(256,256), filter_hash, iso=false, normS1=true)
+
+DHC_compute_temp(rand(256,256), filter_hash, iso=false, normS1iso=true)
+
+DHC_compute_temp(rand(256,256), filter_hash, iso=false, normS1iso=true, normS1=true)
