@@ -89,9 +89,9 @@ module ReconFuncs
         if settings["Invcov_matrix"]=="Diagonal"
             s2icov = invert_covmat(sig2)
         elseif settings["Invcov_matrix"]=="Diagonal+Eps"
-            s2icov = invert_covmat(sig2, 1e-8) #DEBUG
+            s2icov = invert_covmat(sig2, settings["epsvalue"]) #DEBUG
         elseif settings["Invcov_matrix"]=="Full+Eps"
-            s2icov = invert_covmat(cov, 1e-8)
+            s2icov = invert_covmat(cov, settings["epsvalue"])
         else#s2icov
             s2icov = invert_covmat(cov)
         end
@@ -158,7 +158,7 @@ module ReconFuncs
             error("Overwriting file")
         else
             if !settings["safemode"] println("Overwriting existing files") end
-            save(settings["fname_save"], Dict("true_img"=>true_img, "init"=>noisy_init, "recon"=>recon_img, "dict"=>settings, "trace"=>Optim.trace(res), "coeff_mask"=>coeff_mask))
+            save(settings["fname_save"], Dict("true_img"=>true_img, "init"=>noisy_init, "recon"=>recon_img, "dict"=>settings, "trace"=>Optim.trace(res), "coeff_mask"=>coeff_mask, "fhash"=>fhash, "dhc_args"=>dhc_args))
         end
         return res, recon_img
 

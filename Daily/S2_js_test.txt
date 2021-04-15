@@ -1,0 +1,3168 @@
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 0 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_0_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_0_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_0_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_0_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_0_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_0_j2_1 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 0 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_0_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_0_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_0_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_0_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_0_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_0_j2_2 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 0 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_0_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_0_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_0_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_0_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_0_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_0_j2_3 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 0 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_0_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_0_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_0_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_0_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_0_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_0_j2_4 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 0 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_0_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_0_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_0_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_0_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_0_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_0_j2_5 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 0 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_0_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_0_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_0_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_0_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_0_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_0_j2_6 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 1 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_1_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_1_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_1_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_1_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_1_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_1_j2_1 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 1 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_1_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_1_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_1_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_1_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_1_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_1_j2_2 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 1 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_1_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_1_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_1_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_1_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_1_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_1_j2_3 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 1 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_1_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_1_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_1_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_1_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_1_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_1_j2_4 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 1 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_1_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_1_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_1_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_1_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_1_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_1_j2_5 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 1 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_1_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_1_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_1_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_1_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_1_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_1_j2_6 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 2 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_2_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_2_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_2_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_2_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_2_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_2_j2_1 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 2 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_2_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_2_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_2_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_2_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_2_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_2_j2_2 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 2 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_2_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_2_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_2_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_2_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_2_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_2_j2_3 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 2 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_2_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_2_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_2_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_2_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_2_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_2_j2_4 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 2 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_2_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_2_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_2_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_2_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_2_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_2_j2_5 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 2 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_2_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_2_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_2_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_2_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_2_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_2_j2_6 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 3 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_3_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_3_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_3_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_3_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_3_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_3_j2_1 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 3 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_3_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_3_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_3_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_3_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_3_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_3_j2_2 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 3 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_3_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_3_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_3_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_3_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_3_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_3_j2_3 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 3 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_3_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_3_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_3_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_3_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_3_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_3_j2_4 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 3 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_3_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_3_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_3_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_3_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_3_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_3_j2_5 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 3 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_3_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_3_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_3_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_3_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_3_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_3_j2_6 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 4 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_4_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_4_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_4_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_4_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_4_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_4_j2_1 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 4 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_4_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_4_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_4_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_4_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_4_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_4_j2_2 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 4 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_4_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_4_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_4_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_4_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_4_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_4_j2_3 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 4 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_4_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_4_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_4_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_4_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_4_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_4_j2_4 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 4 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_4_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_4_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_4_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_4_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_4_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_4_j2_5 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 4 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_4_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_4_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_4_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_4_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_4_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_4_j2_6 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 5 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_5_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_5_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_5_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_5_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_5_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_5_j2_1 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 5 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_5_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_5_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_5_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_5_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_5_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_5_j2_2 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 5 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_5_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_5_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_5_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_5_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_5_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_5_j2_3 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 5 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_5_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_5_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_5_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_5_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_5_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_5_j2_4 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 5 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_5_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_5_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_5_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_5_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_5_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_5_j2_5 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 5 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_5_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_5_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_5_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_5_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_5_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_5_j2_6 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 6 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_6_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_6_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_6_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_6_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_6_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_6_j2_1 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 6 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_6_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_6_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_6_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_6_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_6_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_6_j2_2 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 6 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_6_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_6_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_6_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_6_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_6_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_6_j2_3 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 6 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_6_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_6_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_6_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_6_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_6_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_6_j2_4 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 6 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_6_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_6_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_6_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_6_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_6_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_6_j2_5 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 6 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_6_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_6_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_6_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_6_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_6_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_6_j2_6 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 7 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_7_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_7_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_7_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_7_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_7_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_7_j2_1 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 7 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_7_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_7_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_7_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_7_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_7_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_7_j2_2 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 7 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_7_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_7_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_7_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_7_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_7_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_7_j2_3 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 7 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_7_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_7_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_7_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_7_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_7_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_7_j2_4 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 7 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_7_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_7_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_7_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_7_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_7_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_7_j2_5 
+
+} else if (spinnerJ1.value == 1 && spinnerL1.value == 7 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_1_l1_7_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_1_l1_7_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_1_l1_7_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_1_l1_7_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_1_l1_7_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_1_l1_7_j2_6 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 0 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_0_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_0_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_0_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_0_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_0_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_0_j2_1 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 0 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_0_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_0_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_0_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_0_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_0_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_0_j2_2 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 0 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_0_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_0_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_0_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_0_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_0_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_0_j2_3 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 0 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_0_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_0_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_0_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_0_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_0_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_0_j2_4 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 0 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_0_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_0_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_0_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_0_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_0_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_0_j2_5 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 0 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_0_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_0_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_0_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_0_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_0_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_0_j2_6 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 1 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_1_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_1_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_1_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_1_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_1_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_1_j2_1 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 1 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_1_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_1_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_1_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_1_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_1_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_1_j2_2 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 1 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_1_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_1_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_1_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_1_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_1_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_1_j2_3 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 1 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_1_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_1_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_1_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_1_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_1_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_1_j2_4 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 1 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_1_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_1_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_1_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_1_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_1_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_1_j2_5 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 1 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_1_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_1_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_1_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_1_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_1_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_1_j2_6 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 2 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_2_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_2_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_2_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_2_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_2_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_2_j2_1 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 2 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_2_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_2_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_2_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_2_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_2_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_2_j2_2 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 2 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_2_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_2_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_2_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_2_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_2_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_2_j2_3 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 2 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_2_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_2_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_2_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_2_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_2_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_2_j2_4 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 2 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_2_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_2_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_2_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_2_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_2_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_2_j2_5 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 2 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_2_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_2_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_2_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_2_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_2_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_2_j2_6 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 3 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_3_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_3_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_3_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_3_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_3_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_3_j2_1 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 3 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_3_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_3_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_3_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_3_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_3_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_3_j2_2 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 3 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_3_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_3_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_3_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_3_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_3_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_3_j2_3 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 3 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_3_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_3_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_3_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_3_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_3_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_3_j2_4 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 3 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_3_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_3_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_3_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_3_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_3_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_3_j2_5 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 3 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_3_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_3_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_3_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_3_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_3_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_3_j2_6 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 4 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_4_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_4_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_4_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_4_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_4_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_4_j2_1 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 4 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_4_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_4_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_4_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_4_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_4_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_4_j2_2 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 4 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_4_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_4_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_4_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_4_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_4_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_4_j2_3 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 4 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_4_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_4_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_4_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_4_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_4_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_4_j2_4 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 4 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_4_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_4_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_4_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_4_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_4_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_4_j2_5 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 4 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_4_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_4_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_4_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_4_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_4_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_4_j2_6 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 5 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_5_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_5_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_5_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_5_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_5_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_5_j2_1 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 5 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_5_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_5_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_5_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_5_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_5_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_5_j2_2 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 5 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_5_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_5_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_5_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_5_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_5_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_5_j2_3 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 5 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_5_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_5_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_5_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_5_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_5_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_5_j2_4 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 5 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_5_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_5_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_5_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_5_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_5_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_5_j2_5 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 5 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_5_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_5_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_5_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_5_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_5_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_5_j2_6 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 6 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_6_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_6_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_6_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_6_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_6_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_6_j2_1 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 6 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_6_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_6_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_6_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_6_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_6_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_6_j2_2 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 6 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_6_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_6_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_6_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_6_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_6_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_6_j2_3 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 6 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_6_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_6_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_6_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_6_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_6_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_6_j2_4 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 6 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_6_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_6_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_6_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_6_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_6_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_6_j2_5 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 6 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_6_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_6_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_6_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_6_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_6_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_6_j2_6 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 7 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_7_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_7_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_7_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_7_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_7_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_7_j2_1 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 7 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_7_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_7_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_7_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_7_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_7_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_7_j2_2 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 7 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_7_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_7_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_7_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_7_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_7_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_7_j2_3 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 7 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_7_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_7_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_7_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_7_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_7_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_7_j2_4 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 7 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_7_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_7_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_7_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_7_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_7_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_7_j2_5 
+
+} else if (spinnerJ1.value == 2 && spinnerL1.value == 7 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_2_l1_7_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_2_l1_7_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_2_l1_7_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_2_l1_7_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_2_l1_7_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_2_l1_7_j2_6 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 0 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_0_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_0_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_0_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_0_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_0_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_0_j2_1 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 0 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_0_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_0_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_0_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_0_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_0_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_0_j2_2 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 0 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_0_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_0_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_0_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_0_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_0_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_0_j2_3 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 0 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_0_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_0_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_0_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_0_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_0_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_0_j2_4 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 0 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_0_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_0_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_0_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_0_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_0_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_0_j2_5 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 0 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_0_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_0_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_0_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_0_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_0_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_0_j2_6 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 1 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_1_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_1_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_1_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_1_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_1_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_1_j2_1 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 1 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_1_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_1_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_1_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_1_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_1_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_1_j2_2 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 1 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_1_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_1_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_1_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_1_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_1_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_1_j2_3 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 1 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_1_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_1_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_1_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_1_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_1_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_1_j2_4 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 1 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_1_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_1_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_1_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_1_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_1_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_1_j2_5 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 1 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_1_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_1_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_1_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_1_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_1_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_1_j2_6 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 2 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_2_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_2_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_2_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_2_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_2_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_2_j2_1 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 2 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_2_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_2_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_2_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_2_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_2_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_2_j2_2 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 2 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_2_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_2_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_2_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_2_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_2_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_2_j2_3 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 2 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_2_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_2_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_2_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_2_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_2_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_2_j2_4 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 2 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_2_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_2_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_2_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_2_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_2_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_2_j2_5 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 2 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_2_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_2_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_2_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_2_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_2_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_2_j2_6 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 3 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_3_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_3_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_3_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_3_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_3_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_3_j2_1 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 3 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_3_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_3_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_3_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_3_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_3_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_3_j2_2 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 3 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_3_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_3_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_3_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_3_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_3_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_3_j2_3 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 3 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_3_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_3_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_3_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_3_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_3_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_3_j2_4 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 3 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_3_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_3_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_3_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_3_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_3_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_3_j2_5 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 3 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_3_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_3_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_3_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_3_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_3_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_3_j2_6 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 4 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_4_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_4_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_4_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_4_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_4_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_4_j2_1 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 4 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_4_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_4_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_4_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_4_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_4_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_4_j2_2 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 4 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_4_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_4_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_4_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_4_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_4_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_4_j2_3 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 4 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_4_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_4_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_4_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_4_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_4_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_4_j2_4 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 4 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_4_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_4_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_4_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_4_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_4_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_4_j2_5 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 4 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_4_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_4_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_4_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_4_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_4_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_4_j2_6 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 5 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_5_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_5_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_5_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_5_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_5_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_5_j2_1 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 5 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_5_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_5_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_5_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_5_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_5_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_5_j2_2 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 5 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_5_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_5_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_5_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_5_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_5_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_5_j2_3 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 5 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_5_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_5_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_5_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_5_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_5_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_5_j2_4 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 5 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_5_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_5_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_5_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_5_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_5_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_5_j2_5 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 5 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_5_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_5_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_5_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_5_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_5_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_5_j2_6 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 6 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_6_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_6_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_6_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_6_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_6_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_6_j2_1 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 6 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_6_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_6_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_6_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_6_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_6_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_6_j2_2 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 6 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_6_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_6_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_6_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_6_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_6_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_6_j2_3 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 6 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_6_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_6_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_6_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_6_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_6_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_6_j2_4 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 6 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_6_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_6_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_6_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_6_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_6_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_6_j2_5 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 6 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_6_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_6_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_6_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_6_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_6_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_6_j2_6 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 7 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_7_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_7_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_7_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_7_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_7_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_7_j2_1 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 7 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_7_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_7_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_7_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_7_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_7_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_7_j2_2 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 7 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_7_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_7_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_7_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_7_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_7_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_7_j2_3 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 7 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_7_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_7_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_7_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_7_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_7_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_7_j2_4 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 7 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_7_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_7_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_7_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_7_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_7_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_7_j2_5 
+
+} else if (spinnerJ1.value == 3 && spinnerL1.value == 7 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_3_l1_7_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_3_l1_7_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_3_l1_7_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_3_l1_7_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_3_l1_7_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_3_l1_7_j2_6 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 0 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_0_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_0_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_0_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_0_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_0_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_0_j2_1 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 0 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_0_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_0_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_0_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_0_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_0_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_0_j2_2 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 0 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_0_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_0_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_0_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_0_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_0_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_0_j2_3 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 0 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_0_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_0_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_0_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_0_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_0_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_0_j2_4 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 0 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_0_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_0_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_0_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_0_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_0_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_0_j2_5 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 0 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_0_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_0_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_0_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_0_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_0_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_0_j2_6 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 1 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_1_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_1_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_1_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_1_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_1_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_1_j2_1 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 1 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_1_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_1_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_1_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_1_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_1_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_1_j2_2 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 1 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_1_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_1_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_1_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_1_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_1_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_1_j2_3 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 1 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_1_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_1_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_1_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_1_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_1_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_1_j2_4 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 1 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_1_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_1_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_1_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_1_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_1_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_1_j2_5 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 1 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_1_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_1_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_1_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_1_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_1_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_1_j2_6 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 2 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_2_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_2_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_2_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_2_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_2_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_2_j2_1 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 2 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_2_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_2_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_2_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_2_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_2_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_2_j2_2 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 2 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_2_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_2_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_2_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_2_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_2_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_2_j2_3 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 2 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_2_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_2_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_2_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_2_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_2_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_2_j2_4 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 2 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_2_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_2_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_2_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_2_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_2_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_2_j2_5 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 2 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_2_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_2_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_2_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_2_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_2_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_2_j2_6 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 3 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_3_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_3_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_3_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_3_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_3_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_3_j2_1 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 3 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_3_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_3_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_3_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_3_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_3_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_3_j2_2 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 3 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_3_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_3_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_3_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_3_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_3_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_3_j2_3 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 3 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_3_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_3_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_3_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_3_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_3_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_3_j2_4 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 3 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_3_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_3_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_3_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_3_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_3_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_3_j2_5 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 3 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_3_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_3_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_3_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_3_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_3_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_3_j2_6 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 4 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_4_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_4_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_4_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_4_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_4_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_4_j2_1 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 4 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_4_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_4_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_4_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_4_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_4_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_4_j2_2 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 4 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_4_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_4_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_4_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_4_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_4_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_4_j2_3 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 4 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_4_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_4_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_4_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_4_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_4_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_4_j2_4 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 4 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_4_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_4_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_4_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_4_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_4_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_4_j2_5 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 4 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_4_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_4_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_4_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_4_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_4_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_4_j2_6 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 5 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_5_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_5_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_5_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_5_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_5_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_5_j2_1 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 5 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_5_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_5_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_5_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_5_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_5_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_5_j2_2 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 5 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_5_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_5_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_5_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_5_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_5_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_5_j2_3 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 5 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_5_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_5_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_5_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_5_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_5_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_5_j2_4 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 5 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_5_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_5_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_5_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_5_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_5_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_5_j2_5 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 5 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_5_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_5_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_5_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_5_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_5_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_5_j2_6 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 6 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_6_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_6_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_6_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_6_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_6_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_6_j2_1 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 6 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_6_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_6_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_6_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_6_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_6_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_6_j2_2 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 6 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_6_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_6_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_6_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_6_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_6_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_6_j2_3 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 6 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_6_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_6_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_6_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_6_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_6_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_6_j2_4 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 6 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_6_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_6_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_6_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_6_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_6_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_6_j2_5 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 6 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_6_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_6_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_6_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_6_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_6_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_6_j2_6 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 7 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_7_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_7_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_7_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_7_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_7_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_7_j2_1 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 7 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_7_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_7_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_7_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_7_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_7_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_7_j2_2 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 7 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_7_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_7_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_7_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_7_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_7_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_7_j2_3 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 7 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_7_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_7_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_7_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_7_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_7_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_7_j2_4 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 7 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_7_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_7_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_7_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_7_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_7_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_7_j2_5 
+
+} else if (spinnerJ1.value == 4 && spinnerL1.value == 7 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_4_l1_7_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_4_l1_7_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_4_l1_7_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_4_l1_7_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_4_l1_7_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_4_l1_7_j2_6 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 0 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_0_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_0_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_0_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_0_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_0_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_0_j2_1 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 0 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_0_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_0_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_0_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_0_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_0_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_0_j2_2 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 0 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_0_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_0_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_0_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_0_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_0_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_0_j2_3 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 0 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_0_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_0_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_0_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_0_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_0_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_0_j2_4 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 0 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_0_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_0_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_0_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_0_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_0_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_0_j2_5 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 0 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_0_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_0_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_0_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_0_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_0_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_0_j2_6 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 1 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_1_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_1_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_1_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_1_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_1_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_1_j2_1 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 1 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_1_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_1_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_1_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_1_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_1_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_1_j2_2 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 1 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_1_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_1_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_1_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_1_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_1_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_1_j2_3 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 1 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_1_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_1_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_1_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_1_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_1_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_1_j2_4 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 1 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_1_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_1_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_1_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_1_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_1_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_1_j2_5 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 1 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_1_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_1_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_1_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_1_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_1_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_1_j2_6 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 2 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_2_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_2_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_2_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_2_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_2_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_2_j2_1 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 2 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_2_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_2_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_2_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_2_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_2_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_2_j2_2 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 2 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_2_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_2_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_2_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_2_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_2_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_2_j2_3 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 2 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_2_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_2_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_2_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_2_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_2_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_2_j2_4 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 2 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_2_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_2_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_2_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_2_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_2_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_2_j2_5 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 2 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_2_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_2_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_2_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_2_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_2_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_2_j2_6 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 3 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_3_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_3_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_3_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_3_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_3_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_3_j2_1 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 3 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_3_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_3_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_3_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_3_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_3_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_3_j2_2 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 3 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_3_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_3_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_3_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_3_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_3_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_3_j2_3 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 3 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_3_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_3_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_3_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_3_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_3_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_3_j2_4 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 3 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_3_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_3_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_3_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_3_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_3_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_3_j2_5 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 3 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_3_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_3_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_3_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_3_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_3_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_3_j2_6 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 4 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_4_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_4_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_4_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_4_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_4_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_4_j2_1 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 4 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_4_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_4_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_4_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_4_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_4_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_4_j2_2 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 4 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_4_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_4_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_4_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_4_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_4_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_4_j2_3 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 4 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_4_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_4_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_4_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_4_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_4_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_4_j2_4 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 4 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_4_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_4_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_4_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_4_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_4_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_4_j2_5 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 4 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_4_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_4_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_4_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_4_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_4_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_4_j2_6 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 5 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_5_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_5_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_5_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_5_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_5_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_5_j2_1 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 5 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_5_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_5_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_5_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_5_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_5_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_5_j2_2 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 5 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_5_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_5_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_5_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_5_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_5_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_5_j2_3 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 5 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_5_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_5_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_5_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_5_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_5_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_5_j2_4 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 5 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_5_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_5_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_5_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_5_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_5_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_5_j2_5 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 5 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_5_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_5_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_5_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_5_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_5_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_5_j2_6 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 6 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_6_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_6_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_6_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_6_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_6_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_6_j2_1 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 6 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_6_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_6_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_6_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_6_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_6_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_6_j2_2 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 6 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_6_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_6_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_6_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_6_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_6_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_6_j2_3 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 6 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_6_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_6_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_6_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_6_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_6_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_6_j2_4 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 6 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_6_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_6_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_6_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_6_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_6_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_6_j2_5 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 6 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_6_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_6_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_6_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_6_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_6_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_6_j2_6 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 7 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_7_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_7_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_7_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_7_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_7_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_7_j2_1 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 7 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_7_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_7_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_7_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_7_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_7_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_7_j2_2 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 7 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_7_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_7_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_7_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_7_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_7_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_7_j2_3 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 7 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_7_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_7_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_7_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_7_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_7_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_7_j2_4 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 7 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_7_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_7_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_7_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_7_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_7_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_7_j2_5 
+
+} else if (spinnerJ1.value == 5 && spinnerL1.value == 7 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_5_l1_7_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_5_l1_7_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_5_l1_7_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_5_l1_7_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_5_l1_7_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_5_l1_7_j2_6 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 0 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_0_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_0_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_0_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_0_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_0_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_0_j2_1 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 0 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_0_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_0_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_0_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_0_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_0_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_0_j2_2 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 0 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_0_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_0_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_0_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_0_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_0_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_0_j2_3 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 0 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_0_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_0_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_0_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_0_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_0_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_0_j2_4 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 0 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_0_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_0_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_0_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_0_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_0_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_0_j2_5 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 0 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_0_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_0_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_0_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_0_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_0_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_0_j2_6 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 1 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_1_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_1_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_1_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_1_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_1_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_1_j2_1 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 1 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_1_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_1_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_1_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_1_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_1_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_1_j2_2 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 1 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_1_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_1_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_1_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_1_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_1_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_1_j2_3 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 1 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_1_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_1_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_1_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_1_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_1_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_1_j2_4 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 1 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_1_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_1_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_1_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_1_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_1_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_1_j2_5 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 1 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_1_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_1_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_1_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_1_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_1_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_1_j2_6 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 2 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_2_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_2_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_2_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_2_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_2_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_2_j2_1 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 2 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_2_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_2_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_2_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_2_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_2_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_2_j2_2 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 2 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_2_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_2_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_2_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_2_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_2_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_2_j2_3 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 2 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_2_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_2_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_2_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_2_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_2_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_2_j2_4 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 2 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_2_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_2_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_2_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_2_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_2_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_2_j2_5 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 2 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_2_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_2_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_2_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_2_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_2_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_2_j2_6 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 3 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_3_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_3_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_3_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_3_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_3_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_3_j2_1 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 3 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_3_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_3_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_3_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_3_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_3_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_3_j2_2 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 3 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_3_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_3_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_3_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_3_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_3_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_3_j2_3 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 3 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_3_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_3_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_3_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_3_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_3_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_3_j2_4 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 3 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_3_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_3_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_3_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_3_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_3_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_3_j2_5 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 3 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_3_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_3_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_3_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_3_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_3_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_3_j2_6 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 4 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_4_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_4_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_4_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_4_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_4_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_4_j2_1 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 4 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_4_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_4_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_4_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_4_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_4_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_4_j2_2 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 4 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_4_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_4_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_4_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_4_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_4_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_4_j2_3 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 4 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_4_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_4_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_4_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_4_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_4_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_4_j2_4 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 4 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_4_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_4_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_4_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_4_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_4_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_4_j2_5 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 4 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_4_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_4_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_4_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_4_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_4_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_4_j2_6 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 5 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_5_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_5_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_5_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_5_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_5_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_5_j2_1 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 5 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_5_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_5_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_5_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_5_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_5_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_5_j2_2 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 5 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_5_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_5_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_5_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_5_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_5_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_5_j2_3 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 5 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_5_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_5_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_5_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_5_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_5_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_5_j2_4 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 5 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_5_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_5_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_5_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_5_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_5_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_5_j2_5 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 5 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_5_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_5_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_5_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_5_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_5_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_5_j2_6 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 6 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_6_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_6_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_6_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_6_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_6_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_6_j2_1 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 6 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_6_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_6_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_6_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_6_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_6_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_6_j2_2 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 6 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_6_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_6_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_6_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_6_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_6_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_6_j2_3 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 6 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_6_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_6_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_6_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_6_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_6_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_6_j2_4 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 6 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_6_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_6_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_6_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_6_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_6_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_6_j2_5 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 6 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_6_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_6_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_6_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_6_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_6_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_6_j2_6 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 7 && spinnerJ2.value == 1){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_7_j2_1', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_7_j2_1 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_7_j2_1', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_7_j2_1 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_7_j2_1', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_7_j2_1 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 7 && spinnerJ2.value == 2){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_7_j2_2', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_7_j2_2 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_7_j2_2', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_7_j2_2 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_7_j2_2', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_7_j2_2 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 7 && spinnerJ2.value == 3){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_7_j2_3', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_7_j2_3 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_7_j2_3', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_7_j2_3 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_7_j2_3', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_7_j2_3 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 7 && spinnerJ2.value == 4){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_7_j2_4', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_7_j2_4 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_7_j2_4', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_7_j2_4 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_7_j2_4', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_7_j2_4 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 7 && spinnerJ2.value == 5){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_7_j2_5', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_7_j2_5 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_7_j2_5', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_7_j2_5 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_7_j2_5', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_7_j2_5 
+
+} else if (spinnerJ1.value == 6 && spinnerL1.value == 7 && spinnerJ2.value == 6){ 
+	 r0.glyph.fill_color = {field: 'j1_6_l1_7_j2_6', transform: color_mapper} 
+	 r0.glyph.fill_alpha = 1 
+	 source0.data.image=source0.data.j1_6_l1_7_j2_6 
+	 r1.glyph.fill_color = {field: 'j1_6_l1_7_j2_6', transform: color_mapper} 
+	 r1.glyph.fill_alpha = 1 
+	 source1.data.image=source1.data.j1_6_l1_7_j2_6 
+	 r2.glyph.fill_color = {field: 'j1_6_l1_7_j2_6', transform: color_mapper} 
+	 r2.glyph.fill_alpha = 1 
+	 source2.data.image=source2.data.j1_6_l1_7_j2_6 
+

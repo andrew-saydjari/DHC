@@ -40,3 +40,12 @@ junk/
 *.fits
 .nfs00*
 *.jld2
+*.html
+scratch_AKS/2021_04_03.ipynb
+
+#Logs
+*.e
+*.o
+
+#Trash
+scratch_NM/Trash/*
