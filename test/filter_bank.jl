@@ -56,5 +56,6 @@ end
     rod_test = rod_image(1,1,30,35,8)
     filter_hash = fink_filter_hash(1,8)
     test = DHC_compute(rod_test,filter_hash)
-    @test sum(test[3:end])-2 < 1e-6 #check well sampled images sum layer by layer to 1
+    #check well sampled images sum layer by layer to 1
+    @test sum(test[3:end])-2 < 1e-6
 end
