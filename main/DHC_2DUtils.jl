@@ -37,9 +37,9 @@ module DHC_2DUtils
 
 ## Filter hash construct core
 
-    function fink_filter_hash(c, L; nx=256, wd=2, pc=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1)
+    function fink_filter_hash(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1)
         # -------- compute the filter bank
-        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on, wd_cutoff=wd_cutoff)
+        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, t=t, shift=shift, Omega=Omega, safety_on=safety_on, wd_cutoff=wd_cutoff)
 
         # -------- list of non-zero pixels
         flist = fink_filter_list(filt)
@@ -59,10 +59,10 @@ module DHC_2DUtils
         return hash
     end
 
-    function fink_filter_hash_gpu(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
+    function fink_filter_hash_gpu(c, L; nx=256, wd=1, t=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
 
         # -------- compute the filter bank
-        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on)
+        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, t=t, shift=shift, Omega=Omega, safety_on=safety_on)
 
         flist = fink_filter_list(filt)
         # -------- pack everything you need into the info structure
@@ -90,10 +90,10 @@ module DHC_2DUtils
         return hash
     end
 
-    function fink_filter_hash_gpu_fake(c, L; nx=256, wd=1, pc=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
+    function fink_filter_hash_gpu_fake(c, L; nx=256, wd=1, t=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
 
         # -------- compute the filter bank
-        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, pc=pc, shift=shift, Omega=Omega, safety_on=safety_on)
+        filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, t=t, shift=shift, Omega=Omega, safety_on=safety_on)
 
         flist = fink_filter_list(filt)
         # -------- pack everything you need into the info structure
@@ -117,9 +117,9 @@ module DHC_2DUtils
         return hash
     end
 
-    function fink_filter_bank_3dizer(hash, cz; nz=256, pcz=1, Omega3d=false)
-        @assert hash["pc"]==2 #can remove later when we add support for pcz=2
-        @assert pcz==1
+    function fink_filter_bank_3dizer(hash, cz; nz=256, tz=1, Omega3d=false)
+        @assert hash["t"]==2 #can remove later when we add support for tz=2
+        @assert tz==1
 
         # -------- set parameters
         nx = convert(Int64,hash["npix"])
@@ -209,9 +209,9 @@ module DHC_2DUtils
 
         #### ------- This is phi0 containing the plane
         # phi contains power near k=0 not yet accounted for
-        # for plane half-covered (pcz=1), add other half-plane
+        # for plane half-covered (tz=1), add other half-plane
 
-        if pcz == 1
+        if tz == 1
             filter_power .+= circshift(filter_power[:,:,end:-1:1],(0,0,1))
         end
 
@@ -222,8 +222,8 @@ module DHC_2DUtils
         ind = findall(phi_cen_shift .> 1E-13)
         val = phi_cen_shift[ind]
 
-        # -------- before adding ϕ to filter bank, renormalize ψ if pc=1
-        if pcz==1 filtval[1:n2d*K] .*= sqrt(2.0) end  # double power for half coverage
+        # -------- before adding ϕ to filter bank, renormalize ψ if t=1
+        if tz==1 filtval[1:n2d*K] .*= sqrt(2.0) end  # double power for half coverage
 
         # -------- add result to filter array
         filtind[n2d*K + 1] = ind
@@ -258,7 +258,7 @@ module DHC_2DUtils
                 filter_power[filtind[index]] .+= filtval[index].^2
             end
 
-            if pcz == 1
+            if tz == 1
                 filter_power .+= circshift(filter_power[:,:,end:-1:1],(0,0,1))
             end
 
@@ -282,7 +282,7 @@ module DHC_2DUtils
         info["2d_psi_index"]    = hash["psi_index"]
         info["2d_phi_index"]    = hash["phi_index"]
         info["2d_J_L"]          = hash["J_L"]
-        info["2d_pc"]           = hash["pc"]
+        info["2d_t"]           = hash["t"]
         info["2d_wd"]           = hash["wd"]
         info["2d_fs_center_r"]  = hash["fs_center_r"]
         info["2d_filt_index"]   = hash["filt_index"]
@@ -298,7 +298,7 @@ module DHC_2DUtils
         info["k_value"]         = k_value
         info["filt_index"]      = filtind
         info["filt_value"]      = filtval
-        info["pcz"]             = pcz
+        info["tz"]             = tz
         info["Omega3d"]        = Omega3d
         info["psi_ind_L"]       = psi_ind_L
 
@@ -1957,11 +1957,11 @@ module DHC_2DUtils
 
 ## Filter bank utilities
 
-    function fink_filter_bank(c, L; nx=256, wd=2, pc=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1)
+    function fink_filter_bank(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1)
         #c     - sets the scale sampling rate (1 is dyadic, 2 is half dyadic)
-        #L     - number of angular bins (usually 8*pc or 16*pc)
+        #L     - number of angular bins (usually 8*t or 16*t)
         #wd    - width of the wavelets (default 1, wd=2 for a double covering)
-        #pc    - plane coverage (default 1, full 2pi 2)
+        #t    - plane coverage (default 1, full 2pi 2)
         #shift - shift in θ by 1/2 of the θ spacing
         #Omega - true= append Omega filter (all power beyond Nyquist) so the sum of filters is 1.0
 
@@ -1969,7 +1969,7 @@ module DHC_2DUtils
         #@test wd <= L/2
 
         # -------- set parameters
-        dθ   = pc*π/L
+        dθ   = t*π/L
         θ_sh = shift ? dθ/2 : 0.0
         dx   = nx/2-1
 
@@ -1995,7 +1995,7 @@ module DHC_2DUtils
             j_rad_exp[j_ind] = 2^(jrad)
         end
 
-        wd_j = max.(ceil.(wd_cutoff.*L./(pc.*π.*j_rad_exp)),wd)
+        wd_j = max.(ceil.(wd_cutoff.*L./(t.*π.*j_rad_exp)),wd)
 
         if !safety_on
             wd_j.=wd
@@ -2038,7 +2038,7 @@ module DHC_2DUtils
                 angmask = findall(anggood)
             # -------- compute the wavelet in the Fourier domain
             # -------- the angular factor is the same for all j
-                F_angular = norm .* cos.((θ[angmask].-π).*(L/(2*wd*pc)))
+                F_angular = norm .* cos.((θ[angmask].-π).*(L/(2*wd*t)))
 
             # -------- loop over j for the radial part
             #    for (j_ind, j) in enumerate(1/c:1/c:im_scale-2)
@@ -2067,8 +2067,8 @@ module DHC_2DUtils
         # -------- phi contains power near k=0 not yet accounted for
         filter_power = (sum(filt.*filt, dims=3))[:,:,1]
 
-        # -------- for plane half-covered (pc=1), add other half-plane
-        if pc == 1
+        # -------- for plane half-covered (t=1), add other half-plane
+        if t == 1
             filter_power .+= circshift(filter_power[end:-1:1,end:-1:1],(1,1))
         end
 
@@ -2081,8 +2081,8 @@ module DHC_2DUtils
         phi_cen = zeros(nx, nx)
         phi_cen[i0:i1,i0:i1] = sqrt.(center_power)
 
-        # -------- before adding ϕ to filter bank, renormalize ψ if pc=1
-        if pc==1 filt .*= sqrt(2.0) end  # double power for half coverage
+        # -------- before adding ϕ to filter bank, renormalize ψ if t=1
+        if t==1 filt .*= sqrt(2.0) end  # double power for half coverage
 
         # -------- add result to filter array
         phi_index  = J*L+1
@@ -2109,7 +2109,7 @@ module DHC_2DUtils
         info["psi_index"]    = psi_index
         info["phi_index"]    = phi_index
         info["J_L"]          = psi_ind_in
-        info["pc"]           = pc
+        info["t"]            = t
         info["wd"]           = wd_j
         info["wd_cutoff"]    = wd_cutoff
         info["fs_center_r"]  = j_rad_exp
