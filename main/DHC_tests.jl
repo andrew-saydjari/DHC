@@ -10,7 +10,7 @@ module DHC_tests
     export plot_filter_bank_QAxy
     export plot_filter_bank_QAxz
 
-    function plot_filter_bank_QA(filt, info; fname="filter_bank_QA.png")
+    function plot_filter_bank_QA(filt, info; fname="filter_bank_QA.png",p=2)
 
         # -------- define plot1 to append plot to a list
         function plot1(ps, image; clim=nothing, bin=1.0, fsz=12, label=nothing)
@@ -69,23 +69,24 @@ module DHC_tests
                   bin=bfac, label=string("j=",jval[j_ind]," ℓ=",0,":",L-1))
         end
 
-        wavepow = fftshift(dropdims(sum(filt[:,:,ind].^2, dims=(3,4)), dims=(3,4)))
+        wavepow = fftshift(dropdims(sum(filt[:,:,ind].^p, dims=(3,4)), dims=(3,4)))
         plot1(ps, wavepow, label=string("j=1:",jval[end]," ℓ=0:",L-1)) #clim=(-0.1,1)
 
-        if info["pc"]==1
+        if info["t"]==1
             wavepow ./= 2
             wavepow += circshift(wavepow[end:-1:1,end:-1:1],(1,1))
         end
         plot1(ps, wavepow, bin=32, label="missing power") #clim=(-0.1,1)
         phi = filt[:,:,info["phi_index"]]
         phi_shift = fftshift(phi)
-        plot1(ps, phi_shift.^2, bin=32, label="ϕ") #clim=(-0.1,1)
-        disc = wavepow+(phi_shift.^2)
+        plot1(ps, phi_shift.^p, bin=32, label="ϕ") #clim=(-0.1,1)
+        disc = wavepow+(phi_shift.^p)
         plot1(ps, fftshift(real(ifft(phi))), label="ϕ")
         plot1(ps, disc, bin=32, label="all") #clim=(-0.1,1)
 
         myplot = plot(ps..., layout=(7,5), size=(1400,2000))
         savefig(myplot, fname)
+        return disc
     end
 
     #AKS added 3d plotting functions 2021_02_22; They are not fully complete
@@ -188,7 +189,7 @@ module DHC_tests
         wavepow = fftshift(dropdims(sum(filt, dims=3), dims=3))
         plot1(ps, wavepow, label=string("j=1:",J," ℓ=0:",L-1," K=1:",K),color=:white)
 
-        if hash["2d_pc"]==1
+        if hash["2d_t"]==1
             wavepow ./= 2
             wavepow += circshift(wavepow[end:-1:1,end:-1:1],(1,1))
         end
@@ -342,7 +343,7 @@ module DHC_tests
         label=string("j=1:",J," ℓ=0:",L-1," K=1:",K))
 
         wavepow2 = wavepow[:,nx÷2,:]
-        if hash["2d_pc"]==1
+        if hash["2d_t"]==1
             wavepow2 += reverse(wavepow[:,nx÷2,:], dims = 2)
             wavepow2 += circshift(wavepow2[end:-1:1,end:-1:1],(1,1))
         end

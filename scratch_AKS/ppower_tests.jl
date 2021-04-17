@@ -6,8 +6,12 @@ using Profile
 using LinearAlgebra
 using Measures
 using ProgressMeter
+using Plots
+theme(:dark)
+using Revise
 push!(LOAD_PATH, pwd()*"/main")
 using DHC_2DUtils
+using DHC_tests
 
 function fink_filter_bank_p(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1, p=2)
     #c     - sets the scale sampling rate (1 is dyadic, 2 is half dyadic)
@@ -61,7 +65,7 @@ function fink_filter_bank_p(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, s
         logr = zeros(nx, nx)
 
         wdθ  = wd*dθ
-        norm = 1.0/(sqrt(wd))
+        norm = 1.0/((wd).^(1/p))
         # -------- loop over l
         for l = 0:L-1
             θ_l        = dθ*l+θ_sh
@@ -117,7 +121,7 @@ function fink_filter_bank_p(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, s
     end
 
     # -------- phi contains power near k=0 not yet accounted for
-    filter_power = (sum(filt.*filt, dims=3))[:,:,1]
+    filter_power = (sum(filt.^p, dims=3))[:,:,1]
 
     # -------- for plane half-covered (t=1), add other half-plane
     if t == 1
@@ -131,10 +135,10 @@ function fink_filter_bank_p(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, s
     zind = findall(center_power .< 1E-15)
     center_power[zind] .= 0.0  # set small numbers to zero
     phi_cen = zeros(nx, nx)
-    phi_cen[i0:i1,i0:i1] = sqrt.(center_power)
+    phi_cen[i0:i1,i0:i1] = (center_power).^(1/p)
 
     # -------- before adding ϕ to filter bank, renormalize ψ if t=1
-    if t==1 filt .*= sqrt(2.0) end  # double power for half coverage
+    if t==1 filt .*= 2.0^(1/p) end  # double power for half coverage
 
     # -------- add result to filter array
     phi_index  = J*L+1
@@ -143,13 +147,13 @@ function fink_filter_bank_p(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, s
     psi_ind_L[phi_index] = 0
 
     if Omega     # append a filter containing the rest (outside Nyquist)
-        filter_power += filt[:,:,phi_index].^2
+        filter_power += filt[:,:,phi_index].^p
         edge_power    = 1.0 .- filter_power
         zind          = findall(edge_power .< 1E-15)
         edge_power[zind]     .= 0.0  # set small numbers to zero
         Omega_index           = J*L+2
         info["Omega_index"]   = Omega_index
-        filt[:,:,Omega_index] = sqrt.(edge_power)
+        filt[:,:,Omega_index] = (edge_power).^(1/p)
         psi_ind_in[Omega_index,:] = [J,1]
         psi_ind_L[Omega_index] = 0
     end
@@ -166,16 +170,36 @@ function fink_filter_bank_p(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, s
     info["wd_cutoff"]    = wd_cutoff
     info["fs_center_r"]  = j_rad_exp
     info["psi_ind_L"]    = psi_ind_L
+    info["p"]            = p
 
     return filt, info
 end
 
-test_p = fink_filter_bank_p(1,8)
+testtest_p = fink_filter_bank_p(1,8)
 test_bank = fink_filter_bank(1,8)
 test_bank .== test_p
 
+using PyCall
+using PyPlot
+plt.matplotlib.style.use("dark_background")
+
+plot_filter_bank_QA(test_p[1], test_p[2]; fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/images/filter_bank_QA_p2.png")
+
+test_p1 = fink_filter_bank_p(1,8,p=1)
+
+disc = plot_filter_bank_QA(test_p1[1], test_p1[2]; fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/images/filter_bank_QA_p1.png",p=1)
+
+heatmap(disc)
+
+test_p3 = fink_filter_bank_p(1,8,p=3)
+
+disc = plot_filter_bank_QA(test_p3[1], test_p3[2]; fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/images/filter_bank_QA_p3.png",p=3)
+
+heatmap(disc)
+
 function DHC_compute_p(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
-    doS2::Bool=true, doS20::Bool=false, norm=true, iso=false, FFTthreads=2, normS1::Bool=false, normS1iso::Bool=false)
+    doS2::Bool=true, doS20::Bool=false, norm=true, iso=false, FFTthreads=2, normS1::Bool=false, normS1iso::Bool=false,
+    p=2)
     # image        - input for WST
     # filter_hash  - filter hash from fink_filter_hash
     # filter_hash2 - filters for second order.  Default to same as first order.
@@ -203,17 +227,16 @@ function DHC_compute_p(image::Array{Float64,2}, filter_hash::Dict, filter_hash2:
     if doS2  S2  = zeros(Float64, Nf, Nf) end  # traditional 2nd order
     if doS20 S20 = zeros(Float64, Nf, Nf) end  # real space correlation
     anyM2 = doS2 | doS20
-    anyrd = doS2 | doS20             # compute real domain with iFFT
 
     # allocate image arrays for internal use
-    if anyrd im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf) end
+    im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf)
 
     ## 0th Order
     S0[1]   = mean(image)
     norm_im = image.-S0[1]
-    S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
+    S0[2]   = sum(abs.(norm_im).^p)/(Nx*Ny)
     if norm
-        norm_im ./= sqrt(Nx*Ny*S0[2])
+        norm_im ./= (Nx*Ny*S0[2]).^(1/p)
     else
         norm_im = copy(image)
     end
@@ -230,25 +253,17 @@ function DHC_compute_p(image::Array{Float64,2}, filter_hash::Dict, filter_hash2:
     zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
 
     # make a FFTW "plan" for an array of the given size and type
-    if anyrd
-        P = plan_ifft(im_fd_0) end  # P is an operator, P*im is ifft(im)
+    P = plan_ifft(im_fd_0)  # P is an operator, P*im is ifft(im)
 
     ## Main 1st Order and Precompute 2nd Order
     for f = 1:Nf
-        S1tot = 0.0
         f_i = f_ind[f]  # CartesianIndex list for filter
         f_v = f_val[f]  # Values for f_i
-        # for (ind, val) in zip(f_i, f_v)   # this is slower!
         if length(f_i) > 0
-            for i = 1:length(f_i)
-                ind       = f_i[i]
-                zval      = f_v[i] * im_fd_0[ind]
-                S1tot    += abs2(zval)
-                zarr[ind] = zval        # filter*image in Fourier domain
-            end
-            S1[f] = S1tot/(Nx*Ny)  # image power
-            if anyrd
-                im_rd_0_1[:,:,f] .= abs2.(P*zarr) end
+            zarr[f_i] = f_v.*im_fd_0[f_i]
+            im_rd_0_1[:,:,f] .= abs.(P*zarr)
+            S1[f] = sum(im_rd_0_1[:,:,f].^(p))  # image power
+            #zero out the intermediate arrays
             zarr[f_i] .= 0
         end
     end
@@ -258,9 +273,6 @@ function DHC_compute_p(image::Array{Float64,2}, filter_hash::Dict, filter_hash2:
     if normS1iso
         S1iso = vec(reshape(filter_hash["S1_iso_mat"]*S1,(1,:))*filter_hash["S1_iso_mat"])
     end
-
-    # we stored the abs()^2, so take sqrt (this is faster to do all at once)
-    if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
 
     Mat2 = filter_hash["S2_iso_mat"]
     if doS2
@@ -281,8 +293,10 @@ function DHC_compute_p(image::Array{Float64,2}, filter_hash::Dict, filter_hash2:
             for f2 = 1:Nf
                 f_i = f_ind2[f2]  # CartesianIndex list for filter
                 f_v = f_val2[f2]  # Values for f_i
-                # sum im^2 = sum(|fft|^2/npix)
-                S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)/normS1pwr
+                zarr[f_i] = f_v .* thisim[f_i]
+                S2[f1,f2] = sum(abs.(P*zarr).^(p))/normS1pwr
+                #zero out the intermediate arrays
+                zarr[f_i] .= 0
             end
         end
         append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
@@ -297,3 +311,213 @@ function DHC_compute_p(image::Array{Float64,2}, filter_hash::Dict, filter_hash2:
 
     return out_coeff
 end
+
+test = zeros(16,16,6)
+for i=1:6
+    a = rand(16,16)
+    test[:,:,i] .= a
+end
+
+test
+
+filter_hash = fink_filter_hash(1,8)
+f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+f_val   = filter_hash["filt_value"]
+
+temp_mat = zeros(Float64, 256, 256)
+f_i = f_ind[10]  # CartesianIndex list for filter
+f_v = f_val[10]  # Values for f_i
+
+temp_mat[f_i] = f_v
+temp_mat
+@benchmark temp_mat[f_i] = f_v
+
+@benchmark for i = 1:length(f_i)
+    ind       = f_i[i]
+    temp_mat[ind] = f_v[i]        # filter*image in Fourier domain
+end
+
+a = rand(256,256)
+temp_mat[f_i] = f_v
+temp_mat
+@benchmark temp_mat[f_i] = f_v.*a[f_i]
+
+@benchmark for i = 1:length(f_i)
+    ind       = f_i[i]
+    temp_mat[ind] = f_v[i]*a[ind]       # filter*image in Fourier domain
+end
+
+a = rand(256,256)
+
+original = DHC_compute(a,filter_hash)
+
+new = DHC_compute_p(a,filter_hash)
+
+@benchmark DHC_compute_p(a,filter_hash)
+
+@benchmark DHC_compute(a,filter_hash)
+
+6/.178
+
+# so we are slower by slightly less than a factor of Nf... not sure we can help that
+
+function fink_filter_hash_p(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1, p=2)
+    # -------- compute the filter bank
+    filt, hash = fink_filter_bank_p(c, L; nx=nx, wd=wd, t=t, shift=shift, Omega=Omega, safety_on=safety_on, wd_cutoff=wd_cutoff, p=p)
+
+    # -------- list of non-zero pixels
+    flist = fink_filter_list(filt)
+
+    # -------- pack everything you need into the info structure
+    hash["filt_index"] = flist[1]
+    hash["filt_value"] = flist[2]
+
+    # -------- compute matrix that projects iso coeffs, add to hash
+    S1_iso_mat = S1_iso_matrix(hash)
+    hash["S1_iso_mat"] = S1_iso_mat
+    S2_iso_mat = S2_iso_matrix(hash)
+    hash["S2_iso_mat"] = S2_iso_mat
+    hash["num_iso_coeff"] = size(S1_iso_mat)[1] + size(S2_iso_mat)[1] + 2
+    hash["num_coeff"] = size(S1_iso_mat)[2] + size(S2_iso_mat)[2] + 2
+
+    return hash
+end
+
+filter_hash = fink_filter_hash(1,8)
+filter_hashp2 = fink_filter_hash_p(1,8,p=2)
+
+filter_hashp2 == filter_hash
+
+filter_hashp1 = fink_filter_hash_p(1,8,p=1)
+
+@benchmark DHC_compute_p(a,filter_hashp1,p=1)
+
+filter_hashp3 = fink_filter_hash_p(1,8,p=3)
+
+@benchmark DHC_compute_p(a,filter_hashp3,p=3)
+
+b = [-1, 2, 3, 4]
+
+norm(b)
+
+norm(b,1)
+
+norm(b,3)
+
+norm(b,1/3)
+
+sum(abs.(b).^1)
+
+sqrt(sum(abs.(b).^2))
+
+@benchmark sum(abs.(b).^1)
+
+@benchmark norm(b,1)
+
+@benchmark sum(abs.(b).^2)
+
+@benchmark norm(b,2)^2
+
+Profile.clear()
+@profile DHC_compute_p(a,filter_hashp3,p=3)
+
+Juno.profiler()
+
+b = rand(ComplexF64,256,256)
+
+sum(abs.(b).^3)
+
+@benchmark sum(abs.(b).^3)
+
+@benchmark norm(b,3)^3
+
+@benchmark sum(abs2.(b).^(3/2))
+
+sum(abs2.(b).^(3/2))
+
+ref = fink_filter_bank(1,8)
+test = fink_filter_bank_p(1,8)
+
+ref == test
+
+
+a = rand(256,256)
+
+original = DHC_compute(a,filter_hash)
+
+new = DHC_compute_p(a,filter_hash)
+
+original[2:5]./new[2:5]
+
+256*256
+
+original == new
+
+original ≈ new
+
+nearlysame(x, y) = x ≈ y || (isnan(x) & isnan(y))
+nearlysame(A::AbstractArray, B::AbstractArray) = all(map(nearlysame, A, B))
+
+nearlysame(original[1:6*8+1],new[1:6*8+1])
+
+maximum(abs.(new.-original))
+
+original[100:105]./new[100:105]
+
+new[100:105]
+
+sum(original[3:end])
+
+sum(original[3:6*8+1])
+
+function rod_image(xcen, ycen, length, pa, fwhm; nx=256)
+    # returns image of a rod with some (x,y) position, length,
+    #   position angle, and FWHM in an (nx,nx) image.
+    rodimage = zeros(nx,nx)
+
+    x=0
+    y=0
+    sig = fwhm/2.355
+    dtor = π/180
+    # -------- define a unit vector in direction of rod at position angle pa
+    ux = sin(pa*dtor)   #  0 deg is up
+    uy = cos(pa*dtor)   # 90 deg to the right
+
+    for i=1:nx
+        for j=1:nx
+            x=i-nx/2+xcen
+            y=j-nx/2+ycen
+
+            # -------- distance parallel and perpendicular to
+            dpara =  ux*x + uy*y
+            dperp = -uy*x + ux*y
+
+            if abs(dpara)-length <0
+                dpara= 0
+            end
+            dpara = abs(dpara)
+            dpara = min(abs(dpara-length),dpara)
+
+            rodimage[i,j] = exp(-(dperp^2+dpara^2)/(2*sig^2))
+        end
+    end
+    rodimage ./= sqrt(sum(rodimage.^2))
+    return rodimage
+end
+
+rod_test = rod_image(1,1,30,35,8)
+
+heatmap(rod_test)
+
+original = DHC_compute(rod_test,filter_hash)
+
+new = DHC_compute_p(rod_test,filter_hash)
+
+original ≈ new
+
+sum(original[3:end])
+
+sum(new[3:end])
+
+sum(new[3:end])-2 < 1e-6
+sum(original[3:end])-2 < 1e-6
