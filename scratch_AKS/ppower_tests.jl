@@ -191,6 +191,12 @@ disc = plot_filter_bank_QA(test_p1[1], test_p1[2]; fname="/Users/saydjari/Dropbo
 
 heatmap(disc)
 
+test_pp5 = fink_filter_bank_p(1,8,p=0.5)
+
+disc = plot_filter_bank_QA(test_pp5[1], test_pp5[2]; fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/images/filter_bank_QA_pp5.png",p=0.5)
+
+heatmap(disc)
+
 test_p3 = fink_filter_bank_p(1,8,p=3)
 
 disc = plot_filter_bank_QA(test_p3[1], test_p3[2]; fname="/Users/saydjari/Dropbox/GradSchool_AKS/Doug/Projects/DHC/scratch_AKS/images/filter_bank_QA_p3.png",p=3)
@@ -395,6 +401,10 @@ filter_hashp1 = fink_filter_hash_p(1,8,p=1)
 filter_hashp3 = fink_filter_hash_p(1,8,p=3)
 
 @benchmark DHC_compute_p(a,filter_hashp3,p=3)
+
+filter_hashpp5 = fink_filter_hash_p(1,8,p=0.5)
+
+@benchmark DHC_compute_p(a,filter_hashpp5,p=0.5)
 
 b = [-1, 2, 3, 4]
 
