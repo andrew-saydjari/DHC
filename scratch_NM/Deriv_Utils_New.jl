@@ -762,7 +762,7 @@ module Deriv_Utils_New
     end
     =#
     function image_recon_derivsum_regularized(input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, pixmask::BitArray{2}, dhc_args;
-        FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), coeff_mask=nothing, lambda=0.001,show_trace=::Bool=true) #add iso here and a check that returns error if both coeffmask is not nothing and iso is present.
+        FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), coeff_mask=nothing, lambda=0.001,show_trace0::Bool=true) #add iso here and a check that returns error if both coeffmask is not nothing and iso is present.
         #=
         Cases to be handled by this function:
         S20
@@ -893,14 +893,14 @@ module Deriv_Utils_New
         println("Brute:  ",brute)
         println("Clever: ",clever[row, col], " Difference: ", brute - clever[row, col], " Mean ", meanval) #DEB
         println("Initial Loss ", loss_func20(input))
-        res = optimize(loss_func20, dloss20, input, minmethod, Optim.Options(iterations = numitns_dict, store_trace = show_trace, show_trace = show_trace))
+        res = optimize(loss_func20, dloss20, input, minmethod, Optim.Options(iterations = numitns_dict, store_trace = show_trace0, show_trace = show_trace0))
         result_img = Optim.minimizer(res)
         println("Final Loss ", loss_func20(result_img))
         return res, reshape(result_img, (Nx, Nx))
     end
 
     function image_recon_derivsum_regularized_S2(input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, pixmask::BitArray{2}, dhc_args;
-        FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), coeff_mask=nothing, lambda=0.001,show_trace=::Bool=true) #add iso here and a check that returns error if both coeffmask is not nothing and iso is present.
+        FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), coeff_mask=nothing, lambda=0.001,show_trace0::Bool=true) #add iso here and a check that returns error if both coeffmask is not nothing and iso is present.
         #=
         Cases to be handled by this function:
         S20
@@ -1031,7 +1031,7 @@ module Deriv_Utils_New
         println("Brute:  ",brute)
         println("Clever: ",clever[row, col], " Difference: ", brute - clever[row, col], " Mean ", meanval) #DEB
         println("Initial Loss ", loss_func2(input))
-        res = optimize(loss_func2, dloss2, input, minmethod, Optim.Options(iterations = numitns_dict, store_trace = show_trace, show_trace = show_trace))
+        res = optimize(loss_func2, dloss2, input, minmethod, Optim.Options(iterations = numitns_dict, store_trace = show_trace0, show_trace = show_trace0))
         result_img = Optim.minimizer(res)
         println("Final Loss ", loss_func2(result_img))
         return res, reshape(result_img, (Nx, Nx))
