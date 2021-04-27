@@ -54,3 +54,18 @@ filter_hash["S1_iso_mat"]*b
 filter_hash["S1_iso_mat"]
 
 filter_hash["S1_iso_mat"]*b
+
+function test_compute(i)
+    a = rand(256,256)
+    return eqws_compute_convmap(a,filter_hash)
+end
+
+using Distributed
+
+test = pmap(test_compute,1:10)
+
+DHC_out = hcat(test...)
+
+DHC_out[3,:]
+
+49*69000
