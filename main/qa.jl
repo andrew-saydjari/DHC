@@ -1,5 +1,4 @@
-
-module DHC_tests
+module eqws_qa
 
     using FFTW
     using Plots
