@@ -47,11 +47,20 @@ end
 end
 
 @testset "p_power" begin
-    ref = fink_filter_hash(1,8)
-    test = fink_filter_hash_p(1,8)
+    filter_hash = fink_filter_hash(1,8)
+    test_hash = fink_filter_hash_p(1,8)
 
     a = rand(256,256)
-    orig = eqws_compute(a,ref)
-    new = eqws_compute_p(a,test)
+    orig = eqws_compute(a,filter_hash)
+    new = eqws_compute_p(a,test_hash)
     @test orig ≈ new
+end
+
+@testset "conv_maps" begin
+    a = rand(256,256)
+    filter_hash = fink_filter_hash(1,8)
+    d = eqws_compute_convmap(a,filter_hash)
+    d2 = sum.(d)
+    d1 = eqws_compute(a,filter_hash)
+    @test maximum(abs.(d1.-d2)) < 1e-15
 end

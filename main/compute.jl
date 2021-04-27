@@ -125,7 +125,8 @@ function eqws_compute(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::
 end
 
 function eqws_compute_convmap(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
-    doS2::Bool=true, doS20::Bool=false, norm=true, iso=false, FFTthreads=2, normS1::Bool=false, normS1iso::Bool=false)
+    doS2::Bool=true, doS20::Bool=false, norm=true, iso=false, FFTthreads=2, normS1::Bool=false, normS1iso::Bool=false,
+    p=2)
     # image        - input for WST
     # filter_hash  - filter hash from fink_filter_hash
     # filter_hash2 - filters for second order.  Default to same as first order.
@@ -153,17 +154,17 @@ function eqws_compute_convmap(image::Array{Float64,2}, filter_hash::Dict, filter
     if doS2  S2  = zeros(Float64, Nf, Nf) end  # traditional 2nd order
     if doS20 S20 = zeros(Float64, Nf, Nf) end  # real space correlation
     anyM2 = doS2 | doS20
-    anyrd = doS2 | doS20             # compute real domain with iFFT
 
     # allocate image arrays for internal use
-    if anyrd im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf) end
+    im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf)
+    im_rd_0_2  = Array{Float64, 4}(undef, Nx, Ny, Nf, Nf)
 
     ## 0th Order
     S0[1]   = mean(image)
     norm_im = image.-S0[1]
-    S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
+    S0[2]   = sum(abs.(norm_im).^p)/(Nx*Ny)
     if norm
-        norm_im ./= sqrt(Nx*Ny*S0[2])
+        norm_im ./= (Nx*Ny*S0[2]).^(1/p)
     else
         norm_im = copy(image)
     end
@@ -180,38 +181,27 @@ function eqws_compute_convmap(image::Array{Float64,2}, filter_hash::Dict, filter
     zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
 
     # make a FFTW "plan" for an array of the given size and type
-    if anyrd
-        P = plan_ifft(im_fd_0) end  # P is an operator, P*im is ifft(im)
+    P = plan_ifft(im_fd_0)  # P is an operator, P*im is ifft(im)
 
     ## Main 1st Order and Precompute 2nd Order
     for f = 1:Nf
-        S1tot = 0.0
         f_i = f_ind[f]  # CartesianIndex list for filter
         f_v = f_val[f]  # Values for f_i
-        # for (ind, val) in zip(f_i, f_v)   # this is slower!
         if length(f_i) > 0
-            for i = 1:length(f_i)
-                ind       = f_i[i]
-                zval      = f_v[i] * im_fd_0[ind]
-                S1tot    += abs2(zval)
-                zarr[ind] = zval        # filter*image in Fourier domain
-            end
-            S1[f] = S1tot/(Nx*Ny)  # image power
-            if anyrd
-                im_rd_0_1[:,:,f] .= abs2.(P*zarr) end
+            zarr[f_i] = f_v.*im_fd_0[f_i]
+            im_rd_0_1[:,:,f] .= abs.(P*zarr)
+            S1[f] = sum(im_rd_0_1[:,:,f].^(p))  # image power
+            #zero out the intermediate arrays
             zarr[f_i] .= 0
         end
     end
 
-
-    append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*[im_rd_0_1[:,:,i]  for i in size(im_rd_0_1)[3]] : [im_rd_0_1[:,:,i]  for i in size(im_rd_0_1)[3]])
+    #append!(out_coeff, iso ? filter_hash["S1_iso_mat"].*S1 : S1)
+    append!(out_coeff, [im_rd_0_1[:,:,i].^(p)  for i in 1:Nf])
 
     if normS1iso
         S1iso = vec(reshape(filter_hash["S1_iso_mat"]*S1,(1,:))*filter_hash["S1_iso_mat"])
     end
-
-    # we stored the abs()^2, so take sqrt (this is faster to do all at once)
-    if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
 
     Mat2 = filter_hash["S2_iso_mat"]
     if doS2
@@ -232,11 +222,15 @@ function eqws_compute_convmap(image::Array{Float64,2}, filter_hash::Dict, filter
             for f2 = 1:Nf
                 f_i = f_ind2[f2]  # CartesianIndex list for filter
                 f_v = f_val2[f2]  # Values for f_i
-                # sum im^2 = sum(|fft|^2/npix)
-                S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)/normS1pwr
+                zarr[f_i] = f_v .* thisim[f_i]
+                im_rd_0_2[:,:,f1,f2] .= abs.(P*zarr).^(p)
+                S2[f1,f2] = sum(im_rd_0_2[:,:,f1,f2])/normS1pwr
+                #zero out the intermediate arrays
+                zarr[f_i] .= 0
             end
         end
-        append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
+        #append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
+        append!(out_coeff, [im_rd_0_2[:,:,f1,f2] for f2 in 1:Nf for f1 in 1:Nf])
     end
 
     # Real domain 2nd order
