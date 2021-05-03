@@ -96,6 +96,11 @@ resobj, recon_img = reconstruction_wrapper(true_img, imfilter(init, Kernel.gauss
 plot(heatmap(true_img), heatmap(recon_settings["iteration_init"]), heatmap(recon_img))
 
 
+
+DHC_compute_wrapper(recon_img, filter_hash, norm=false; dhc_args...) .- DHC_compute_wrapper(true_img, filter_hash, norm=false; dhc_args...)
+
+
+
 p= plot([t.value for t in Optim.trace(resobj)])
 plot!(title="Loss: S20 | Targ = S(SFD) | Cov = SFD Covariance", xlabel = "No. Iterations", ylabel = "Loss")
 savefig(p, fname_save * "_trace.png")

@@ -161,7 +161,7 @@ module Data_Utils
             icov = Diagonal(cov.^(-1))
             println("Numerical error wrt Id", mean(abs.((Diagonal(cov) * icov) - I)))
         else #Matrix
-            cov = cov + Diagonal(dstb)
+            cov = Symmetric(cov + Diagonal(dstb))
             println("Cond No before inversion", cond(cov))
             icov = inv(cov)
             println("Numerical error wrt Id", mean(abs.((cov * icov) - I)))
