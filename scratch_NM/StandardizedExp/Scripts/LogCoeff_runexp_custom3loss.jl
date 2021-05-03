@@ -67,7 +67,7 @@ filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
 dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
 
 optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
-recon_settings = Dict([("log", logbool), ("Invcov_matrix", ARGS_buffer[6]), ("optim_settings", optim_settings), ("eps_value_sfd", 1e-10), ("eps_value_init", 1e-10)]) #Add constraints
+recon_settings = Dict([("log", logbool), ("Invcov_matrix", ARGS_buffer[6]), ("optim_settings", optim_settings), ("eps_value_sfd", 1e-5), ("eps_value_init", 1e-10)]) #Add constraints
 
 recon_settings["datafile"] = datfile
 #Read in SFD Dbn
@@ -108,7 +108,7 @@ else #Not iso
     #coeff_maskS1[lowjidx] .= true
     #coeff_maskS1[33] .= true
     #coeff_maskS1[34] = true
-    coeff_masksfd[Nf+3:end] .= true
+    coeff_masksfd[Nf+3:end] .= Diagonal(trues(Nf))[:] #triu(trues(Nf, Nf))[:]
 end
 
 #Construct Init CoeffMask
@@ -136,16 +136,16 @@ ftarginit = log.(DHC_compute_wrapper(imfilter(init, Kernel.gaussian(0.8)), filte
 ftarginit = ftarginit[coeff_maskinit]
 
 #Weight given to terms
-lval2 = 1.0
-lval3=1.0
-recon_settings["lambda2"] = lval2
-recon_settings["lambda3"] = lval3
+lval2 = 10.0
+lval3=0.01
+
 println("Regularizer Lambda=", round(lval3, sigdigits=3))
 #input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, dhc_args, LossFunc, dLossFunc;
 #FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), lambda=0.001, func_specific_params=nothing
-func_specific_params = Dict([(:reg_input=> init), (:coeff_mask2=> coeff_maskinit), (:target2=>ftarginit), (:invcov2=>fcovinv2),
+func_specific_params = Dict([(:reg_input=> init), (:coeff_mask1=> coeff_masksfd), (:target1=>ftargsfd), (:invcov1=>fcovinv1), (:coeff_mask2=> coeff_maskinit), (:target2=>ftarginit), (:invcov2=>fcovinv2),
     (:func=> Data_Utils.fnlog), (:dfunc=> Data_Utils.fndlog)])
-
+func_specific_params[:lambda2] = lval2
+func_specific_params[:lambda3] = lval3
 
 recon_settings["fname_save"] = fname_save * ".jld2"
 recon_settings["optim_settings"] = optim_settings
@@ -154,10 +154,10 @@ if logbool
     error("Not implemented here")
 end
 
-res, recon_img = image_recon_derivsum_custom(init, filter_hash, ftargsfd, fcovinv1, coeff_masksfd, dhc_args, ReconFuncs.Loss3Gaussian_transformed,
-    ReconFuncs.dLoss3Gaussian_transformed!; optim_settings=optim_settings, lambda=lval, func_specific_params)
+res, recon_img = image_recon_derivsum_custom(init, filter_hash, dhc_args, ReconFuncs.Loss3Gaussian_transformed,
+    ReconFuncs.dLoss3Gaussian_transformed!; optim_settings=optim_settings, func_specific_params)
 #save(settings["fname_save"], Dict("true_img"=>true_img, "init"=>noisy_init, "recon"=>recon_img, "dict"=>settings, "trace"=>Optim.trace(res), "coeff_mask"=>coeff_mask, "fhash"=>fhash, "dhc_args"=>dhc_args))
-heatmap(recon_img)
+
 
 function loss1(inp_img)
     s_curr = DHC_compute_wrapper(inp_img, filter_hash, norm=false; dhc_args...)
@@ -170,11 +170,11 @@ function loss2(inp_img)
     s_curr = DHC_compute_wrapper(inp_img, filter_hash, norm=false; dhc_args...)
     s_curr1 = Data_Utils.fnlog(s_curr[coeff_maskinit])
     diff1 = s_curr1 - ftarginit
-    return ( 0.5 .* (diff1)' * fcovinv2 * (diff1))
+    return ( 0.5 *lval2 .* (diff1)' * fcovinv2 * (diff1))
 end
 
 function loss3(inp_img)
-    return 0.5*lval*sum((ReconFuncs.adaptive_apodizer(inp_img, dhc_args) - ReconFuncs.adaptive_apodizer(init, dhc_args)).^2)
+    return 0.5*lval3*sum((ReconFuncs.adaptive_apodizer(inp_img, dhc_args) - ReconFuncs.adaptive_apodizer(init, dhc_args)).^2)
 end
 
 
@@ -196,17 +196,22 @@ println("Recon", loss3(recon_img))
 save("scratch_NM/NewWrapper/4-28/1000_C5_S2sfd_highjinit.jld2", Dict("true_img"=>true_img, "init"=>init, "recon"=>recon_img, "dict"=>recon_settings, "trace"=>Optim.trace(res), "coeff_mask"=>[coeff_masksfd, coeff_maskinit], "fhash"=>filter_hash, "dhc_args"=>dhc_args, "func_specific_params"=>func_specific_params))
 
 
-
+heatmap(recon_img)
 kbins= convert(Array{Float64}, collect(1:32))
-true_ps = Data_Utils.calc_1dps(true_img, kbins)
-initps = Data_Utils.calc_1dps(init, kbins)
-recps = Data_Utils.calc_1dps(recon_img, kbins)
-p = plot(log.(kbins), log.(true_ps), label="True")
+clim=(minimum(apodizer(true_img)), maximum(apodizer(true_img)))
+true_ps = Data_Utils.calc_1dps(apodizer(true_img), kbins)
+initps = Data_Utils.calc_1dps(apodizer(init), kbins)
+recps = Data_Utils.calc_1dps(apodizer(recon_img), kbins)
+p1 = heatmap(apodizer(recon_img), title="Recon", clim=clim)
+p3 = plot(log.(kbins), log.(true_ps), label="True")
 plot!(log.(kbins), log.(recps), label="Recon")
 plot!(log.(kbins), log.(initps), label="Init")
 plot!(title="P(k): LogCoeffs 3 Loss")
 xlabel!("lnk")
 ylabel!("lnP(k)")
+p2 = heatmap(apodizer(true_img), title="True Img", clim=clim)
+p4= heatmap(apodizer(init), title="Init Img", clim=clim)
+p = plot(p1, p2, p3, p4, layout=4, size=(1200, 1200))
 Visualization.plot_synth_QA(apodizer(true_img), apodizer(init), apodizer(recon_img), fname="scratch_NM/NewWrapper/4-28/1000_C5_S2sfd_highjinit.png")
 
 

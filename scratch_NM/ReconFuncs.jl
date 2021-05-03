@@ -234,6 +234,7 @@ module ReconFuncs
     end
 
     #Loss Functions
+    #=
     function Loss3Gaussian(img_curr, filter_hash, dhc_args, coeff_mask1, target1, invcov1, lambda; reg_input=nothing, coeff_mask2=nothing, target2=nothing, invcov2=nothing)
         #func_specific_params should contain: coeff_mask2, target2, invcov2
         s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=false; dhc_args...)
@@ -261,23 +262,23 @@ module ReconFuncs
         dsumterms = wst_S20_deriv_sum(apdimg_curr, filter_hash, wt1)' + wst_S20_deriv_sum(apdimg_curr, filter_hash, wt2)' + reshape(lambda.*(apdimg_curr - adaptive_apodizer(reg_input, dhc_args)), (1, Nx^2))
         storage_grad .= reshape(dsumterms * dA, (Nx, Nx))
     end
+    =#
 
-
-    function Loss3Gaussian_transformed(img_curr, filter_hash, dhc_args, coeff_mask1, target1, invcov1, lambda; reg_input=nothing, coeff_mask2=nothing, target2=nothing, invcov2=nothing, func=nothing, dfunc=nothing)
+    function Loss3Gaussian_transformed(img_curr, filter_hash, dhc_args; coeff_mask1=nothing, target1=nothing, invcov1=nothing, reg_input=nothing, coeff_mask2=nothing, target2=nothing, invcov2=nothing, func=nothing, dfunc=nothing, lambda2=nothing, lambda3=nothing)
         #func_specific_params should contain: coeff_mask2, target2, invcov2
         s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=false; dhc_args...)
         s_curr1 = s_curr[coeff_mask1]
         s_curr2 = s_curr[coeff_mask2]
-        regterm =  0.5*lambda*sum((adaptive_apodizer(img_curr, dhc_args) - adaptive_apodizer(reg_input, dhc_args)).^2)
+        regterm =  0.5*lambda3*sum((adaptive_apodizer(img_curr, dhc_args) - adaptive_apodizer(reg_input, dhc_args)).^2)
         diff1 = func(s_curr1) - target1
         diff2 = func(s_curr2) - target2
         lnlik_sfd = ( 0.5 .* (diff1)' * invcov1 * (diff1))
         s_curr2 = s_curr[coeff_mask2]
-        lnlik_init = ( 0.5 .* (diff2)' * invcov2 * (diff2))
+        lnlik_init = ( 0.5*lambda2 .* (diff2)' * invcov2 * (diff2))
         neglogloss = lnlik_sfd[1] + lnlik_init[1] + regterm
     end
 
-    function dLoss3Gaussian_transformed!(storage_grad, img_curr, filter_hash, dhc_args, coeff_mask1, target1, invcov1, lambda; reg_input=nothing, coeff_mask2=nothing, target2=nothing, invcov2=nothing, dA=nothing, func=nothing, dfunc=nothing)
+    function dLoss3Gaussian_transformed!(storage_grad, img_curr, filter_hash, dhc_args; coeff_mask1=nothing, target1=nothing, invcov1=nothing, reg_input=nothing, coeff_mask2=nothing, target2=nothing, invcov2=nothing, dA=nothing, func=nothing, dfunc=nothing, lambda2=nothing, lambda3=nothing)
         #func_specific_params should contain: coeff_mask2, target2, invcov2
         Nx = size(img_curr)[1]
         #println(Nx)
@@ -293,15 +294,15 @@ module ReconFuncs
         apdimg_curr = adaptive_apodizer(img_curr, dhc_args)
 
         term1 = Deriv_Utils_New.wst_S20_deriv_sum(apdimg_curr, filter_hash, wt1)'
-        term2 = Deriv_Utils_New.wst_S20_deriv_sum(apdimg_curr, filter_hash, wt2)'
-        term3= reshape(lambda.*(apdimg_curr - adaptive_apodizer(reg_input, dhc_args)),(1, Nx^2))
+        term2 = lambda2 .* Deriv_Utils_New.wst_S20_deriv_sum(apdimg_curr, filter_hash, wt2)'
+        term3= reshape(lambda3.*(apdimg_curr - adaptive_apodizer(reg_input, dhc_args)),(1, Nx^2))
         #println(size(term1), size(term2), size(term3))
         dsumterms = term1 + term2 + term3
         storage_grad .= reshape(dsumterms * dA, (Nx, Nx))
     end
 
-    function image_recon_derivsum_custom(input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, coeff_mask, dhc_args, LossFunc, dLossFunc;
-        FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), lambda=0.001, func_specific_params=nothing) #add iso here and a check that returns error if both coeffmask is not nothing and iso is present.
+    function image_recon_derivsum_custom(input::Array{Float64, 2}, filter_hash::Dict, dhc_args, LossFunc, dLossFunc;
+        FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), func_specific_params=nothing) #add iso here and a check that returns error if both coeffmask is not nothing and iso is present.
         #=
         func_specific_params: All the functions, target vectors, covariance matrices etc that go into the loss and its derivative
 
@@ -312,36 +313,22 @@ module ReconFuncs
         Log or Regular: If log then input, targ and cov should have been constructed using log
         Select pixels masked or all floating--not using for masked currently
         Select coefficients optimized wrt
-        Lambda: regularization
 
         Cases NOT handled by this function:
-        Only S1
         Non-Gaussian loss function
         Using the S0 params (mean and variance) in the loss function
         DHC_compute with norm=true
         =#
         #@assert !haskey(dhc_args, :coeff_mask) #remove because you're gonna have two different masks right?
         (N1iso, Nf) = size(filter_hash["S1_iso_mat"])
-        println("Coeff mask:", (coeff_mask!=nothing))
 
         (Nx, Ny)  = size(input)
         if Nx != Ny error("Input image must be square") end
         if !dhc_args[:doS20] error("Not implemented") end
         if Nf == 0 error("filter hash corrupted") end
 
-        #pixmask = pixmask[:] #flattened: Nx^2s #DEB
         ori_input = reshape(copy(input), (Nx^2, 1))
 
-        #=
-        if coeff_mask!=nothing
-            if (!dhc_args[:iso]) & (count((i->i==true), coeff_mask[1:Nf+2])!=0) error("Code assumes S1 coeffs and S0 are masked out") end
-            if (dhc_args[:iso]) & (count((i->i==true), coeff_mask[1:N1iso+2])!=0) error("Code assumes S1iso coeffs and S0 are masked out") end
-            if size(s_targ_mean)[1]!=count((i->(i==true)), coeff_mask) error("s_targ_mean should only contain coeffs to be optimized") end #remove?
-            if size(s_targ_invcov)[1]!=count((i->(i==true)), coeff_mask) error("s_targ_invcov should only have coeffs to be optimized") end
-        else
-            error("You must supply a coeff_mask")
-        end
-        =#
 
         #After this all cases have a coeffmask, and s_targ_mean and s_targ_invcov have the shapes of the coefficients that we want to select.
         #Optimization Hyperparameters
@@ -352,13 +339,13 @@ module ReconFuncs
         dA = get_dApodizer(Nx, dhc_args)
 
         function loss_func20(img_curr::Array{Float64, 2})
-            neglogloss = LossFunc(img_curr, filter_hash, dhc_args, coeff_mask, s_targ_mean, s_targ_invcov, lambda; func_specific_params...) #tonorm
+            neglogloss = LossFunc(img_curr, filter_hash, dhc_args; func_specific_params...) #tonorm
             return neglogloss
         end
         #TODO: Need to replace the deriv_sums20 with a deriv_sum wrapper that handles all cases (S12, S20, S2)
 
         function dloss20(storage_grad::Array{Float64, 2}, img_curr::Array{Float64, 2})
-            dLossFunc(storage_grad, img_curr, filter_hash, dhc_args, coeff_mask, s_targ_mean, s_targ_invcov, lambda; dA=dA, func_specific_params...)
+            dLossFunc(storage_grad, img_curr, filter_hash, dhc_args; dA=dA, func_specific_params...)
             return
         end
 
@@ -379,6 +366,7 @@ module ReconFuncs
         println("Brute:  ",brute)
         println("Clever: ",clever[row, col], " Difference: ", brute - clever[row, col]) #DEB
         println("Initial Loss ", loss_func20(input))
+        #=
         if typeof(minmethod)==ADAM
             result_img = copy(input)
             buffer_grad = zeros(size(input))
@@ -391,9 +379,10 @@ module ReconFuncs
                 Flux.update!(minmethod, result_img, dLoss_adam)
             end
         else
-            res = optimize(loss_func20, dloss20, input, minmethod, Optim.Options(iterations = numitns_dict, store_trace = true, show_trace = true))
-            result_img = Optim.minimizer(res)
-        end
+        =#
+        res = optimize(loss_func20, dloss20, input, minmethod, Optim.Options(iterations = numitns_dict, store_trace = true, show_trace = true))
+        result_img = Optim.minimizer(res)
+        #end
         println("Final Loss ", loss_func20(result_img))
         return res, reshape(result_img, (Nx, Nx))
     end
