@@ -14,7 +14,7 @@ module Deriv_Utils_New
 
     # put the cwd on the path so Julia can find the module
     push!(LOAD_PATH, pwd()*"/main")
-    using DHC_2DUtils
+    using eqws
 
 
 
@@ -416,7 +416,7 @@ module Deriv_Utils_New
         wts1 = reshape(wt[1:Nf], (Nf, 1))
         wts2 = reshape(wt[Nf+1:end], (Nf, Nf))
 
-        dwS1 = reshape(wst_S1_deriv(image, filter_hash), (Nx^2, Nf)) * wts1 #NOTE: Replace this with DHC_2DUtils.wst_S1_deriv
+        dwS1 = reshape(wst_S1_deriv(image, filter_hash), (Nx^2, Nf)) * wts1 #NOTE: Replace this with eqws_2DUtils.wst_S1_deriv
         dwS2 = reshape(wst_S2_deriv_sum(image, filter_hash, wts2), (Nx^2, 1))
         #println(size(dwS1), size(dwS2))
         return dwS1 + dwS2 #Why was another reshape needed here?
@@ -541,7 +541,7 @@ module Deriv_Utils_New
         No Regularization
         Non-Gaussian loss function
         Using the S0 params (mean and variance) in the loss function
-        DHC_compute with norm=true
+        eqws_compute with norm=true
         Log
         Apodizing
         =#
@@ -584,14 +584,14 @@ module Deriv_Utils_New
 
             function loss_func(img_curr)
                 #size(img_curr) must be (Nx^2, 1)
-                s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=true, doS12=false, doS20=false, norm=tonorm)[coeff_mask]
+                s_curr = eqws_compute(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=true, doS12=false, doS20=false, norm=tonorm)[coeff_mask]
                 neglogloss = 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean)
                 return neglogloss[1]
             end
 
             function dloss(storage_grad, img_curr)
                 #storage_grad, img_curr must be (Nx^2, 1)
-                s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=tonorm)[coeff_mask]
+                s_curr = eqws_compute(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=tonorm)[coeff_mask]
                 diff = s_curr - s_targ_mean
                 wts1s2 = zeros(Nf+Nf^2)
                 wtall = reshape(diff' * s_targ_invcov, num_freecoeff)
@@ -609,7 +609,7 @@ module Deriv_Utils_New
             chisq1 = loss_func(input+eps./2)
             chisq0 = loss_func(input-eps./2)
             brute  = (chisq1-chisq0)/1e-4
-            #df_brute = DHC_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
+            #df_brute = eqws_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
             clever = reshape(zeros(size(input)), (Nx*Nx, 1))
             _bar = dloss(clever, reshape(input, (Nx^2, 1)))
             #println("dS1S2comb check")
@@ -661,14 +661,14 @@ module Deriv_Utils_New
 
             function loss_func20(img_curr)
                 #size(img_curr) must be (Nx^2, 1)
-                s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=false, doS12=false, doS20=true, norm=tonorm)[coeff_mask]
+                s_curr = eqws_compute(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=false, doS12=false, doS20=true, norm=tonorm)[coeff_mask]
                 neglogloss = 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean)
                 return neglogloss[1]
             end
 
             function dloss20(storage_grad, img_curr)
                 #storage_grad, img_curr must be (Nx^2, 1)
-                s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=false, doS12=false, doS20=true, norm=tonorm)[coeff_mask]
+                s_curr = eqws_compute(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=false, doS12=false, doS20=true, norm=tonorm)[coeff_mask]
                 diff = s_curr - s_targ_mean
                 wt = reshape(convert(Array{Float64, 2}, transpose(diff) * s_targ_invcov), (Nf, Nf))
                 dterm = wst_S20_deriv_sum(reshape(img_curr, (Nx, Nx)), filter_hash, wt, FFTthreads=FFTthreads)
@@ -684,7 +684,7 @@ module Deriv_Utils_New
             chisq1 = loss_func20(input+eps./2)
             chisq0 = loss_func20(input-eps./2)
             brute  = (chisq1-chisq0)/1e-4
-            #df_brute = DHC_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
+            #df_brute = eqws_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
             clever = reshape(zeros(size(input)), (Nx*Nx, 1))
             _bar = dloss20(clever, reshape(input, (Nx^2, 1)))
             println("Chisq Derve Check")
@@ -725,14 +725,14 @@ module Deriv_Utils_New
 
              function loss_func12(img_curr)
                  #size(img_curr) must be (Nx^2, 1)
-                 s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=false, doS12=true, doS20=false, norm=tonorm)[coeff_mask]
+                 s_curr = eqws_compute(reshape(img_curr, (Nx, Nx)),  filter_hash, doS2=false, doS12=true, doS20=false, norm=tonorm)[coeff_mask]
                  neglogloss = 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean)
                  return neglogloss[1]
              end
 
              function dloss12(storage_grad, img_curr)
                  #storage_grad, img_curr must be (Nx^2, 1)
-                 s_curr = DHC_compute(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=false, doS12=true, doS20=false, norm=tonorm)[coeff_mask]
+                 s_curr = eqws_compute(reshape(img_curr, (Nx, Nx)), filter_hash, doS2=false, doS12=true, doS20=false, norm=tonorm)[coeff_mask]
                  diff = s_curr - s_targ_mean
                  wt = transpose(diff) * s_targ_invcov
                  storage_grad .= reshape(wst_S12_deriv(reshape(img_curr, (Nx, Nx)), filter_hash, FFTthreads=FFTthreads), (Nx^2, Nf^2))[:, coeffmask_S12] * transpose(wt) #->(nx^2, 1)
@@ -747,7 +747,7 @@ module Deriv_Utils_New
              chisq1 = loss_func12(input+eps./2)
              chisq0 = loss_func12(input-eps./2)
              brute  = (chisq1-chisq0)/1e-4
-             #df_brute = DHC_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
+             #df_brute = eqws_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
              clever = reshape(zeros(size(input)), (Nx*Nx, 1))
              _bar = dloss12(clever, reshape(input, (Nx^2, 1)))
              println("Chisq Derve Check")
@@ -762,7 +762,7 @@ module Deriv_Utils_New
     end
     =#
     function image_recon_derivsum_regularized(input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, pixmask::BitArray{2}, dhc_args;
-        FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), coeff_mask=nothing, lambda=0.001,show_trace0::Bool=true) #add iso here and a check that returns error if both coeffmask is not nothing and iso is present.
+        FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), coeff_mask::BitArray{1}=nothing, lambda=0.001,show_trace0::Bool=true) #add iso here and a check that returns error if both coeffmask is not nothing and iso is present.
         #=
         Cases to be handled by this function:
         S20
@@ -777,7 +777,7 @@ module Deriv_Utils_New
         Only S1
         Non-Gaussian loss function
         Using the S0 params (mean and variance) in the loss function
-        DHC_compute with norm=true
+        eqws_compute with norm=true
         =#
         (N1iso, Nf) = size(filter_hash["S1_iso_mat"])
         println("Coeff mask:", (coeff_mask!=nothing))
@@ -857,7 +857,7 @@ module Deriv_Utils_New
         end
 
         function loss_func20(img_curr::Array{Float64, 2})
-            s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
+            s_curr = eqws_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
             regterm =  0.5*lambda*sum((adaptive_apodizer(img_curr) - adaptive_apodizer(input)).^2)
             lnlik = ( 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean))
             neglogloss = lnlik[1] + regterm
@@ -866,7 +866,7 @@ module Deriv_Utils_New
         #TODO: Need to replace the deriv_sums20 with a deriv_sum wrapper that handles all cases (S12, S20, S2)
 
         function dloss20(storage_grad::Array{Float64, 2}, img_curr::Array{Float64, 2})
-            s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
+            s_curr = eqws_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
             diff = s_curr - s_targ_mean
             #Add branches here
             wt = augment_weights(convert(Array{Float64,1}, reshape(transpose(diff) * s_targ_invcov, (length(diff),))))
@@ -885,7 +885,7 @@ module Deriv_Utils_New
         chisq1 = loss_func20(input+eps./2) #DEB
         chisq0 = loss_func20(input-eps./2) #DEB
         brute  = (chisq1-chisq0)/epsmag
-        #df_brute = DHC_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
+        #df_brute = eqws_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
         clever = zeros(size(input)) #DEB
         meanval = mean(adaptive_apodizer(input)) ./ mean(wind_2d(Nx))
         _bar = dloss20(clever, input) #DEB
@@ -915,7 +915,7 @@ module Deriv_Utils_New
         Only S1
         Non-Gaussian loss function
         Using the S0 params (mean and variance) in the loss function
-        DHC_compute with norm=true
+        eqws_compute with norm=true
         =#
         (N1iso, Nf) = size(filter_hash["S1_iso_mat"])
         println("Coeff mask:", (coeff_mask!=nothing))
@@ -995,7 +995,7 @@ module Deriv_Utils_New
         end
 
         function loss_func2(img_curr::Array{Float64, 2})
-            s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
+            s_curr = eqws_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
             regterm =  0.5*lambda*sum((adaptive_apodizer(img_curr) - adaptive_apodizer(input)).^2)
             lnlik = ( 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean))
             neglogloss = lnlik[1] + regterm
@@ -1004,7 +1004,7 @@ module Deriv_Utils_New
         #TODO: Need to replace the deriv_sums20 with a deriv_sum wrapper that handles all cases (S12, S20, S2)
 
         function dloss2(storage_grad::Array{Float64, 2}, img_curr::Array{Float64, 2})
-            s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
+            s_curr = eqws_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
             diff = s_curr - s_targ_mean
             #Add branches here
             wt = augment_weights(convert(Array{Float64,1}, reshape(transpose(diff) * s_targ_invcov, (length(diff),))))
@@ -1023,7 +1023,7 @@ module Deriv_Utils_New
         chisq1 = loss_func2(input+eps./2) #DEB
         chisq0 = loss_func2(input-eps./2) #DEB
         brute  = (chisq1-chisq0)/epsmag
-        #df_brute = DHC_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
+        #df_brute = eqws_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
         clever = zeros(size(input)) #DEB
         meanval = mean(adaptive_apodizer(input)) ./ mean(wind_2d(Nx))
         _bar = dloss2(clever, input) #DEB
@@ -1121,8 +1121,8 @@ module Deriv_Utils_New
         end
 
         function loss_func20(img_curr::Array{Float64, 2})
-            #println(typeof(DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]))
-            s_curr = func(DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]) #Edit
+            #println(typeof(eqws_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]))
+            s_curr = func(eqws_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]) #Edit
             regterm =  0.5*lambda*sum((adaptive_apodizer(img_curr) - adaptive_apodizer(input)).^2)
             lnlik = ( 0.5 .* (s_curr - fs_targ_mean)' * fs_targ_invcov * (s_curr - fs_targ_mean))
             neglogloss = lnlik[1] + regterm
@@ -1131,7 +1131,7 @@ module Deriv_Utils_New
         #TODO: Need to replace the deriv_sums20 with a deriv_sum wrapper that handles all cases (S12, S20, S2)
 
         function dloss20(storage_grad::Array{Float64, 2}, img_curr::Array{Float64, 2})
-            s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
+            s_curr = eqws_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
             diff = func(s_curr) - fs_targ_mean
             #Add branches here
             wt = convert(Array{Float64,1}, reshape(transpose(diff) * fs_targ_invcov, (length(diff),))) .* dfunc(s_curr)
@@ -1152,7 +1152,7 @@ module Deriv_Utils_New
         chisq1 = loss_func20(input+eps./2) #DEB
         chisq0 = loss_func20(input-eps./2) #DEB
         brute  = (chisq1-chisq0)/epsmag
-        #df_brute = DHC_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
+        #df_brute = eqws_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
         clever = zeros(size(input)) #DEB
         meanval = mean(adaptive_apodizer(input)) ./ mean(wind_2d(Nx))
         _bar = dloss20(clever, input) #DEB
@@ -1182,7 +1182,7 @@ module Deriv_Utils_New
         Only S1
         Non-Gaussian loss function
         Using the S0 params (mean and variance) in the loss function
-        DHC_compute with norm=true
+        eqws_compute with norm=true
         =#
         (N1iso, Nf) = size(filter_hash["S1_iso_mat"])
         println("Coeff mask:", (coeff_mask!=nothing))
@@ -1262,7 +1262,7 @@ module Deriv_Utils_New
         end
 
         function loss_func20(img_curr::Array{Float64, 2})
-            s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
+            s_curr = eqws_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
             regterm =  0.5*lambda*sum((adaptive_apodizer(img_curr) - adaptive_apodizer(input)).^2)
             lnlik = ( 0.5 .* (s_curr - s_targ_mean)' * s_targ_invcov * (s_curr - s_targ_mean))
             neglogloss = lnlik[1] + regterm
@@ -1271,7 +1271,7 @@ module Deriv_Utils_New
         #TODO: Need to replace the deriv_sums20 with a deriv_sum wrapper that handles all cases (S12, S20, S2)
 
         function dloss20(storage_grad::Array{Float64, 2}, img_curr::Array{Float64, 2})
-            s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
+            s_curr = eqws_compute_wrapper(img_curr, filter_hash, norm=tonorm; dhc_args...)[coeff_mask]
             diff = s_curr - s_targ_mean
             #Add branches here
             wt = augment_weights(convert(Array{Float64,1}, reshape(transpose(diff) * s_targ_invcov, (length(diff),))))
@@ -1290,7 +1290,7 @@ module Deriv_Utils_New
         chisq1 = loss_func20(input+eps./2) #DEB
         chisq0 = loss_func20(input-eps./2) #DEB
         brute  = (chisq1-chisq0)/epsmag
-        #df_brute = DHC_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
+        #df_brute = eqws_compute(reshape(input, (Nx, Nx)), filter_hash, doS2=true, doS12=false, doS20=false, norm=false)[coeff_mask] - s_targ_mean
         clever = zeros(size(input)) #DEB
         meanval = mean(adaptive_apodizer(input)) ./ mean(wind_2d(Nx))
         _bar = dloss20(clever, input) #DEB
