@@ -24,7 +24,7 @@ using Visualization
 using ReconFuncs
 
 
-numfile = Base.parse(Int, ENV["SLURM_ARRAY_TASK_ID"]) 
+numfile = Base.parse(Int, ENV["SLURM_ARRAY_TASK_ID"])
 println(numfile, ARGS[1], ARGS[2])
 
 if ARGS[1]=="log"
@@ -74,7 +74,7 @@ optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", Conj
 recon_settings = Dict([("target_type", "sfd_dbn"), ("covar_type", "sfd_dbn"), ("log", logbool), ("GaussianLoss", true), ("Invcov_matrix", ARGS[6]),
   ("optim_settings", optim_settings), ("white_noise_args", white_noise_args)]) #Add constraints
 
-recon_settings["datafile"] = datfile 
+recon_settings["datafile"] = datfile
 
 regs_true = DHC_compute_wrapper(log.(true_img), filter_hash; norm=false, dhc_args...)[coeff_mask]
 s2mean, s2icov = meancov_generator(true_img, filter_hash, dhc_args, coeff_mask, recon_settings, safety=nothing)

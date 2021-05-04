@@ -17,9 +17,9 @@ using Flux
 using StatsBase
 using SparseArrays
 
-push!(LOAD_PATH, pwd()*"/main")
+push!(LOAD_PATH, pwd()*"../main")
 using DHC_2DUtils
-push!(LOAD_PATH, pwd()*"/scratch_NM")
+push!(LOAD_PATH, pwd()*"../scratch_NM")
 using Deriv_Utils_New
 using Data_Utils
 using Visualization
