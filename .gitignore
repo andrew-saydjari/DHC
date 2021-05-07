@@ -49,5 +49,8 @@ Daily/2021_04_11int.ipynb
 *.e
 *.o
 
+#Specific Large files
+scratch_NM/NewWrapper/4-28/Covariance\ Samples\ Vis.ipynb
+
 #Trash
 scratch_NM/Trash/*
