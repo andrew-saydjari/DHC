@@ -310,7 +310,7 @@ module Data_Utils
         end
     end
 
-    function calc_1dps(image::Array{Float64,2}, kbins::Array{Float64,1})
+    function calc_1dps(image, kbins::Array{Float64,1})
         #Assumes uniformly spaced kbins
         Nx = size(image)[1]
         fft_zerocenter = fftshift(fft(image))
