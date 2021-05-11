@@ -501,3 +501,62 @@ function S2_equiv_matrix(fhash,l_shift)
 
     return sparse(Mat)
 end
+
+## Assist in convmap
+
+function pre_subdivide(coeff_list; sub_block = 0)
+    Nc, Ns = size(coeff_list)
+    Nx, Ny = size(coeff_list[3])
+    out_maps = zeros(Nx,Ny,Nc-2,Ns)
+    for i=1:Ns
+        out_maps[:,:,:,i] .= cat(coeff_list[3:end,i]...,dims=3)
+    end
+
+    out = zeros(Int(2^(sub_block)),Int(2^(sub_block)),size(out_maps)[3],size(out_maps)[4])
+    red = Nx/(2^(sub_block))
+    for i=1:Nx
+        for j=1:Ny
+            out[ceil(Int,i/red),ceil(Int,j/red),:,:] .+=  out_maps[i,j,:,:]
+        end
+    end
+    return out
+end
+
+function post_subdivide(coeff_maps; sub_block = 0)
+    Nx, Ny, Nc, Ns = size(coeff_maps)
+
+    out = zeros(Int(2^(sub_block)),Int(2^(sub_block)),size(out_maps)[3],size(out_maps)[4])
+    red = Nx/(2^(sub_block))
+    for i=1:Nx
+        for j=1:Ny
+            out[ceil(Int,i/red),ceil(Int,j/red),:,:] .+=  out_maps[i,j,:,:]
+        end
+    end
+    return out
+end
+
+function sub_strip(coeff_maps, lab; sub_bl_size=64)
+    Nx, Ny, Nc, Ns  = size(coeff_maps)
+    Nl = size(lab)[1]
+    out_stripped = zeros(Nc,Nx*Ny*Ns)
+    new_lab = zeros(Nl,Nx*Ny*Ns)
+    for k=1:Ns
+        for i=1:Nx
+            for j=1:Ny
+                new_lab[:,i+Nx*(j-1)+Nx*Ny*(k-1)] .= lab[:,k] .+ [0; 0; 0; 0; 0; sub_bl_size*(i-1); sub_bl_size*(j-1)]
+                out_stripped[:,i+Nx*(j-1)+Nx*Ny*(k-1)] .= out[i,j,:,k]
+            end
+        end
+    end
+    return out_stripped, new_lab
+end
+
+function renorm(coeff_mats,filter_hash)
+    Nc, Ns  = size(coeff_maps)
+    Nf = size(filter_hash["filt_index"])[1]
+
+    S1normed = coeff_mats[1:Nf,:]./sum(coeff_mats[1:Nf,:],dims=1)
+    S2normed = coeff_mats[Nf+1:end,:]./sum(coeff_mats[Nf+1:end,:],dims=1)
+
+    return vcat(S1normed,S2normed)
+end
