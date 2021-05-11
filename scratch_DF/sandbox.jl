@@ -16,10 +16,10 @@ using Distributions
 
 # put the cwd on the path so Julia can find the module
 push!(LOAD_PATH, pwd()*"/main")
-using DHC_2DUtils
-using DHC_tests
+using eqws
+#using DHC_tests
 
-@time fhash = fink_filter_hash(1, 8, nx=64, pc=1, wd=1)
+@time fhash = fink_filter_hash(1, 8, nx=64, t=1, wd=1)
 
 
 
@@ -33,6 +33,64 @@ function realspace_filter(Nx, f_i, f_v)
     return filt
 end
 
+
+# spitballing here...
+
+filt = realspace_filter(Nx, f_i, f_v)
+filt2 = abs2.(filt)
+predvar =ifft(fft(sigim.^2) .* fft(filt2))
+
+function foobar(image, Ntrial, sigim)
+
+    Nx    = size(image,1)
+    fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+    psi_ind = fhash["psi_index"]
+    filt_ind = psi_ind[3,3]
+
+    f_ind = fhash["filt_index"]
+    f_val = fhash["filt_value"]
+    im_fd_0 = fft(image)
+    zarr = zeros(ComplexF64,Nx,Nx)
+    out  = zeros(ComplexF64,Nx,Nx,Ntrial)
+    P = plan_ifft(im_fd_0)
+
+    f = filt_ind
+    S1tot = 0.0
+    f_i = f_ind[f]  # CartesianIndex list for filter
+    f_v = f_val[f]  # Values for f_i
+
+    #for f = 1:Nf
+
+    zval       = f_v .* im_fd_0[f_i]
+    S1tot      = sum(abs2.(zval))
+    zarr[f_i] .= zval        # filter*image in Fourier domain
+    Zλ = P*zarr
+    zarr[f_i] .= 0
+
+
+    for itrial = 1:Ntrial
+
+        noise      = sigim .* randn(Nx,Nx)
+        dimage     = image+noise
+        im_fd_0    = fft(dimage)
+        zval       = f_v .* im_fd_0[f_i]
+        S1tot      = sum(abs2.(zval))
+        zarr[f_i] .= zval        # filter*image in Fourier domain
+
+        #S1[f] = S1tot/(Nx*Ny)  # image power
+        #im_rd_0_1[:,:,f] .= abs2.(P*zarr)
+        out[:,:,itrial] = P*zarr
+        zarr[f_i] .= 0
+
+    end
+    return out, Zλ
+end
+🙄=5
+🌖angle = 10
+sigim = ones(Nx,Nx).*10
+#sigim[33,33:34].=1
+out,Zλ = foobar(im,10000,sigim)
+bar    = std(out,dims=3)[:,:,1]
 
 
 Nx = 256
@@ -181,8 +239,8 @@ derivtestS1S2(8)
 println(1)
 
 function derivtest2(Nx)
-    eps = 1e-4
-    fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+    eps = 1e-5
+    fhash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1)
     im = rand(Float64, Nx, Nx).*0.1
     im[6,6]=1.0
     im1 = copy(im)
@@ -191,8 +249,8 @@ function derivtest2(Nx)
     im0[2,3] -= eps/2
     dS20dp = wst_S20_deriv(im, fhash)
 
-    der0=DHC_compute(im0,fhash,doS2=false,doS20=true)
-    der1=DHC_compute(im1,fhash,doS2=false,doS20=true)
+    der0=eqws_compute(im0,fhash,doS2=false,doS20=true,norm=false)
+    der1=eqws_compute(im1,fhash,doS2=false,doS20=true,norm=false)
     dS = (der1-der0) ./ eps
 
     Nf = length(fhash["filt_index"])
@@ -351,6 +409,7 @@ im = rand(Nx,Nx)
 @benchmark Sarr = DHC_compute(im, fhash, doS2=false, doS20=true)  # 6.6 ms
 
 
+
 Nx=256
 im = rand(Nx,Nx)
 @time fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
@@ -495,8 +554,11 @@ function readphoto(N)
     RGBA_img = load(pwd()*"/../WSTphotos/"*flist[N])
     #RGBA_img = load("/n/home08/dfink/DHC/scratch_DF/t115_clean_small.png")
     img = reinterpret(UInt8,rawview(channelview(RGBA_img)))
-    temp = Float64.(sum(img,dims=1)[1,:,:])
-    return temp[end:-1:1,:]
+    temp = (Float64.(sum(img,dims=1)[1,:,:]))[end:-1:1,:]
+    mintemp = minimum(temp)
+    maxtemp = maximum(temp)
+    output = (temp.-mintemp).*(255.0 / (maxtemp-mintemp))
+    return output
 end
 
 
@@ -510,7 +572,7 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
 
         M20 = fhash["S2_iso_mat"]
 
-        S20 = DHC_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso)
+        S20 = eqws_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso)
         i0 = 3+(iso ? N1iso : Nf)
         diff  = ((S20[i0:end] - S_targ)./S20sig)
 
@@ -530,7 +592,7 @@ function wst_synthS20(im_init, fixmask, S_targ, S20sig; iso=false)
         thisim[indfloat] = vec_in
 
         i0 = 3+(iso ? N1iso : Nf)
-        S20arr = (DHC_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
+        S20arr = (eqws_compute(thisim, fhash, doS2=false, doS20=true, norm=false, iso=iso))[i0:end]
         diff   = (S20arr - S_targ)./(S20sig.^2)
         if iso
             diffwt = diff[indiso]
@@ -603,12 +665,12 @@ function S20_weights(im, fhash, Nsam=10; iso=iso)
 
     # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
 
-    S20   = DHC_compute(im, fhash, doS2=false, doS20=true, norm=false, iso=iso)
+    S20   = eqws_compute(im, fhash, doS2=false, doS20=true, norm=false, iso=iso)
     Ns    = length(S20)
     S20arr = zeros(Float64, Ns, Nsam)
     for j=1:Nsam
         noise = rand(Nx,Nx)
-        S20arr[:,j] = DHC_compute(im+noise, fhash, doS2=false, doS20=true, norm=false, iso=iso)
+        S20arr[:,j] = eqws_compute(im+noise, fhash, doS2=false, doS20=true, norm=false, iso=iso)
     end
 
     wt = zeros(Float64, Ns)
@@ -630,14 +692,14 @@ doiso  = true
 initimg = imresize(readphoto(2),Nx,Nx)
 initimg = 250 .* (initimg./maximum(initimg))
 
-fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1, Omega=true)
+fhash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
 (N1iso, Nf)    = size(fhash["S1_iso_mat"])
 i0 = 3+(doiso ? N1iso : Nf)
 im    = imresize(dust,(Nx,Nx))
 fixmask = rand(Nx,Nx) .< 0.01
 
 
-S_targ = DHC_compute(im, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
+S_targ = eqws_compute(im, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
 S_targ = S_targ[i0:end]
 
 init = copy(im)
@@ -653,7 +715,7 @@ init[fixind] .= im[fixind]
 S20sig = S20_weights(im, fhash, 100, iso=doiso)
 S20sig = S20sig[i0:end]
 foo = wst_synthS20(init, fixmask, S_targ, S20sig, iso=doiso)
-S_foo = DHC_compute(foo, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
+S_foo = eqws_compute(foo, fhash, doS2=false, doS20=true, norm=false, iso=doiso)
 
 
 Profile.clear()
@@ -967,3 +1029,687 @@ heatmap(init,clim=(-0.6,0.6))
 heatmap(exp.(im),clim=(0.5,1.8))
 heatmap(exp.(foo),clim=(0.5,1.8))
 heatmap(exp.(init),clim=(0.5,1.8))
+
+
+
+function my_DHC_compute(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict=filter_hash, sigim=nothing;
+    doS2::Bool=true, doS12::Bool=false, doS20::Bool=false, norm=true, iso=false, FFTthreads=2)
+    # image        - input for WST
+    # filter_hash  - filter hash from fink_filter_hash
+    # filter_hash2 - filters for second order.  Default to same as first order.
+    # doS2         - compute S2 coeffs
+    # doS12        - compute S2 coeffs
+    # doS20        - compute S2 coeffs
+    # norm         - scale to mean zero, unit variance
+    # iso          - sum over angles to obtain isotropic coeffs
+
+    # Use 2 threads for FFT
+    FFTW.set_num_threads(FFTthreads)
+
+    # array sizes
+    (Nx, Ny)  = size(image)
+    if Nx != Ny error("Input image must be square") end
+    (Nf, )    = size(filter_hash["filt_index"])
+    if Nf == 0  error("filter hash corrupted") end
+    @assert Nx==filter_hash["npix"] "Filter size should match npix"
+    @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
+
+    # allocate coeff arrays
+    out_coeff = []
+    S0  = zeros(Float64, 2)
+    S1  = zeros(Float64, Nf)
+    if doS2  S2  = zeros(Float64, Nf, Nf) end  # traditional 2nd order
+    if doS12 S12 = zeros(Float64, Nf, Nf) end  # Fourier correlation
+    if doS20 S20 = zeros(Float64, Nf, Nf) end  # real space correlation
+    anyM2 = doS2 | doS12 | doS20
+    anyrd = doS2 | doS20             # compute real domain with iFFT
+
+    # allocate image arrays for internal use
+    if doS12 im_fdf_0_1 = zeros(Float64,           Nx, Ny, Nf) end   # this must be zeroed!
+    if anyrd im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf) end
+
+    ## 0th Order
+    S0[1]   = mean(image)
+    norm_im = image.-S0[1]
+    S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
+    if norm
+        norm_im ./= sqrt(Nx*Ny*S0[2])
+    else
+        norm_im = copy(image)
+    end
+
+    append!(out_coeff,S0[:])
+
+    ## 1st Order
+    im_fd_0 = fft(norm_im)  # total power=1.0
+
+    # unpack filter_hash
+    f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+    f_val   = filter_hash["filt_value"]
+    fvar = fft(sigim.^2)
+    zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
+
+    # make a FFTW "plan" for an array of the given size and type
+    if anyrd
+        P = plan_ifft(im_fd_0) end  # P is an operator, P*im is ifft(im)
+
+    ## Main 1st Order and Precompute 2nd Order
+    for f = 1:Nf
+        S1tot = 0.0
+        f_i = f_ind[f]  # CartesianIndex list for filter
+        f_v = f_val[f]  # Values for f_i
+        # for (ind, val) in zip(f_i, f_v)   # this is slower!
+        if length(f_i) > 0
+            for i = 1:length(f_i)
+                ind       = f_i[i]
+                zval      = f_v[i] * im_fd_0[ind]
+                S1tot    += abs2(zval)
+                zarr[ind] = zval        # filter*image in Fourier domain
+                if doS12 im_fdf_0_1[ind,f] = abs(zval) end
+            end
+            S1[f] = S1tot/(Nx*Ny)  # image power
+            if anyrd
+                fpsi = fft(abs2.(realspace_filter(Nx, f_ind[f], f_val[f])))
+                extrapower = ifft(fvar.*fpsi)
+                im_rd_0_1[:,:,f] .= abs2.(P*zarr) .+ abs.(extrapower)
+            #    im_rd_0_1[:,:,f] .= abs2.(P*zarr) .+ sigim.^2 .*(sum(f_v.^2)/(Nx*Nx))
+            end
+            zarr[f_i] .= 0
+        end
+    end
+
+    append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
+
+
+    # we stored the abs()^2, so take sqrt (this is faster to do all at once)
+    if anyrd im_rd_0_1 .= sqrt.(im_rd_0_1) end
+
+    Mat2 = filter_hash["S2_iso_mat"]
+    if doS2
+        f_ind2   = filter_hash2["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val2   = filter_hash2["filt_value"]
+
+        ## Traditional second order
+        for f1 = 1:Nf
+            thisim = fft(im_rd_0_1[:,:,f1])  # Could try rfft here
+            # println("  f1",f1,"  sum(fft):",sum(abs2.(thisim))/Nx^2, "  sum(im): ",sum(abs2.(im_rd_0_1[:,:,f1])))
+            # Loop over f2 and do second-order convolution
+            for f2 = 1:Nf
+                f_i = f_ind2[f2]  # CartesianIndex list for filter
+                f_v = f_val2[f2]  # Values for f_i
+                # sum im^2 = sum(|fft|^2/npix)
+                S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)
+            end
+        end
+        append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
+    end
+
+    # Fourier domain 2nd order
+    if doS12
+        Amat = reshape(im_fdf_0_1, Nx*Ny, Nf)
+        S12  = Amat' * Amat
+        append!(out_coeff, iso ? Mat2*S12[:] : S12[:])
+    end
+
+    # Real domain 2nd order
+    if doS20
+        Amat = reshape(im_rd_0_1, Nx*Ny, Nf)
+        S20  = Amat' * Amat
+        append!(out_coeff, iso ? Mat2*S20[:] : S20[:])
+    end
+
+    return out_coeff
+end
+
+
+function psi_matrix(fhash)
+    (N1iso, Nf)    = size(fhash["S1_iso_mat"])
+    Nx = fhash["npix"]
+    rfilt = zeros(ComplexF64, Nx, Nx, Nf)
+    f_ind = fhash["filt_index"]
+    f_val = fhash["filt_value"]
+
+    for i = 1:Nf
+        rfilt[:,:,i] = realspace_filter(Nx, f_ind[i], f_val[i])
+    end
+    rfilt = abs.(reshape(rfilt,Nx*Nx,Nf))
+    prod = rfilt' * rfilt
+
+    return prod
+end
+
+# read dust map
+dust = Float64.(readdust())
+dust = dust[1:256,1:256]
+
+Nx     = 16
+Nsam   = 40000
+doiso  = false
+doS2   = false
+doS20  = true
+img    = imresize(dust,Nx,Nx)
+fhash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+(N1iso, Nf)    = size(fhash["S1_iso_mat"])
+(N2iso, _)    = size(fhash["S2_iso_mat"])
+i0 = doiso ? 3+N1iso : 3+Nf
+sigim = zeros(Nx,Nx)  # sigma for each pixel
+sigim[1:Nx÷2,:] .= 20
+#sigim = zeros(Nx,Nx)  # sigma for each pixel
+#sigim[Nx÷2,Nx÷2] = 10
+#sigim[2,5] = 10
+
+img0  = img .- mean(img)
+Smean, Scov = S20_noisecovar(img0, fhash, sigim, Nsam, iso=doiso, doS2=doS2, doS20=doS20)
+
+dS20dp = wst_S20_deriv(img0, fhash)
+Scoeff = (eqws_compute(img0, fhash,  doS2=doS2, doS20=doS20, norm=false, iso=doiso))[i0:end]
+Stry = (my_DHC_compute(img0, fhash, fhash, sigim,  doS2=doS2, doS20=doS20, norm=false, iso=doiso))[i0:end]
+
+G = reshape(dS20dp, Nx*Nx, Nf*Nf) .* reshape(sigim, Nx*Nx, 1)
+pred = G'*G
+fracerr = (Scov - pred) ./ Scov
+
+fval = fhash["filt_value"]
+psi2 = [sum(vals.^2)/Nx^2 for vals in fval]
+diff = Smean-Scoeff
+
+prod = psi_matrix(fhash)
+
+plot(diff)
+plot!((Stry-Scoeff))  # why 0.66 ????
+
+
+plot!(reshape(prod.*25600 .*2,Nf*Nf))
+
+
+
+
+filt1 = realspace_filter(Nx, f_ind[1], f_val[1])
+filt2 = realspace_filter(Nx, f_ind[3], f_val[3])
+
+img = randn(Nx,Nx)
+img0  = img .- mean(img)
+
+Z1 = ifft(fft(img0).*fft(filt1))
+cplot(Z1)
+cplot!(Z1 + 2. *filt1)
+
+
+Z2 = ifft(fft(img0).*fft(filt2))
+
+heatmap(abs.(Z1))
+S2 = sum(abs.(Z1).*abs.(Z2))
+S2c = sum(abs.(Z1+filt1).*abs.(Z2+filt2))
+
+S2all = [sum(abs.(Z1+α.*filt1).*abs.(Z2+α.*filt2)) for α in randn(100000) ]
+
+foo=Z1.*Z2 + filt1.*Z2 + filt2.*Z1 + filt1.*filt2
+
+function cplot(Zarr)
+    ZZ = reshape(Zarr,length(Zarr))
+    plot(real.(ZZ), imag.(ZZ), seriestype=:scatter,size=(300,300),aspect_ratio=1)
+end
+
+function cplot!(Zarr)
+    ZZ = reshape(Zarr,length(Zarr))
+    plot!(real.(ZZ), imag.(ZZ), seriestype=:scatter)
+end
+
+
+
+##########################
+# Bruno's method
+##########################
+
+
+# Bruno's method: estimate mean and covariance from noise realizations (slow)
+function S20_noisecovar(im, fhash, σmap, Nsam=10; iso=iso, doS2=false, doS20=false)
+
+    (Nx, Ny)  = size(im)
+    if Nx != Ny error("Input image must be square") end
+    (N1iso, Nf) = size(fhash["S1_iso_mat"])
+    (N2iso, _)  = size(fhash["S2_iso_mat"])
+    # fhash = fink_filter_hash(1, 8, nx=Nx, pc=1, wd=1)
+    if iso
+        Sarr = zeros(Float64, N2iso, Nsam)
+        i0 = 3+N1iso
+        Smask = nothing # not implemented yet
+    else
+        # triangle mask
+        tri_mask = reshape(tril(trues(Nf,Nf)),Nf*Nf)
+        #tri_mask[1,1] = false
+        Smask = vcat(falses(2+Nf), tri_mask)
+        # sum(S1[jmax,l=odd]) = sum(S1[jmax,l=even]) so we must remove one more to avoid redundancy
+        #Smask[19] = false
+        Sarr  = zeros(Float64, sum(Smask), Nsam)
+    end
+
+    for j=1:Nsam
+        noise = randn(Nx,Nx) .* σmap
+        Scoeff = eqws_compute(im+noise, fhash, doS2=doS2, doS20=doS20, norm=false, iso=iso)
+        Sarr[:,j] = (Scoeff[Smask])
+    end
+    Smean = mean(Sarr,dims=2)
+    Smean = reshape(Smean, length(Smean))
+    ΔS    = Sarr .- Smean
+    Scov  = ΔS*ΔS' ./ (Nsam-1)
+    return Smean, Scov, Smask
+end
+
+
+function bruno_synthS2R(im_targ, im_ivar, S_targ, S_icov, S_mask, fhash; im_init=nothing, iso=false)
+    # im_targ - target (noisy) image
+    # im_ivar - pixelwise inverse variance of im_targ
+    # S_targ  - target WST vector
+    # S_icov  - covariance of S_targ due to noise expressed in im_ivar
+    # S_mask  - Boolean mask of coefficients to include
+    # im_init - (optional) starting image for gradient descent
+    # iso     - use only ISO coeffs (not implemented!)
+
+    function wst_synth_chisq(vec_in)
+        # As global vars need
+        # fhash, iso, i0, Nx, S_icov, verbose, im_targ, im_ivar
+        # could use Nayantara's wrapper here
+        image_in = reshape(vec_in, Nx, Nx)
+        #if mod(iter,20) == 0
+        #    pframe = heatmap(image_in)
+        #    display(pframe)
+        #end
+
+        ΔI    = vec_in - reshape(im_targ,Nx*Nx)
+        im_χ2 = (reshape(im_ivar,1,Nx*Nx) * (ΔI.^2))[1]
+
+        # Right now this only does S2R, but we could generalize
+        S_vec  = (eqws_compute(image_in, fhash, doS2=false, doS20=true, norm=false, iso=iso))[S_mask]
+
+        S_diff = (S_vec- S_targ)
+        chisq  = (S_diff' * S_icov * S_diff)[1]
+
+        if verbose != nothing
+            if mod(iter,20) == 0
+                println(iter, "   ", "chi2 function   S_TS: ", chisq, "   im_TS: ",im_χ2)
+            end
+            iter += 1
+        end
+
+        return Sχfac*chisq+im_χ2
+        #return im_χ2
+    end
+
+    function wst_synth_dchisq(storage, vec_in)
+        # As global vars need
+        # fhash, iso, i0, Nx, S_icov, verbose
+        image_in = reshape(vec_in, Nx, Nx)
+        ΔI    = vec_in - reshape(im_targ,Nx*Nx)
+
+        dchisq_image = 2 .* (reshape(im_ivar,Nx*Nx) .* ΔI)
+
+        S_vec  = (eqws_compute(image_in, fhash, doS2=false, doS20=true, norm=false, iso=iso))[S_mask]
+        S_diff = (S_vec - S_targ)
+        if iso
+            diffwt = S_icov * S_diff[indiso]  # not checked
+        else
+            diffwt = S_icov * S_diff
+        end
+        # this is a hack -- paint values on grid so we can transpose
+        gwt = zeros(Nf,Nf)
+        gwt[tril(trues(Nf,Nf))] = diffwt
+
+        # derivative of chisq is 2*Sdiff*Cinv*grad(S) (see paper)
+        # wtgrid = 2 .* (reshape(diffwt, Nf, Nf) + reshape(diffwt, Nf, Nf)')
+        wtgrid = 2 .* (gwt + gwt')
+        dchisq_im = wst_S20_deriv_sum(image_in, fhash, wtgrid, 1)
+
+        # dSdp matrix * S1-S_targ is dchisq
+        # dchisq_im = (reshape(dS20dp, Nx*Nx, Nf*Nf) * diff).*2
+        # dchisq_im = (dS20dp * diff).*2
+        # dchisq = reshape(dchisq_im, Nx, Nx)[indfloat]
+        dchisq = reshape(dchisq_im,length(dchisq_im))
+         storage .= Sχfac.*dchisq + dchisq_image
+        #storage .= dchisq_image
+    end
+
+    # preliminaries
+    verbose = true
+    iter = 0
+    Sχfac = 1.0
+    (Nx, Ny)  = size(im_targ)
+    if Nx != Ny error("Input image must be square") end
+
+    # get number of filters (keep this iso-compatible for the moment)
+    (N1iso, Nf) = size(fhash["S1_iso_mat"])
+    if iso
+        M20 = fhash["S2_iso_mat"]
+        (Nwt,Nind) = size(M20)
+        indiso = zeros(Int64,Nind)
+        for ind = 1:Nind  indiso[M20.colptr[ind]] = M20.rowval[ind]  end
+    end
+    i0 = 3+(iso ? N1iso : Nf)
+
+    # initialize vector for gradient descent, default to zeros
+    vec_init = (im_init == nothing) ? zeros(Nx*Nx) : reshape(im_init,Nx*Nx)
+
+    # spot check that derivative works
+    if verbose
+        eps = zeros(size(vec_init))
+        eps[1] = 1e-4
+        chisq1 = wst_synth_chisq(vec_init+eps./2)
+        chisq0 = wst_synth_chisq(vec_init-eps./2)
+        brute  = (chisq1-chisq0)[1]/eps[1]
+        clever = zeros(size(vec_init))
+        println("clever",size(clever))
+        ___bar = wst_synth_dchisq(clever, vec_init)
+        println("Brute:  ",brute, "   Clever: ",clever[1], "   Diff: ",abs(brute-clever[1]))
+
+    end
+    println("vec_init  ",size(vec_init))
+    # call optimizer
+    #res = optimize(wst_synth_chisq, wst_synth_dchisq, copy(vec_init), BFGS())
+    res = optimize(wst_synth_chisq, wst_synth_dchisq, copy(vec_init),
+        ConjugateGradient(), Optim.Options(iterations=2000,f_tol=1E-12))
+
+    # copy results into pixels of output image
+    im_synth = Optim.minimizer(res)
+    println(res)
+
+    return im_synth
+end
+
+
+function write_results(outname, results)
+    #(img0, im_targ, im_ivar, im_init, im_denoise, Smean, Scov, Smask, S_true, S_noisy)
+    f = FITS(outname, "w")
+    for arr in results
+        write(f, arr)
+    end
+    close(f)
+end
+
+
+function read_results(fname)
+    f = FITS(fname, "r")
+    arr = [read(hdu) for hdu in f]
+    close(f)
+    return arr
+end
+
+
+function bruno_plot_synth(dat; fname="test.png")
+
+    # -------- define plot1 to append plot to a list
+    function plot1(ps, image; clim=nothing, bin=1.0, fsz=14, label=nothing)
+        # ps    - list of plots to append to
+        # image - image to heatmap
+        # clim  - tuple of color limits (min, max)
+        # bin   - bin down by this factor, centered on nx/2+1
+        # fsz   - font size
+        marg   = 2mm
+        nx, ny = size(image)
+        nxb    = nx/round(Integer, 2*bin)
+
+        # -------- center on nx/2+1
+        i0 = max(1,round(Integer, (nx/2+2)-nxb-1))
+        i1 = min(nx,round(Integer, (nx/2)+nxb+1))
+        lims = [i0,i1]
+        subim = image[i0:i1,i0:i1]
+        push!(ps, heatmap(image, aspect_ratio=:equal, clim=clim,
+            xlims=lims, ylims=lims, size=(400,400),
+            legend=false, xtickfontsize=fsz, ytickfontsize=fsz,#tick_direction=:out,
+            rightmargin=marg, leftmargin=marg, topmargin=marg, bottommargin=marg))
+        if label != nothing
+            annotate!(lims'*[.96,.04],lims'*[.09,.91],text(label,:left,:white,28))
+        end
+        return
+    end
+
+    # -------- initialize array of plots
+    ps   = []
+    clim  = (-75,125)
+    clim2 = clim
+    im_true = dat[1]
+    im_targ = dat[2]
+    im_sig = 1 ./sqrt.(dat[3])
+    im_init = dat[4][:,:,1]
+    im_denoise = dat[5][:,:,4] # number 4 starts near answer
+
+    #(img0, im_targ, im_ivar, im_init, im_denoise, Smean, Scov, UInt8.(Smask), Float64.(S_true), Float64.(S_noisy))
+   # g
+    # -------- 6 panel QA plot
+    plot1(ps, im_true, clim=clim, label="True")
+    plot1(ps, im_denoise, clim=clim, label="Synth")
+    #plot1(ps, im_targ-im_true, clim=clim2, label="Noise")
+    p = plot(dat[6],label="S mean")
+    plot!(p,dat[10],label="S noisy")
+    plot!(p,dat[9],label="S true")
+
+    push!(ps, p)
+    plot1(ps, im_targ, clim=clim, label="Noisy")
+    plot1(ps, im_targ-im_true, clim=clim2, label="Noisy-True")
+    plot1(ps, im_sig, clim=clim2, label="Sigma")
+    plot1(ps, im_targ-im_denoise, clim=clim2, label="Noisy-Synth")
+    plot1(ps, im_denoise-im_true, clim=clim2, label="Synth-True")
+
+    plot1(ps, dat[5][:,:,1]-dat[5][:,:,2], clim=clim2, label="Synth 1-2")
+    plot1(ps, dat[5][:,:,1]-dat[5][:,:,3], clim=clim2, label="Synth 1-3")
+    plot1(ps, dat[5][:,:,1]-dat[5][:,:,4], clim=clim2, label="Synth 1-4")
+    plot1(ps, dat[5][:,:,2]-dat[5][:,:,3], clim=clim2, label="Synth 2-3")
+
+
+    myplot = plot(ps..., layout=(4,3), size=(1400,2000))
+    savefig(myplot, fname)
+end
+bruno_plot_synth(foo, fname="test.png")
+
+
+println(1)
+
+
+
+function S20_covariance(img, im_sigma, fhash)
+    (N1iso, Nf) = size(fhash["S1_iso_mat"])
+    Nx = size(img,1)
+    dS20dα = wst_S20_deriv(img, fhash)
+    G = reshape(dS20dα, Nx*Nx, Nf*Nf) .* reshape(im_sigma, Nx*Nx, 1)
+    pred = G'*G
+    return pred
+end
+
+
+function test_S20_covariance()
+    # test covariance
+    Nx = 16
+    fhash  = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true, safety_on=false)
+    (N1iso, Nf) = size(fhash["S1_iso_mat"])
+    img = randn(Nx,Nx)
+    im_sigma = ones(Nx,Nx)
+    pred = S20_covariance(img, im_sigma, fhash)
+
+    Smean, Scov, Smask = S20_noisecovar(img, fhash, im_sigma, 4000, iso=false,doS2=false, doS20=true)
+    Cmask = Smask[Nf+3:end]
+    return pred, Scov, Cmask
+end
+
+pred, Scov, Cmask = test_S20_covariance()
+
+
+
+function bruno_denoise(im_true, im_sigma, Nx=64, Nsam=10000)
+    # Options we could have
+    # Non-uniform noise
+    # generate filter bank, safety_on=false forces wd=1 to avoid redundancy
+    fhash  = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true, safety_on=false)
+    (N1iso, Nf) = size(fhash["S1_iso_mat"])
+
+    # do S20 (aka S2R)
+    doiso  = false
+    doS2   = false
+    doS20  = true
+
+    # get Monte Carlo Scov
+    if Nsam != 0
+        Smean, Scov, Smask = S20_noisecovar(im_true, fhash, im_sigma, Nsam, iso=doiso, doS2=doS2, doS20=doS20)
+    else
+        Smean, Scov, Smask = S20_noisecovar(im_true, fhash, im_sigma, 10, iso=doiso, doS2=doS2, doS20=doS20)
+        S20cov = S20_covariance(im_true, im_sigma, fhash)
+        println("S20cov", size(S20cov))
+        println("Smask", size(Smask))
+        Cmask = Smask[Nf+3:end]
+        println("Cmask", size(Cmask))
+        Scov = S20cov[Cmask,Cmask] + 0.1I     # choose this regularization better???
+        println("using true image for covar")
+    end
+
+    # Eigenvalue check
+    evals = eigvals(Scov)
+    println("MC Scov, minmax eigenvalues:  ", minimum(evals), "    ", maximum(evals))
+
+    # invert with Cholesky
+    Sicov = inv(cholesky(Scov))
+
+    # make noisy image and its inverse variance
+    im_targ = im_true .+ im_sigma.*randn(Nx,Nx)
+    im_ivar = 1 ./ (im_sigma.*im_sigma)
+
+    # EQWS coeffs for true image and noisy image
+    S_true  = eqws_compute(im_true, fhash, doS2=false, doS20=true, norm=false)[Smask]
+    S_noisy = eqws_compute(im_targ, fhash, doS2=false, doS20=true, norm=false)[Smask]
+
+    # Attempt synthesis with estimated Smean, Scov
+    im_init = zeros(Nx,Nx,4)
+    im_denoise = zeros(Nx,Nx,4)
+    for i=1:4
+        im_init[:,:,i] = imresize(readphoto(i+1),Nx,Nx)
+        if i==4
+            im_init[:,:,i] = copy(im_targ)
+        end
+        im_denoise[:,:,i] = bruno_synthS2R(im_targ, im_ivar, S_true, Sicov, Smask, fhash; im_init=im_init[:,:,i], iso=false)
+    end
+
+    return (im_true, im_targ, im_ivar, im_init, im_denoise, Smean, Scov, UInt8.(Smask), Float64.(S_true), Float64.(S_noisy))
+    # gradient descent converges to machine precision regardless of starting point.
+end
+
+
+
+
+function call_bruno(sigma_index, Nx=64, Nsam=10000)
+    # read dust map
+    dust = Float64.(readdust())
+    dust = dust[1:256,1:256]
+
+    # mean subtract resized image
+    img     = imresize(dust,Nx,Nx)
+    im_true = img .- mean(img)
+
+    # noise scenarios
+    Ntrial = 4
+    sigim = zeros(Nx,Nx,Ntrial)
+    sigim[:,:,1] .= 10
+    sigim[:,:,2] .= 20
+
+    sigim[1:Nx÷4,:,3] .= 1
+    sigim[Nx÷4+1:Nx÷2,:,3] .= 5
+    sigim[Nx÷2+1:3*Nx÷4,:,3] .= 10
+    sigim[3*Nx÷4:Nx,:,3] .= 50
+
+    sigim[:,:,4] .= rand(Nx,Nx).*10
+    rx = ceil.(Int,rand(round(Int,Nx*Nx*0.1))*Nx)
+    ry = ceil.(Int,rand(round(Int,Nx*Nx*0.1))*Nx)
+    for i=1:length(rx) sigim[rx[i],ry[i],4] = 100.0 end
+
+    im_sigma = sigim[:,:,sigma_index]
+    arr = bruno_denoise(im_true, im_sigma, Nx, Nsam)
+    return arr
+end
+
+
+
+function bruno_noise_loop(Nx=64,Nsam=10000)
+
+    prefix = "bruno"*string(Nx)
+    for noise_index=1:4
+        @time result = call_bruno(noise_index, Nx, Nsam)
+        fname = prefix*"-"*string(noise_index)
+        write_results(fname*".fits", result)
+        bruno_plot_synth(result, fname=fname*".png")
+    end
+end
+
+bruno_noise_loop(128,40000)
+
+
+
+
+bruno_plot_synth(read_results("bruno64-1.fits"), fname="bruno64-1.png")N
+bruno_plot_synth(read_results("bruno64-2.fits"), fname="bruno64-2.png")
+bruno_plot_synth(read_results("bruno64-3.fits"), fname="bruno64-3.png")
+bruno_plot_synth(read_results("bruno64-4.fits"), fname="bruno64-4.png")
+
+
+
+bar = randn(100,200)
+cov = bar*bar'
+U=cholesky(cov).U
+plot(eigvals(cov),label="Eval(cov)")
+plot!(eigvals(U),label="Eval(U)")
+
+heatmap(U,clim=(-2,2))
+
+C
+Cinv = inv(C)
+Cinv*C
+L = cholesky(C).L
+Λ = cholesky(Symmetric(Cinv)).U
+Λ'*Λ*L*L'
+
+
+Stry = (my_DHC_compute(img, fhash, fhash, sigim,  doS2=doS2, doS20=doS20, norm=false, iso=doiso))[i0:end]
+
+fval = fhash["filt_value"]
+psi2 = [sum(vals.^2)/Nx^2 for vals in fval]
+diff = Smean-Scoeff
+
+prod = psi_matrix(fhash)
+
+plot(diff)
+plot!((Stry-Scoeff))  # why 0.66 ????
+
+
+plot!(reshape(prod.*25600 .*2,Nf*Nf))
+
+
+
+
+
+function gaussian_draw_test(Ns=100)
+    # make a set of correlated (x,y) pairs
+    mockx = randn(Ns)
+    mocky = randn(Ns)+mockx.*2 .+1
+    mydata = hcat(mockx,mocky)
+
+    # subtract the mean
+    data_mean = mean(mydata,dims=1)
+    data_meansub = mydata .- data_mean
+    cov = (data_meansub' * data_meansub)./(Ns-1)
+
+    # U is upper triagular matrix, sqrt of cov, so U' * U = cov
+    U = cholesky(cov).U
+
+    # random draw is unit Gaussian draw times U plus mean
+    ran = randn(Ns,2)
+    draw = (ran * U) .+ data_mean
+
+    # plot origina distribution and draws
+    scatter(mydata[:,1],mydata[:,2])
+    scatter!(draw[:,1],draw[:,2])
+end
+
+
+struct Foo2
+    a::Float64
+    b::Any
+    c::Array{Float64}
+end
+
+fname = "/Users/dfink/Downloads/1581898633071O-result.fits"
+ff = FITS(fname,"r")
