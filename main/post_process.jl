@@ -552,7 +552,7 @@ function sub_strip(coeff_maps, lab; sub_bl_size=64)
 end
 
 function renorm(coeff_mats,filter_hash)
-    Nc, Ns  = size(coeff_maps)
+    Nc, Ns  = size(coeff_mats)
     Nf = size(filter_hash["filt_index"])[1]
 
     S1normed = coeff_mats[1:Nf,:]./sum(coeff_mats[1:Nf,:],dims=1)
