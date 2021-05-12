@@ -525,7 +525,7 @@ end
 function post_subdivide(coeff_maps; sub_block = 0)
     Nx, Ny, Nc, Ns = size(coeff_maps)
 
-    out = zeros(Int(2^(sub_block)),Int(2^(sub_block)),size(out_maps)[3],size(out_maps)[4])
+    out = zeros(Int(2^(sub_block)),Int(2^(sub_block)),size(coeff_maps)[3],size(coeff_maps)[4])
     red = Nx/(2^(sub_block))
     for i=1:Nx
         for j=1:Ny
@@ -544,7 +544,7 @@ function sub_strip(coeff_maps, lab; sub_bl_size=64)
         for i=1:Nx
             for j=1:Ny
                 new_lab[:,i+Nx*(j-1)+Nx*Ny*(k-1)] .= lab[:,k] .+ [0; 0; 0; 0; 0; sub_bl_size*(i-1); sub_bl_size*(j-1)]
-                out_stripped[:,i+Nx*(j-1)+Nx*Ny*(k-1)] .= out[i,j,:,k]
+                out_stripped[:,i+Nx*(j-1)+Nx*Ny*(k-1)] .= coeff_maps[i,j,:,k]
             end
         end
     end
