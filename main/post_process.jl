@@ -529,7 +529,7 @@ function post_subdivide(coeff_maps; sub_block = 0)
     red = Nx/(2^(sub_block))
     for i=1:Nx
         for j=1:Ny
-            out[ceil(Int,i/red),ceil(Int,j/red),:,:] .+=  out_maps[i,j,:,:]
+            out[ceil(Int,i/red),ceil(Int,j/red),:,:] .+=  coeff_maps[i,j,:,:]
         end
     end
     return out
