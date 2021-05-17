@@ -194,6 +194,7 @@ module ReconFuncs
 
     function augment_weights_S20(inpwt::Array{Float64}, filter_hash, dhc_args, coeff_mask)
         Nf = size(filter_hash["filt_index"])[1]
+        N1iso = size(filter_hash["S1_iso_mat"])[1]
         if (dhc_args[:doS20]) & (dhc_args[:iso])
             iso2nf2mask = zeros(Int64, Nf^2)
             M20 = filter_hash["S2_iso_mat"]
@@ -201,6 +202,7 @@ module ReconFuncs
             coeff_masks20 = coeff_mask[3+N1iso:end]
             #wt (Nc) -> |S2_iso| -> |Nf^2|
             w_s2iso = zeros(size(filter_hash["S2_iso_mat"])[1])
+            #println(coeff_masks20)
             w_s2iso[coeff_masks20] .= inpwt
             w_nf2 = zeros(Nf^2)
             w_nf2 .= w_s2iso[iso2nf2mask]
