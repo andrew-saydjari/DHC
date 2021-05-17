@@ -36,7 +36,11 @@ module eqws
         S1_equiv_matrix,
         S2_equiv_matrix,
         S1_iso_matrix3d,
-        S2_iso_matrix3d
+        S2_iso_matrix3d,
+        pre_subdivide,
+        post_subdivide,
+        sub_strip,
+        renorm
 
     include("compute.jl")
     include("filter_bank.jl")
