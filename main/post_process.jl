@@ -502,6 +502,127 @@ function S2_equiv_matrix(fhash,l_shift)
     return sparse(Mat)
 end
 
+function S1_iso_matrix_gpu(fhash, prec=Float32)
+    # fhash is the filter hash output by fink_filter_hash
+    # The output matrix converts an S1 coeff vector to S1iso by
+    #   summing over l
+    # Matrix is stored in sparse CSC format using SparseArrays.
+    # DPF 2021-Feb-18
+
+    # Does hash contain Omega filter?
+    Omega   = haskey(fhash, "Omega_index")
+    if Omega Ω_ind = fhash["Omega_index"] end
+
+    # unpack fhash
+    Nl      = length(fhash["theta_value"])
+    Nj      = length(fhash["j_value"])
+    Nf      = fhash["Nf"]
+    ψ_ind   = fhash["psi_index"]
+    ϕ_ind   = fhash["phi_index"]
+
+    # number of iso coefficients
+    Niso    = Omega ? Nj+2 : Nj+1
+    Mat     = zeros(prec, Niso, Nf)
+
+    # first J elements of iso
+    for j = 1:Nj
+        for l = 1:Nl
+            λ = ψ_ind[j,l]
+            Mat[j, λ] = 1.0
+        end
+    end
+
+    # Next elements are ϕ, Ω
+    I0     = Nj+1
+    Mat[I0, ϕ_ind] = 1.0
+    if Omega Mat[I0+1, Ω_ind] = 1.0 end
+
+    return sparse(Mat)
+end
+
+function S2_iso_matrix_gpu(fhash, prec=Float32)
+    # fhash is the filter hash output by fink_filter_hash
+    # The output matrix converts an S2 coeff vector to S2iso by
+    #   summing over l1,l2 and fixed Δl.
+    # Matrix is stored in sparse CSC format using SparseArrays.
+    # DPF 2021-Feb-18
+
+    # Does hash contain Omega filter?
+    Omega   = haskey(fhash, "Omega_index")
+    if Omega Ω_ind = fhash["Omega_index"] end
+
+    # unpack fhash
+    Nl      = length(fhash["theta_value"])
+    Nj      = length(fhash["j_value"])
+    Nf      = fhash["Nf"]
+    ψ_ind   = fhash["psi_index"]
+    ϕ_ind   = fhash["phi_index"]
+
+    # number of iso coefficients
+    Niso    = Omega ? Nj*Nj*Nl+4*Nj+4 : Nj*Nj*Nl+2*Nj+1
+    Mat     = zeros(prec, Niso, Nf*Nf)
+
+    # first J*J*L elements of iso
+    for j1 = 1:Nj
+        for j2 = 1:Nj
+            for l1 = 1:Nl
+                for l2 = 1:Nl
+                    DeltaL = mod(l1-l2, Nl)
+                    λ1     = ψ_ind[j1,l1]
+                    λ2     = ψ_ind[j2,l2]
+
+                    Iiso   = j1+Nj*((j2-1)+Nj*DeltaL)
+                    Icoeff = λ1+Nf*(λ2-1)
+                    Mat[Iiso, Icoeff] = 1.0
+                end
+            end
+        end
+    end
+
+    # Next J elements are λϕ, then J elements ϕλ
+    for j = 1:Nj
+        for l = 1:Nl
+            λ      = ψ_ind[j,l]
+            Iiso   = Nj*Nj*Nl+j
+            Icoeff = λ+Nf*(ϕ_ind-1)  # λϕ
+            Mat[Iiso, Icoeff] = 1.0
+
+            Iiso   = Nj*Nj*Nl+Nj+j
+            Icoeff = ϕ_ind+Nf*(λ-1)  # ϕλ
+            Mat[Iiso, Icoeff] = 1.0
+        end
+    end
+
+    # Next 1 element is ϕϕ
+    I0     = Nj*Nj*Nl+Nj+Nj+1
+    Icoeff = ϕ_ind+Nf*(ϕ_ind-1)
+    Mat[I0, Icoeff] = 1.0
+
+    # If the Omega filter exists, add more terms
+    if Omega
+        # Next J elements are λΩ, then J elements Ωλ
+        for j = 1:Nj
+            for l = 1:Nl
+                λ      = ψ_ind[j,l]
+                Iiso   = I0+j
+                Icoeff = λ+Nf*(Ω_ind-1)  # λΩ
+                Mat[Iiso, Icoeff] = 1.0
+
+                Iiso   = I0+Nj+j
+                Icoeff = Ω_ind+Nf*(λ-1)  # Ωλ
+                Mat[Iiso, Icoeff] = 1.0
+            end
+        end
+        # Next 3 elements are ϕΩ, Ωϕ, ΩΩ
+        Iiso   = I0+Nj+Nj
+        Mat[Iiso+1, ϕ_ind+Nf*(Ω_ind-1)] = 1.0
+        Mat[Iiso+2, Ω_ind+Nf*(ϕ_ind-1)] = 1.0
+        Mat[Iiso+3, Ω_ind+Nf*(Ω_ind-1)] = 1.0
+    end
+
+    return sparse(Mat)
+end
+
 ## Assist in convmap
 
 function pre_subdivide(coeff_list; sub_block = 0)

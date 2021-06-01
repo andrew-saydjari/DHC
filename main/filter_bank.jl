@@ -44,7 +44,7 @@ function fink_filter_hash_p(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, s
     return hash
 end
 
-function fink_filter_hash_gpu(c, L; nx=256, wd=1, t=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
+function fink_filter_hash_gpu(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
 
     # -------- compute the filter bank
     filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, t=t, shift=shift, Omega=Omega, safety_on=safety_on)
@@ -75,7 +75,30 @@ function fink_filter_hash_gpu(c, L; nx=256, wd=1, t=1, shift=false, Omega=false,
     return hash
 end
 
-function fink_filter_hash_gpu_fake(c, L; nx=256, wd=1, t=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
+function fink_filter_hash_gpu_sparse(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, safety_on=true, wd_cutoff=1, prec=Float32)
+    filt, hash = eqws.fink_filter_bank(c, L; nx=nx, wd=wd, t=t, shift=shift, Omega=Omega, safety_on=safety_on, wd_cutoff=wd_cutoff)
+
+    Nf = size(filt)[3]
+    hash["Nf"] = Nf
+
+    gpu_filt = CUDA.zeros(Float64,size(filt))
+    #send to GPU by convert to sparse CPU, transfer to sparse GPU, convert to dense GPU
+    for i=1:Nf
+        gpu_filt[:,:,i] .= CUDA.CuArray(CuSparseMatrixCSC(sparse(filt[:,:,i])))
+    end
+    hash["gpu_filt"] = gpu_filt
+
+    S1_iso_mat = CuSparseMatrixCSC(S1_iso_matrix_gpu(hash, prec))
+    hash["S1_iso_mat"] = S1_iso_mat
+    S2_iso_mat = CuSparseMatrixCSC(S2_iso_matrix_gpu(hash, prec))
+    hash["S2_iso_mat"] = S2_iso_mat
+    hash["num_iso_coeff"] = size(S1_iso_mat)[1] + size(S2_iso_mat)[1] + 2
+    hash["num_coeff"] = size(S1_iso_mat)[2] + size(S2_iso_mat)[2] + 2
+
+    return hash
+end
+
+function fink_filter_hash_gpu_fake(c, L; nx=256, wd=2, t=1, shift=false, Omega=false, safety_on=true,threeD=false,cz=1,nz=256)
 
     # -------- compute the filter bank
     filt, hash = fink_filter_bank(c, L; nx=nx, wd=wd, t=t, shift=shift, Omega=Omega, safety_on=safety_on)
