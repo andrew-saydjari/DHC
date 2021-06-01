@@ -15,7 +15,7 @@ module ReconFuncs
     export Loss3Gaussian
     export dLoss3Gaussian!
     export image_recon_derivsum_custom
-
+    export get_dApodizer
     #Basic Gaussian Loss Function
     #=
     function LossGaussianS20(img_curr, filter_hash, ori_input, coeff_mask, s_targ_mean, s_invcov, lambda)
@@ -236,21 +236,22 @@ module ReconFuncs
     end
 
     #Loss Functions
-    #=
-    function Loss3Gaussian(img_curr, filter_hash, dhc_args, coeff_mask1, target1, invcov1, lambda; reg_input=nothing, coeff_mask2=nothing, target2=nothing, invcov2=nothing)
+
+    function Loss3Gaussian(img_curr, filter_hash, dhc_args; coeff_mask1=nothing, target1=nothing, invcov1=nothing, reg_input=nothing, coeff_mask2=nothing, target2=nothing, invcov2=nothing, lambda2=nothing, lambda3=nothing)
         #func_specific_params should contain: coeff_mask2, target2, invcov2
         s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=false; dhc_args...)
         s_curr1 = s_curr[coeff_mask1]
         s_curr2 = s_curr[coeff_mask2]
-        regterm =  0.5*lambda*sum((adaptive_apodizer(img_curr, dhc_args) - adaptive_apodizer(reg_input, dhc_args)).^2)
+        regterm =  0.5*lambda3*sum((adaptive_apodizer(img_curr, dhc_args) - adaptive_apodizer(reg_input, dhc_args)).^2)
         lnlik_sfd = ( 0.5 .* (s_curr1 - target1)' * invcov1 * (s_curr1 - target1))
         s_curr2 = s_curr[coeff_mask2]
-        lnlik_init = ( 0.5 .* (s_curr2 - target2)' * invcov2 * (s_curr2 - target2))
+        lnlik_init = ( 0.5*lambda2 .* (s_curr2 - target2)' * invcov2 * (s_curr2 - target2))
         neglogloss = lnlik_sfd[1] + lnlik_init[1] + regterm
     end
 
-    function dLoss3Gaussian!(storage_grad, img_curr, filter_hash, dhc_args, coeff_mask1, target1, invcov1, lambda; reg_input=nothing, coeff_mask2=nothing, target2=nothing, invcov2=nothing, dA=nothing)
+    function dLoss3Gaussian!(storage_grad, img_curr, filter_hash, dhc_args; coeff_mask1=nothing, target1=nothing, invcov1=nothing, reg_input=nothing, coeff_mask2=nothing, target2=nothing, invcov2=nothing, dA=nothing, lambda2=nothing, lambda3=nothing)
         #func_specific_params should contain: coeff_mask2, target2, invcov2
+        Nx = size(img_curr)[1]
         s_curr = DHC_compute_wrapper(img_curr, filter_hash, norm=false; dhc_args...)
         s_curr1 = s_curr[coeff_mask1]
         s_curr2 = s_curr[coeff_mask2]
@@ -261,10 +262,14 @@ module ReconFuncs
         wt1 = augment_weights_S20(convert(Array{Float64,1}, reshape(transpose(diff1) * invcov1, (length(diff1),))), filter_hash, dhc_args, coeff_mask1)
         wt2 = augment_weights_S20(convert(Array{Float64,1}, reshape(transpose(diff2) * invcov2, (length(diff2),))), filter_hash, dhc_args, coeff_mask2)
         apdimg_curr = adaptive_apodizer(img_curr, dhc_args)
-        dsumterms = wst_S20_deriv_sum(apdimg_curr, filter_hash, wt1)' + wst_S20_deriv_sum(apdimg_curr, filter_hash, wt2)' + reshape(lambda.*(apdimg_curr - adaptive_apodizer(reg_input, dhc_args)), (1, Nx^2))
+
+        term1 = Deriv_Utils_New.wst_S20_deriv_sum(apdimg_curr, filter_hash, wt1)'
+        term2 = lambda2 .* Deriv_Utils_New.wst_S20_deriv_sum(apdimg_curr, filter_hash, wt2)'
+        term3= reshape(lambda3.*(apdimg_curr - adaptive_apodizer(reg_input, dhc_args)),(1, Nx^2))
+        dsumterms = term1 + term2 + term3
         storage_grad .= reshape(dsumterms * dA, (Nx, Nx))
     end
-    =#
+
 
     function Loss3Gaussian_transformed(img_curr, filter_hash, dhc_args; coeff_mask1=nothing, target1=nothing, invcov1=nothing, reg_input=nothing, coeff_mask2=nothing, target2=nothing, invcov2=nothing, func=nothing, dfunc=nothing, lambda2=nothing, lambda3=nothing)
         #func_specific_params should contain: coeff_mask2, target2, invcov2

@@ -573,3 +573,201 @@ function img_reconfunc_coeffmask(input, filter_hash, s_targ_mean, s_targ_invcov,
     return reshape(result_img, (Nx, Nx))
 end
 =#
+
+##5-31: Biased coefficients: wrong for even S1 (excluded the Second order terms)
+#=
+function DHC_compute_S20r_noisy(image::Array{Float64,2}, filter_hash::Dict, sigim::Array{Float64,2};
+    doS2::Bool=true, doS20::Bool=false, apodize=false, norm=false, iso=false, FFTthreads=1, filter_hash2::Dict=filter_hash, coeff_mask=nothing)
+    #Not using coeff_mask here after all. ASSUMES ANY ONE of doS12, doS2 and doS20 are true, when using coeff_mask
+    #@assert !iso "Iso not implemented yet"
+    Nf = size(filter_hash["filt_index"])[1]
+    Nx = size(true_img)[1]
+
+    if apodize
+        ap_img = apodizer(image)
+        dA = get_dApodizer(Nx, Dict([(:apodize => apodize)]))
+    else
+        ap_img = image
+        dA = get_dApodizer(Nx, Dict([(:apodize => apodize)]))
+    end
+
+    function DHC_compute_biased(image::Array{Float64,2}, filter_hash::Dict, filter_hash2::Dict, sigim::Array{Float64,2};
+        doS2::Bool=true, doS20::Bool=false, norm=true, iso=false, FFTthreads=2, normS1::Bool=false, normS1iso::Bool=false)
+        # image        - input for WST
+        # filter_hash  - filter hash from fink_filter_hash
+        # filter_hash2 - filters for second order.  Default to same as first order.
+        # doS2         - compute S2 coeffs
+        # doS20        - compute S2 coeffs
+        # norm         - scale to mean zero, unit variance
+        # iso          - sum over angles to obtain isotropic coeffs
+
+        # Use 2 threads for FFT
+        FFTW.set_num_threads(FFTthreads)
+
+        (Nx, Ny)  = size(image)
+        if Nx != Ny error("Input image must be square") end
+        (Nf, )    = size(filter_hash["filt_index"])
+        if Nf == 0  error("filter hash corrupted") end
+        @assert Nx==filter_hash["npix"] "Filter size should match npix"
+        @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
+        @assert (normS1 && normS1iso) != 1 "normS1 and normS1iso are mutually exclusive"
+
+        # allocate coeff arrays
+        out_coeff = []
+        S0  = zeros(Float64, 2)
+        S1  = zeros(Float64, Nf)
+        if doS2  S2  = zeros(Float64, Nf, Nf) end  # traditional 2nd order
+        if doS20 S20 = zeros(Float64, Nf, Nf) end  # real space correlation
+        anyM2 = doS2 | doS20
+        anyrd = doS2 | doS20             # compute real domain with iFFT
+
+        # allocate image arrays for internal use
+        if anyrd
+            im_rd_0_1  = Array{Float64, 3}(undef, Nx, Ny, Nf)
+            ψsqfac = Array{Float64, 4}(undef, Nf, Nx, Ny, 2)
+            Iψfac = Array{ComplexF64, 4}(undef, Nf, Nx, Ny, 2)
+            ψfaccross = Array{Float64, 2}(undef, Nf, Nf)
+        end
+        varim  = sigim.^2
+        Pf = plan_fft(varim)
+        fvar = Pf*(varim)
+
+        ## 0th Order
+        S0[1]   = mean(image)
+        norm_im = image.-S0[1]
+        S0[2]   = sum(norm_im .* norm_im)/(Nx*Ny)
+        if norm
+            norm_im ./= sqrt(Nx*Ny*S0[2])
+        else
+            norm_im = copy(image)
+        end
+
+        append!(out_coeff,S0[:])
+
+        ## 1st Order
+        im_fd_0 = Pf*(norm_im)  # total power=1.0
+
+        # unpack filter_hash
+        f_ind   = filter_hash["filt_index"]  # (J, L) array of filters represented as index value pairs
+        f_val   = filter_hash["filt_value"]
+
+        zarr = zeros(ComplexF64, Nx, Ny)  # temporary array to fill with zvals
+
+        # make a FFTW "plan" for an array of the given size and type
+        if anyrd
+            P = plan_ifft(im_fd_0) end  # P is an operator, P*im is ifft(im)
+
+        ## Main 1st Order and Precompute 2nd Order
+        for f = 1:Nf
+            S1tot = 0.0
+            f_i = f_ind[f]  # CartesianIndex list for filter
+            f_v = f_val[f]  # Values for f_i
+            # for (ind, val) in zip(f_i, f_v)   # this is slower!
+            if length(f_i) > 0
+                for i = 1:length(f_i)
+                    ind       = f_i[i]
+                    zval      = f_v[i] * im_fd_0[ind]
+                    S1tot    += abs2(zval)
+                    zarr[ind] = zval        # filter*image in Fourier domain
+                end
+                S1[f] = S1tot/(Nx*Ny)  # image power
+                if anyrd
+                    psi_pow = sum(f_v.^2)./(Nx*Ny)
+                    im_rd_0_1[:,:,f] .= abs2.(P*zarr)
+                    rsψ = realspace_filter(Nx, f_i, f_v)
+                    frealψ = Pf*(real.(rsψ))
+                    fimψ = Pf*(imag.(rsψ))
+                    ψsqfac[f, :, :, 1] = real.(rsψ) #check that real
+                    ψsqfac[f, :, :, 2] = imag.(rsψ) #check that real
+                    Iψfac[f, :, :, 1] = P*(im_fd_0 .* frealψ)
+                    Iψfac[f, :, :, 2] = P*(im_fd_0 .* fimψ)
+                end
+
+                zarr[f_i] .= 0
+            end
+        end
+
+        append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
+
+        if normS1iso
+            S1iso = vec(reshape(filter_hash["S1_iso_mat"]*S1,(1,:))*filter_hash["S1_iso_mat"])
+        end
+
+        # we stored the abs()^2, so take sqrt (this is faster to do all at once)
+        if anyrd
+            im_rd_0_1 .= sqrt.(im_rd_0_1)
+            for f1=1:Nf
+                #println("f1", f1)
+                for f2=1:Nf
+                    #println("f2", f2)
+                    val1 = Pf*(ψsqfac[f1, :, :, 1] .* ψsqfac[f2, :, :, 1])
+                    #println(size(val1), size(fvar))
+                    term1 = (P*(fvar .* val1) .* Iψfac[f1, :, :, 1]) .* Iψfac[f2, :, :, 1]
+                    term2 = (P*(fvar .* (Pf*(ψsqfac[f1, :, :, 1] .* ψsqfac[f2, :, :, 2]))).* Iψfac[f1, :, :, 1]) .* Iψfac[f2, :, :, 2]
+                    term3 = (P*(fvar .* (Pf*(ψsqfac[f1, :, :, 2] .* ψsqfac[f2, :, :, 1]))).* Iψfac[f1, :, :, 2]) .* Iψfac[f2, :, :, 1]
+                    term4 = (P*(fvar .* (Pf*(ψsqfac[f1, :, :, 2] .* ψsqfac[f2, :, :, 2]))).* Iψfac[f1, :, :, 2]) .* Iψfac[f2, :, :, 2]
+                    combined = sum((term1 + term2 + term3 + term4)./(im_rd_0_1[:, :, f1] .* im_rd_0_1[:, :, f2]))
+                    println(imag(combined))
+                    ψfaccross[f1, f2] = real(combined)
+                end
+            end
+        end
+
+        Mat2 = filter_hash["S2_iso_mat"]
+        if doS2
+            f_ind2   = filter_hash2["filt_index"]  # (J, L) array of filters represented as index value pairs
+            f_val2   = filter_hash2["filt_value"]
+
+            ## Traditional second order
+            for f1 = 1:Nf
+                thisim = fft(im_rd_0_1[:,:,f1])  # Could try rfft here
+                # Loop over f2 and do second-order convolution
+                if normS1
+                    normS1pwr = S1[f1]
+                elseif normS1iso
+                    normS1pwr = S1iso[f1]
+                else
+                    normS1pwr = 1
+                end
+
+                for f2 = 1:Nf
+                    f_i = f_ind2[f2]  # CartesianIndex list for filter
+                    f_v = f_val2[f2]  # Values for f_i
+                    # sum im^2 = sum(|fft|^2/npix)
+                    #intfterm = fft((real.(rsψ1) + imag.(rsψ1)).*(real.(rsψ2) + imag.(rsψ2)))
+                    S2[f1,f2] = sum(abs2.(f_v .* thisim[f_i]))/(Nx*Ny)/normS1pwr
+                end
+            end
+            append!(out_coeff, iso ? Mat2*S2[:] : S2[:])
+        end
+
+        # Real domain 2nd order
+        if doS20
+            Amat = reshape(im_rd_0_1, Nx*Ny, Nf)
+            S20  = Amat' * Amat
+            #println(size(S20))
+            S20 .+= ψfaccross #assuming the nx*ny factor above was for the parseval correction
+            append!(out_coeff, iso ? Mat2*S20[:] : S20[:])
+        end
+
+
+        return out_coeff
+    end
+
+    sall = DHC_compute_biased(ap_img, filter_hash, filter_hash2, sigim, doS2=doS2, doS20=doS20, norm=norm, iso=iso, FFTthreads=FFTthreads)
+    dS20dp = wst_S20_deriv(ap_img, filter_hash)
+    ap_dS20dp = dA * reshape(dS20dp, Nx*Nx, Nf*Nf)
+    G =  ap_dS20dp .* reshape(sigim, Nx*Nx, 1)
+    cov = G'*G
+
+    if coeff_mask!=nothing
+        @assert count(!iszero, coeff_mask[1:Nf+2])==0 "This function only handles S20r"
+        @assert length(coeff_mask)==length(sall) "Mask must have the same length as the total number of coefficients"
+        s20rmask = coeff_mask[Nf+3:end]
+        return sall[coeff_mask], cov[s20rmask, s20rmask]
+    else
+        return sall, cov
+    end
+
+end
+=#
