@@ -9,8 +9,11 @@ module eqws
     using DSP
     using Interpolations
     using StatsBase
+    using NNlib
+    using SparseArrays
 
     import CUDA
+    using CUDA.CUSPARSE
 
     export
         fink_filter_bank,

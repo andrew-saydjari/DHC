@@ -653,7 +653,7 @@ function eqws_compute_gpu(image::Array{Float64,2}, filter_hash::Dict, filter_has
     anyrd = doS2 | doS20             # compute real domain with iFFT
 
     # allocate image arrays for internal use
-    if doS12 im_fdf_0_1 = CUDA.zeros(Float64,           Nx, Ny) end   # this must be zeroed!
+    if doS12 im_fdf_0_1 = CUDA.zeros(Float64, Nx, Ny) end   # this must be zeroed!
     if anyrd im_rd_0_1  = CUDA.CuArray(Array{Float64, 2}(undef, Nx, Ny)) end
 
     image= CUDA.CuArray(image)
@@ -737,6 +737,172 @@ function eqws_compute_gpu(image::Array{Float64,2}, filter_hash::Dict, filter_has
     append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S1 : S1)
     if doS2 append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S2 : S2) end
     if doS12 append!(out_coeff, iso ? filter_hash["S1_iso_mat"]*S12 : S12) end
+    return out_coeff
+end
+
+function eqws_compute_batch_gpu(image::Union{Array{Float64,3},Array{Float32,3}}, filter_hash::Dict, filter_hash2::Dict=filter_hash;
+    doS2::Bool=true, doS20::Bool=false, norm=true, iso=false, normS1::Bool=false, normS1iso::Bool=false,prec=Float64)
+    # image        - input for WST
+    # filter_hash  - filter hash from fink_filter_hash
+    # filter_hash2 - filters for second order.  Default to same as first order.
+    # doS2         - compute S2 coeffs
+    # doS20        - compute S2 coeffs
+    # norm         - scale to mean zero, unit variance
+    # iso          - sum over angles to obtain isotropic coeffs
+
+    # array sizes
+    (Nx, Ny, Nb)  = size(image)
+    if Nx != Ny error("Input image must be square") end
+    Nf    = filter_hash["Nf"]
+    if Nf == 0  error("filter hash corrupted") end
+    @assert Nx==filter_hash["npix"] "Filter size should match npix"
+    @assert Nx==filter_hash2["npix"] "Filter2 size should match npix"
+    @assert (normS1 && normS1iso) != 1 "normS1 and normS1iso are mutually exclusive"
+    if prec == Float64
+        cprec = ComplexF64
+    elseif prec == Float32
+        cprec = ComplexF32
+    else
+        error("precision is not acceptable, please choose Float32 or Float64")
+    end
+
+    # allocate coeff arrays
+    anyrd = doS2 | doS20             # compute real domain with iFFT
+
+    if iso
+        ind=1
+    else
+        ind=2
+    end
+
+    if !anyrd
+        S1s = size(filter_hash["S1_iso_mat"])[ind]
+        out_coeff = zeros(S1s+2,Nb)
+    elseif doS2 ⊻ doS20
+        S1s = size(filter_hash["S1_iso_mat"])[ind]
+        S2s = size(filter_hash["S2_iso_mat"])[ind]
+        out_coeff = zeros(S1s + S2s + 2,Nb)
+    else
+        S1s = size(filter_hash["S1_iso_mat"])[ind]
+        S2s = size(filter_hash["S2_iso_mat"])[ind]
+        out_coeff = zeros(S1s + 2*S2s + 2,Nb)
+    end
+
+    S0  = zeros(prec, 2, Nb)
+    S1  = zeros(prec, Nf, Nb)
+    if doS2  S2  = zeros(prec, Nf, Nf, Nb) end  # traditional 2nd order
+    if doS20 S20 = zeros(prec, Nf, Nf, Nb) end  # real space correlation
+
+    # allocate image arrays for internal use
+    if anyrd im_rd_0_1  = CUDA.CuArray{prec}(undef, Nx, Ny, Nf, Nb) end
+
+    #image handling
+    if typeof(image[1]) != prec
+        image = convert(Array{prec,3},image)
+    end
+
+    ## 0th Order
+    μ = mean(image, dims=(1,2))
+    S0[1,:] = dropdims(μ, dims=(1,2))
+    norm_im = image.-μ
+    σ       = sum(norm_im .* norm_im, dims=(1,2))/(Nx*Ny)
+    S0[2,:] = dropdims(σ, dims=(1,2))
+    if norm
+        norm_im ./= sqrt.(Nx*Ny*σ)
+    else
+        norm_im = image
+    end
+
+    out_coeff[1:2,:] .= S0
+
+    image_in = CUDA.CuArray(norm_im)
+
+    if doS2
+        P2 = CUDA.CUFFT.plan_fft(image_in,[1,2])
+        im_fd_0 = P2*image_in
+    else
+        im_fd_0 = CUDA.CUFFT.fft(image_in,[1,2])  # total power=1.0
+    end
+
+    CUDA.unsafe_free!(image_in)
+
+    # unpack filter_hash
+    filts   = filter_hash["gpu_filt"]  # dense gpu array
+
+    zarr = CUDA.zeros(cprec, Nx, Ny, Nb)  # temporary array to fill with zvals
+
+    # make a FFTW "plan" for an array of the given size and type
+    if anyrd
+        P1 = CUDA.CUFFT.plan_ifft(im_fd_0,[1,2]) # P is an operator, P*im is ifft(im)
+    end
+
+    ## Main 1st Order and Precompute 2nd Order
+    for f = 1:Nf
+        zarr = filts[:,:,f].*im_fd_0
+
+        if anyrd
+            im_rd_0_1[:,:,f,:] = abs2.(P1*zarr)
+            S1[f,:] = sum(im_rd_0_1[:,:,f,:],dims=(1,2))  # image power
+        else
+            S1[f,:] = sum(abs2.(zarr),dims=(1,2))/(Nx*Ny)
+        end
+    end
+
+    CUDA.unsafe_free!(zarr)
+
+    if iso
+        out_coeff[3:3+S1s-1,:] .= filter_hash["S1_iso_mat"]*S1
+    else
+        out_coeff[3:3+S1s-1,:] .= S1
+    end
+
+    if normS1iso
+        S1iso = vec(reshape(filter_hash["S1_iso_mat"]*S1,(1,:))*filter_hash["S1_iso_mat"]) #FIXME CuVec?
+    end
+
+    # we stored the abs()^2, so take sqrt (this is faster to do all at once)
+    if anyrd im_rd_0_1 = sqrt.(im_rd_0_1) end
+
+    if (doS2 | doS20) & iso
+        Mat2 = filter_hash["S2_iso_mat"]
+    end
+
+    # Real domain 2nd order
+    if doS20
+        Amat = reshape(im_rd_0_1, Nx*Ny, Nf, Nb)
+        S20  = permutedims(Amat,(2,1,3)) ⊠ Amat
+        if iso
+            out_coeff[3+S1s:3+S1s+S2s-1,:] .= Mat2*reshape(S20,Nf*Nf,Nb)
+        else
+            out_coeff[3+S1s:3+S1s+S2s-1,:] .= reshape(S20,Nf*Nf,Nb)
+        end
+    end
+
+    if doS2
+        ## Traditional second order
+        for f1 = 1:Nf
+            thisim = P2*im_rd_0_1[:,:,f1,:]
+            # Loop over f2 and do second-order convolution
+            if normS1
+                normS1pwr = S1[f1,:]
+            elseif normS1iso
+                normS1pwr = S1iso[f1,:]
+            else
+                normS1pwr = 1
+            end
+            for f2 = 1:Nf
+                # sum im^2 = sum(|fft|^2/npix)
+                S2[f1,f2,:] .= sum(abs2.(filts[:,:,f2].*thisim))/(Nx*Ny)/normS1pwr
+            end
+        end
+
+        if iso
+            out_coeff[end-S2s+1:end,:] .= Mat2*reshape(S2,Nf*Nf,Nb)
+        else
+            out_coeff[end-S2s+1:end,:] .= reshape(S2,Nf*Nf,Nb)
+        end
+    end
+
     return out_coeff
 end
 
