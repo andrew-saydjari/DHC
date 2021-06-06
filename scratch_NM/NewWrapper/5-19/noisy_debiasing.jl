@@ -1752,7 +1752,7 @@ function DHC_compute_S20r_noisy_so(image::Array{Float64,2}, filter_hash::Dict, s
     #Not using coeff_mask here after all. ASSUMES ANY ONE of doS12, doS2 and doS20 are true, when using coeff_mask
     #@assert !iso "Iso not implemented yet"
     Nf = size(filter_hash["filt_index"])[1]
-    Nx = size(true_img)[1]
+    Nx = size(image)[1]
 
     if apodize
         ap_img = apodizer(image)
@@ -3616,8 +3616,8 @@ direc = "scratch_NM/StandardizedExp/Nx64/"
 datfile = direc * "Data_" * string(numfile) * ".jld2" #Replace w SLURM array
 loaddf = load(datfile)
 true_img = loaddf["true_img"]
-true_img = true_img .- mean(true_img)
-sigma = loaddf["std"]./10
+#true_img = true_img .- mean(true_img)
+sigma = loaddf["std"]
 Nx=64
 Nr=10000
 empsn = []
@@ -3645,9 +3645,8 @@ discmat[triumask] .= (thcoeffmean ./ mean(coeffsim[:, coeffmask], dims=1)[:])
 discmat
 mask = Diagonal(trues(Nf, Nf))
 discmat[mask]
-clim = (0.95, 1.05)
-heatmap(discmat, title="sigma=4% mean", clim=clim)
-
+heatmap(discmat, title="sigma=40% mean, no meansub")
+heatmap(true_img)
 res = (thcoeffmean[:] .- ncoeffmean[:][coeffmask])./DHC_compute_wrapper(true_img, filter_hash; dhc_args...)[coeffmask]
 resmat = zeros(Nf, Nf)
 triumask = triu(trues(Nf, Nf))
@@ -3673,37 +3672,1278 @@ rmat
 
 
 #Does the discrepancy scale with sigma?
-function scaling(sigma_perc)
-Nx=64
-filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, Omega=true)
-psir = realspace_filter(Nx, filter_hash["filt_index"][4], filter_hash["filt_value"][4])
+function scaling_loop(sigma_perc, idx=594)
+    Nx=64
+    filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, Omega=true)
+    psir = realspace_filter(Nx, filter_hash["filt_index"][4], filter_hash["filt_value"][4])
 
-#Check s20r theoretical
-numfile = 1000
+    #Check s20r theoretical
+    numfile = 1000
+    direc = "scratch_NM/StandardizedExp/Nx64/"
+    datfile = direc * "Data_" * string(numfile) * ".jld2" #Replace w SLURM array
+    loaddf = load(datfile)
+
+
+    Nx=64
+    Nr=10000
+
+    isobool = false
+    apdbool = false
+    dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool)
+    filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+    p4rat = []
+    p2rat = []
+    thlist = []
+    emplist = []
+    for sp in sigma_perc
+        true_img = loaddf["true_img"]
+        empsn = []
+        sigma = mean(true_img)*sp
+        for n=1:Nr
+            noisyim = randn((Nx, Nx)).*sigma .+ true_img
+            push!(empsn, DHC_compute_wrapper(noisyim, filter_hash; dhc_args...))
+        end
+        coeffsim = hcat(empsn...)'
+        ncoeffmean = mean(coeffsim, dims=1)
+        Nf = size(filter_hash["filt_index"])[1]
+        coeffmask = falses(2+Nf+Nf^2)
+        coeffmask[Nf+3:end] .= triu(trues(Nf, Nf))[:]
+        true_img = loaddf["true_img"]
+        println(mean(true_img))
+        thcoeffmean, thcov = DHC_compute_S20r_noisy_so(true_img, filter_hash, fill(sigma, (Nx, Nx)); coeff_mask = coeffmask, dhc_args...)
+
+        residual = thcoeffmean[:] .- ncoeffmean[:][coeffmask]
+        push!(emplist, ncoeffmean[:][coeffmask])
+        push!(thlist, thcoeffmean[:])
+        push!(p4rat, residual[idx]/(sigma^4))
+        push!(p2rat, residual[idx]/(sigma^2))
+    end
+    p=display(plot(sigma_perc, p2rat, title="Residual/sigma^2"))
+    p=display(plot(sigma_perc, p4rat, title="Residual/sigma^4"))
+    return thlist, emplist, p2rat, p4rat
+
+end
+
+function scaling(sigma_perc, idx=594)
+    Nx=64
+    filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, Omega=true)
+    psir = realspace_filter(Nx, filter_hash["filt_index"][4], filter_hash["filt_value"][4])
+
+    #Check s20r theoretical
+    numfile = 1000
+    direc = "scratch_NM/StandardizedExp/Nx64/"
+    datfile = direc * "Data_" * string(numfile) * ".jld2" #Replace w SLURM array
+    loaddf = load(datfile)
+
+    Nr=1000
+    isobool = false
+    apdbool = false
+    dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool)
+    filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+
+    true_img = loaddf["true_img"]
+    empsn = []
+    sigma = mean(true_img)*sigma_perc
+    for n=1:Nr
+        noisyim = randn((Nx, Nx)).*sigma .+ true_img
+        push!(empsn, DHC_compute_wrapper(noisyim, filter_hash; dhc_args...))
+    end
+    coeffsim = hcat(empsn...)'
+    ncoeffmean = mean(coeffsim, dims=1)
+    Nf = size(filter_hash["filt_index"])[1]
+    coeffmask = falses(2+Nf+Nf^2)
+    coeffmask[Nf+3:end] .= triu(trues(Nf, Nf))[:]
+    thcoeffmean, thcov = DHC_compute_S20r_noisy_so(true_img, filter_hash, fill(sigma, (Nx, Nx)); coeff_mask = coeffmask, dhc_args...)
+
+    residual = thcoeffmean[:] .- ncoeffmean[:][coeffmask]
+
+    return thcoeffmean[:], ncoeffmean[:][coeffmask], residual[idx]/(sigma^2), residual[idx]/(sigma^4)
+end
+
+emplist = []
+thlist = []
+p2rat = []
+p4rat = []
+siglist = [0.025, 0.05, 0.075, 0.1, 0.2, 0.4, 0.5]
+for sigperc in siglist
+    thvec, empvec, p2vec, p4vec = scaling(sigperc)
+    push!(thlist, thvec)
+    push!(emplist, empvec)
+    push!(p2rat, p2vec)
+    push!(p4rat, p4vec)
+end
+
+p= plot(siglist, p2rat, label="Error/Sigma^2")
+plot!(siglist, p4rat, label="Error/Sigma^4")
+
+numfile=1000
 direc = "scratch_NM/StandardizedExp/Nx64/"
 datfile = direc * "Data_" * string(numfile) * ".jld2" #Replace w SLURM array
 loaddf = load(datfile)
-true_img = loaddf["true_img"]
-true_img = true_img .- mean(true_img)
-sigma = loaddf["std"]
-Nx=64
-Nr=10000
-empsn = []
+Nf = length(filter_hash["filt_index"])
+coeffmask = falses(2+Nf+Nf^2)
+coeffmask[Nf+3:end] .= triu(trues(Nf, Nf))[:]
+
 isobool = false
 apdbool = false
 dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool)
+Nx=64
 filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+strue = DHC_compute_wrapper(loaddf["true_img"], filter_hash; norm=false, dhc_args...)[coeffmask]
+
+
+ratio_noisy_true = zeros(Nf, Nf)
+triumask = triu(trues(Nf, Nf))
+ratio_noisy_true[triumask] .= emplist[4]./strue
+heatmap(ratio_noisy_true, label="Empirical Noisy Mean/True Coeffs")
+
+
+##6-4
+#Iterative: using empirical noisy dbn and true
+ARGS_buffer = ["reg", "nonapd", "noiso", "scratch_NM/StandardizedExp/Nx64/", "full_3losstest", "Full+Eps"]
+ENV_buffer= "1000"
+numfile = Base.parse(Int, ENV_buffer)
+println(numfile, ARGS_buffer[1], ARGS_buffer[2])
+
+if ARGS_buffer[1]=="log"
+    logbool=true
+else
+    if ARGS_buffer[1]!="reg" error("Invalid log arg") end
+    logbool=false
+end
+
+if ARGS_buffer[2]=="apd"
+    apdbool = true
+else
+    if ARGS_buffer[2]!="nonapd" error("Invalid apd arg") end
+    apdbool=false
+end
+
+if ARGS_buffer[3]=="iso"
+    isobool = true
+else
+    if ARGS_buffer[3]!="noiso" error("Invalid iso arg") end
+    isobool=false
+end
+
+
+direc = ARGS_buffer[4] #"../StandardizedExp/Nx64/noisy_stdtrue/" #Change
+datfile = direc * "Data_" * string(numfile) * ".jld2" #Replace w SLURM array
+loaddf = load(datfile)
+true_img = loaddf["true_img"]
+init = loaddf["init"]
+
+fname_save = direc * "scratch_NM/NewWrapper/5-30/" * string(numfile) * "_try1"  #Change
+Nx=size(true_img)[1]
+filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("log", logbool), ("Invcov_matrix", ARGS_buffer[6]), ("optim_settings", optim_settings), ("eps_value_sfd", 1e-5), ("eps_value_init", 1e-10)]) #Add constraints
+
+recon_settings["datafile"] = datfile
+
+if dhc_args[:iso]
+    error("Not constructed for iso")
+else #Not iso
+    coeffmask = falses(2+Nf+Nf^2)
+    coeffmask[Nf+3:end] .= Diagonal(trues(Nf))[:] #Diagonal(triu(trues(Nf, Nf)))[:]
+end
+
+
+#Weight given to terms
+lval2 = 0.0
+lval3 = 0.0
+
+println("Regularizer Lambda=", round(lval3, sigdigits=3))
+#input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, dhc_args, LossFunc, dLossFunc;
+#FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), lambda=0.001, func_specific_params=nothing
+img_guess = init
+recon_img = img_guess
+
+img_list = []
+push!(img_list, img_guess)
+num_rounds=5
+
+#if YOU HAD THE TRUE IMAGE, calculating the shift empirically
+Nr=10000
+sigma = loaddf["std"]
+empsn = []
 for n=1:Nr
     noisyim = randn((Nx, Nx)).*sigma .+ true_img
     push!(empsn, DHC_compute_wrapper(noisyim, filter_hash; dhc_args...))
 end
 coeffsim = hcat(empsn...)'
 ncoeffmean = mean(coeffsim, dims=1)
-Nf = size(filter_hash["filt_index"])[1]
+scov = (coeffsim .- ncoeffmean)' * (coeffsim .- ncoeffmean)./(Nr-1)
+scov = scov[coeffmask, coeffmask]
+snmean = ncoeffmean[:][coeffmask]
+strue = DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask]
+shift_true = snmean .- strue
+s_noisy = DHC_compute_wrapper(loaddf["init"], filter_hash, norm=false; dhc_args...)[coeffmask]
+starget = s_noisy - shift_true #DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask] #
+scovinv = invert_covmat(scov, 1e-10)
+
+func_specific_params = Dict([(:reg_input=> init), (:coeff_mask1=> coeffmask), (:target1=>starget), (:invcov1=>scovinv), (:coeff_mask2=> coeffmask), (:target2=>starget), (:invcov2=>scovinv), (:lambda2=>0.0), (:lambda3=>0.0)])
+
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+
+if logbool
+    error("Not implemented here")
+end
+
+res, recon_img = image_recon_derivsum_custom(img_guess, filter_hash, dhc_args, ReconFuncs.Loss3Gaussian, ReconFuncs.dLoss3Gaussian!; optim_settings=optim_settings, func_specific_params)
+heatmap(init)
+heatmap(recon_img, title="Using true shift")
+heatmap(true_img)
+
+#Plotting code
+function calc_1dps_local(image, kbins::Array{Float64,1})
+    #Assumes uniformly spaced kbins
+    Nx = size(image)[1]
+    fft_zerocenter = fftshift(fft(image))
+    impf = abs2.(fft_zerocenter)
+    x = (collect(1:Nx) * ones(Nx)') .- (Nx/2.0)
+    y = (ones(Nx) * collect(1:Nx)') .- (Nx/2.0)
+    krad  = (x.^2 + y.^2).^0.5
+    meanpk = zeros(size(kbins))
+    kdel = kbins[2] - kbins[1]
+    #println(size(meanpk), " ", kdel)
+    for k=1:size(meanpk)[1]
+        filt = findall((krad .>= (kbins[k] - kdel./2.0)) .& (krad .<= (kbins[k] + kdel./2.0)))
+        meanpk[k] = mean(impf[filt])
+    end
+    return meanpk
+end
+function J_hashindices(J_values, fhash)
+    jindlist = []
+    for jval in J_values
+        push!(jindlist, findall(fhash["J_L"][:, 1].==jval))
+    end
+    return vcat(jindlist'...)
+end
+
+function J_S1indices(J_values, fhash)
+    #Assumes this is applied to an object of length 2+Nf+Nf^2 or 2+Nf
+    return J_hashindices(J_values, fhash) .+ 2
+end
+kbins=convert(Array{Float64, 1}, collect(1:32))
+apdsmoothed = imfilter(init, Kernel.gaussian(0.8))
+true_ps = calc_1dps_local(true_img, kbins)
+initps = calc_1dps_local(init, kbins)
+recps = calc_1dps_local(recon_img, kbins)
+smoothps = calc_1dps_local(apdsmoothed, kbins)
+JS1ind = J_S1indices([0, 1, 2, 3], filter_hash)
+clim= (minimum(true_img), maximum(true_img))
+p1 = heatmap(recon_img, title="Recon", clim=clim)
+p3 = plot(log.(kbins), log.(true_ps), label="True")
+plot!(log.(kbins), log.(recps), label="Recon")
+plot!(log.(kbins), log.(initps), label="Init")
+plot!(log.(kbins), log.(smoothps), label="Smoothed Init")
+plot!(title="P(k): Denoising using Shift(init)")
+xlabel!("lnk")
+ylabel!("lnP(k)")
+p2 = heatmap(true_img, title="True Img", clim=clim)
+p4= heatmap(init, title="Init Img", clim=clim)
+p5= heatmap(apdsmoothed, title="Smoothed init", clim=clim)
+residual = recon_img- true_img
+rlims = (minimum(residual), maximum(residual))
+#symmax = maximum([abs(minimum(residual)), maximum(residual)])
+#rg = cgrad(:bwr, [-symmax/2.0, symmax/2.0])
+p6 = heatmap(residual, title="Residual: Recon - True", clims=rlims, c=:bwr)
+p7 = heatmap(apdsmoothed- true_img, title="Residual: SmoothedInit - True", clims=rlims, c=:bwr)
+
+struesel = Data_Utils.fnlog(DHC_compute_wrapper(true_img, filter_hash, norm=false; dhc_args...))
+sinitsel = Data_Utils.fnlog(DHC_compute_wrapper(init, filter_hash, norm=false; dhc_args...))
+ssmoothsel = Data_Utils.fnlog(DHC_compute_wrapper(imfilter(init, Kernel.gaussian(0.8)), filter_hash, norm=false; dhc_args...))
+sreconsel = Data_Utils.fnlog(DHC_compute_wrapper(recon_img, filter_hash, norm=false; dhc_args...))
+slims = (minimum(struesel[JS1ind]), maximum(struesel[JS1ind]))
+cg = cgrad([:blue, :white, :red])
+truephi, trueomg = round(struesel[2+filter_hash["phi_index"]], sigdigits=3), round(struesel[2+filter_hash["Omega_index"]], sigdigits=3)
+reconphi, reconomg = round(sreconsel[2+filter_hash["phi_index"]], sigdigits=3), round(sreconsel[2+filter_hash["Omega_index"]], sigdigits=3)
+smoothphi, smoothomg = round(ssmoothsel[2+filter_hash["phi_index"]], sigdigits=3), round(ssmoothsel[2+filter_hash["Omega_index"]], sigdigits=3)
+
+p8 = heatmap(struesel[JS1ind], title="True Coeffs ϕ=" * string(truephi) * "Ω=" * string(trueomg) , clims=slims, c=cg)
+p9 = heatmap(sreconsel[JS1ind], title="Recon Coeffs ϕ=" * string(reconphi) * "Ω=" * string(reconomg), clims=slims, c=cg)
+p10 = heatmap(ssmoothsel[JS1ind], title="Smooth Init ϕ=" * string(smoothphi) * "Ω=" * string(smoothomg), clims=slims, c=cg)
+p = plot(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, layout=(5, 2), size=(1800, 2400))
+savefig(p, "scratch_NM/NewWrapper/5-30/denoising_trueempnoisydbn.png")
+
+
+##Iterative: using empirical noisy dbn and true: with pixelwise regularization
+ARGS_buffer = ["reg", "nonapd", "noiso", "scratch_NM/StandardizedExp/Nx64/", "full_3losstest", "Full+Eps"]
+ENV_buffer= "1000"
+numfile = Base.parse(Int, ENV_buffer)
+println(numfile, ARGS_buffer[1], ARGS_buffer[2])
+
+if ARGS_buffer[1]=="log"
+    logbool=true
+else
+    if ARGS_buffer[1]!="reg" error("Invalid log arg") end
+    logbool=false
+end
+
+if ARGS_buffer[2]=="apd"
+    apdbool = true
+else
+    if ARGS_buffer[2]!="nonapd" error("Invalid apd arg") end
+    apdbool=false
+end
+
+if ARGS_buffer[3]=="iso"
+    isobool = true
+else
+    if ARGS_buffer[3]!="noiso" error("Invalid iso arg") end
+    isobool=false
+end
+
+
+direc = ARGS_buffer[4] #"../StandardizedExp/Nx64/noisy_stdtrue/" #Change
+datfile = direc * "Data_" * string(numfile) * ".jld2" #Replace w SLURM array
+loaddf = load(datfile)
+true_img = loaddf["true_img"]
+init = loaddf["init"]
+
+fname_save = direc * "scratch_NM/NewWrapper/5-30/" * string(numfile) * "_try1"  #Change
+Nx=size(true_img)[1]
+filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("log", logbool), ("Invcov_matrix", ARGS_buffer[6]), ("optim_settings", optim_settings), ("eps_value_sfd", 1e-5), ("eps_value_init", 1e-10)]) #Add constraints
+
+recon_settings["datafile"] = datfile
+
+if dhc_args[:iso]
+    error("Not constructed for iso")
+else #Not iso
+    coeffmask = falses(2+Nf+Nf^2)
+    coeffmask[Nf+3:end] .= Diagonal(trues(Nf))[:] #Diagonal(triu(trues(Nf, Nf)))[:]
+end
+
+
+#Weight given to terms
+lval2 = 0.0
+lval3 = 1.0
+
+println("Regularizer Lambda=", round(lval3, sigdigits=3))
+#input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, dhc_args, LossFunc, dLossFunc;
+#FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), lambda=0.001, func_specific_params=nothing
+img_guess = init
+recon_img = img_guess
+
+img_list = []
+push!(img_list, img_guess)
+num_rounds=5
+
+#if YOU HAD THE TRUE IMAGE, calculating the shift empirically
+Nr=10000
+sigma = loaddf["std"]
+empsn = []
+for n=1:Nr
+    noisyim = randn((Nx, Nx)).*sigma .+ true_img
+    push!(empsn, DHC_compute_wrapper(noisyim, filter_hash; dhc_args...))
+end
+coeffsim = hcat(empsn...)'
+ncoeffmean = mean(coeffsim, dims=1)
+scov = (coeffsim .- ncoeffmean)' * (coeffsim .- ncoeffmean)./(Nr-1)
+scov = scov[coeffmask, coeffmask]
+snmean = ncoeffmean[:][coeffmask]
+strue = DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask]
+shift_true = snmean .- strue
+s_noisy = DHC_compute_wrapper(loaddf["init"], filter_hash, norm=false; dhc_args...)[coeffmask]
+starget = s_noisy - shift_true #DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask] #
+scovinv = invert_covmat(scov, 1e-10)
+
+func_specific_params = Dict([(:reg_input=> init), (:coeff_mask1=> coeffmask), (:target1=>starget), (:invcov1=>scovinv), (:coeff_mask2=> coeffmask), (:target2=>starget), (:invcov2=>scovinv), (:lambda2=>0.0), (:lambda3=>0.0)])
+
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+
+if logbool
+    error("Not implemented here")
+end
+
+res, recon_img = image_recon_derivsum_custom(img_guess, filter_hash, dhc_args, ReconFuncs.Loss3Gaussian, ReconFuncs.dLoss3Gaussian!; optim_settings=optim_settings, func_specific_params)
+heatmap(init)
+heatmap(recon_img, title="Using true shift")
+heatmap(true_img)
+
+
+kbins=convert(Array{Float64, 1}, collect(1:32))
+apdsmoothed = imfilter(init, Kernel.gaussian(0.8))
+true_ps = calc_1dps_local(true_img, kbins)
+initps = calc_1dps_local(init, kbins)
+recps = calc_1dps_local(recon_img, kbins)
+smoothps = calc_1dps_local(apdsmoothed, kbins)
+JS1ind = J_S1indices([0, 1, 2, 3], filter_hash)
+clim= (minimum(true_img), maximum(true_img))
+p1 = heatmap(recon_img, title="Recon", clim=clim)
+p3 = plot(log.(kbins), log.(true_ps), label="True")
+plot!(log.(kbins), log.(recps), label="Recon")
+plot!(log.(kbins), log.(initps), label="Init")
+plot!(log.(kbins), log.(smoothps), label="Smoothed Init")
+plot!(title="P(k): Denoising using Shift(init)")
+xlabel!("lnk")
+ylabel!("lnP(k)")
+p2 = heatmap(true_img, title="True Img", clim=clim)
+p4= heatmap(init, title="Init Img", clim=clim)
+p5= heatmap(apdsmoothed, title="Smoothed init", clim=clim)
+residual = recon_img- true_img
+rlims = (minimum(residual), maximum(residual))
+#symmax = maximum([abs(minimum(residual)), maximum(residual)])
+#rg = cgrad(:bwr, [-symmax/2.0, symmax/2.0])
+p6 = heatmap(residual, title="Residual: Recon - True", clims=rlims, c=:bwr)
+p7 = heatmap(apdsmoothed- true_img, title="Residual: SmoothedInit - True", clims=rlims, c=:bwr)
+
+struesel = Data_Utils.fnlog(DHC_compute_wrapper(true_img, filter_hash, norm=false; dhc_args...))
+sinitsel = Data_Utils.fnlog(DHC_compute_wrapper(init, filter_hash, norm=false; dhc_args...))
+ssmoothsel = Data_Utils.fnlog(DHC_compute_wrapper(imfilter(init, Kernel.gaussian(0.8)), filter_hash, norm=false; dhc_args...))
+sreconsel = Data_Utils.fnlog(DHC_compute_wrapper(recon_img, filter_hash, norm=false; dhc_args...))
+slims = (minimum(struesel[JS1ind]), maximum(struesel[JS1ind]))
+cg = cgrad([:blue, :white, :red])
+truephi, trueomg = round(struesel[2+filter_hash["phi_index"]], sigdigits=3), round(struesel[2+filter_hash["Omega_index"]], sigdigits=3)
+reconphi, reconomg = round(sreconsel[2+filter_hash["phi_index"]], sigdigits=3), round(sreconsel[2+filter_hash["Omega_index"]], sigdigits=3)
+smoothphi, smoothomg = round(ssmoothsel[2+filter_hash["phi_index"]], sigdigits=3), round(ssmoothsel[2+filter_hash["Omega_index"]], sigdigits=3)
+
+p8 = heatmap(struesel[JS1ind], title="True Coeffs ϕ=" * string(truephi) * "Ω=" * string(trueomg) , clims=slims, c=cg)
+p9 = heatmap(sreconsel[JS1ind], title="Recon Coeffs ϕ=" * string(reconphi) * "Ω=" * string(reconomg), clims=slims, c=cg)
+p10 = heatmap(ssmoothsel[JS1ind], title="Smooth Init ϕ=" * string(smoothphi) * "Ω=" * string(smoothomg), clims=slims, c=cg)
+p = plot(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, layout=(5, 2), size=(1800, 2400))
+savefig(p, "scratch_NM/NewWrapper/5-30/denoisingwpixreg_trueempnoisydbn.png")
+
+##Iterative: using empirical noisy dbn and true: with pixelwise regularization
+ARGS_buffer = ["reg", "nonapd", "noiso", "scratch_NM/StandardizedExp/Nx64/", "full_3losstest", "Full+Eps"]
+ENV_buffer= "1000"
+numfile = Base.parse(Int, ENV_buffer)
+println(numfile, ARGS_buffer[1], ARGS_buffer[2])
+
+if ARGS_buffer[1]=="log"
+    logbool=true
+else
+    if ARGS_buffer[1]!="reg" error("Invalid log arg") end
+    logbool=false
+end
+
+if ARGS_buffer[2]=="apd"
+    apdbool = true
+else
+    if ARGS_buffer[2]!="nonapd" error("Invalid apd arg") end
+    apdbool=false
+end
+
+if ARGS_buffer[3]=="iso"
+    isobool = true
+else
+    if ARGS_buffer[3]!="noiso" error("Invalid iso arg") end
+    isobool=false
+end
+
+
+direc = ARGS_buffer[4] #"../StandardizedExp/Nx64/noisy_stdtrue/" #Change
+datfile = direc * "Data_" * string(numfile) * ".jld2" #Replace w SLURM array
+loaddf = load(datfile)
+true_img = loaddf["true_img"]
+init = loaddf["init"]
+
+fname_save = direc * "scratch_NM/NewWrapper/5-30/" * string(numfile) * "_try1"  #Change
+Nx=size(true_img)[1]
+filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("log", logbool), ("Invcov_matrix", ARGS_buffer[6]), ("optim_settings", optim_settings), ("eps_value_sfd", 1e-5), ("eps_value_init", 1e-10)]) #Add constraints
+
+recon_settings["datafile"] = datfile
+
+if dhc_args[:iso]
+    error("Not constructed for iso")
+else #Not iso
+    coeffmask = falses(2+Nf+Nf^2)
+    coeffmask[Nf+3:end] .= Diagonal(trues(Nf))[:] #Diagonal(triu(trues(Nf, Nf)))[:]
+end
+
+
+#Weight given to terms
+lval2 = 0.0
+lval3 = 1.0
+
+println("Regularizer Lambda=", round(lval3, sigdigits=3))
+#input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, dhc_args, LossFunc, dLossFunc;
+#FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), lambda=0.001, func_specific_params=nothing
+img_guess = init
+recon_img = img_guess
+
+img_list = []
+push!(img_list, img_guess)
+num_rounds=5
+
+#if YOU HAD THE TRUE IMAGE, calculating the shift empirically
+Nr=10000
+sigma = loaddf["std"]
+empsn = []
+for n=1:Nr
+    noisyim = randn((Nx, Nx)).*sigma .+ true_img
+    push!(empsn, DHC_compute_wrapper(noisyim, filter_hash; dhc_args...))
+end
+coeffsim = hcat(empsn...)'
+ncoeffmean = mean(coeffsim, dims=1)
+scov = (coeffsim .- ncoeffmean)' * (coeffsim .- ncoeffmean)./(Nr-1)
+scov = scov[coeffmask, coeffmask]
+snmean = ncoeffmean[:][coeffmask]
+strue = DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask]
+shift_true = snmean .- strue
+s_noisy = DHC_compute_wrapper(loaddf["init"], filter_hash, norm=false; dhc_args...)[coeffmask]
+starget = strue #DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask] #
+scovinv = invert_covmat(scov, 1e-10)
+
+func_specific_params = Dict([(:reg_input=> init), (:coeff_mask1=> coeffmask), (:target1=>starget), (:invcov1=>scovinv), (:coeff_mask2=> coeffmask), (:target2=>starget), (:invcov2=>scovinv), (:lambda2=>0.0), (:lambda3=>0.0)])
+
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+
+if logbool
+    error("Not implemented here")
+end
+
+res, recon_img = image_recon_derivsum_custom(img_guess, filter_hash, dhc_args, ReconFuncs.Loss3Gaussian, ReconFuncs.dLoss3Gaussian!; optim_settings=optim_settings, func_specific_params)
+heatmap(init)
+heatmap(recon_img, title="Using true shift")
+heatmap(true_img)
+
+
+kbins=convert(Array{Float64, 1}, collect(1:32))
+apdsmoothed = imfilter(init, Kernel.gaussian(1.0))
+smoothps = calc_1dps_local(apdsmoothed, kbins)
+true_ps = calc_1dps_local(true_img, kbins)
+initps = calc_1dps_local(init, kbins)
+recps = calc_1dps_local(recon_img, kbins)
+
+JS1ind = J_S1indices([0, 1, 2, 3], filter_hash)
+clim= (minimum(true_img), maximum(true_img))
+p1 = heatmap(recon_img, title="Recon", clim=clim)
+p3 = plot(log.(kbins), log.(true_ps), label="True")
+plot!(log.(kbins), log.(recps), label="Recon")
+plot!(log.(kbins), log.(initps), label="Init")
+plot!(log.(kbins), log.(smoothps), label="Smoothed Init")
+plot!(title="P(k): Denoising using Shift(init)")
+xlabel!("lnk")
+ylabel!("lnP(k)")
+p2 = heatmap(true_img, title="True Img", clim=clim)
+p4= heatmap(init, title="Init Img", clim=clim)
+p5= heatmap(apdsmoothed, title="Smoothed init", clim=clim)
+residual = recon_img- true_img
+rlims = (minimum(residual), maximum(residual))
+#symmax = maximum([abs(minimum(residual)), maximum(residual)])
+#rg = cgrad(:bwr, [-symmax/2.0, symmax/2.0])
+p6 = heatmap(residual, title="Residual: Recon - True", clims=rlims, c=:bwr)
+p7 = heatmap(apdsmoothed- true_img, title="Residual: SmoothedInit - True", clims=rlims, c=:bwr)
+
+struesel = Data_Utils.fnlog(DHC_compute_wrapper(true_img, filter_hash, norm=false; dhc_args...))
+sinitsel = Data_Utils.fnlog(DHC_compute_wrapper(init, filter_hash, norm=false; dhc_args...))
+ssmoothsel = Data_Utils.fnlog(DHC_compute_wrapper(apdsmoothed, filter_hash, norm=false; dhc_args...))
+sreconsel = Data_Utils.fnlog(DHC_compute_wrapper(recon_img, filter_hash, norm=false; dhc_args...))
+slims = (minimum(struesel[JS1ind]), maximum(struesel[JS1ind]))
+cg = cgrad([:blue, :white, :red])
+truephi, trueomg = round(struesel[2+filter_hash["phi_index"]], sigdigits=3), round(struesel[2+filter_hash["Omega_index"]], sigdigits=3)
+reconphi, reconomg = round(sreconsel[2+filter_hash["phi_index"]], sigdigits=3), round(sreconsel[2+filter_hash["Omega_index"]], sigdigits=3)
+smoothphi, smoothomg = round(ssmoothsel[2+filter_hash["phi_index"]], sigdigits=3), round(ssmoothsel[2+filter_hash["Omega_index"]], sigdigits=3)
+
+p8 = heatmap(struesel[JS1ind], title="True Coeffs ϕ=" * string(truephi) * "Ω=" * string(trueomg) , clims=slims, c=cg)
+p9 = heatmap(sreconsel[JS1ind], title="Recon Coeffs ϕ=" * string(reconphi) * "Ω=" * string(reconomg), clims=slims, c=cg)
+p10 = heatmap(ssmoothsel[JS1ind], title="Smooth Init ϕ=" * string(smoothphi) * "Ω=" * string(smoothomg), clims=slims, c=cg)
+p = plot(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, layout=(5, 2), size=(1800, 2400))
+savefig(p, "scratch_NM/NewWrapper/5-30/denoisingwstrue_trueempnoisydbn.png")
+
+
+#S2R
+ARGS_buffer = ["reg", "nonapd", "noiso", "scratch_NM/StandardizedExp/Nx64/", "full_3losstest", "Full+Eps"]
+ENV_buffer= "1000"
+numfile = Base.parse(Int, ENV_buffer)
+println(numfile, ARGS_buffer[1], ARGS_buffer[2])
+
+if ARGS_buffer[1]=="log"
+    logbool=true
+else
+    if ARGS_buffer[1]!="reg" error("Invalid log arg") end
+    logbool=false
+end
+
+if ARGS_buffer[2]=="apd"
+    apdbool = true
+else
+    if ARGS_buffer[2]!="nonapd" error("Invalid apd arg") end
+    apdbool=false
+end
+
+if ARGS_buffer[3]=="iso"
+    isobool = true
+else
+    if ARGS_buffer[3]!="noiso" error("Invalid iso arg") end
+    isobool=false
+end
+
+
+direc = ARGS_buffer[4] #"../StandardizedExp/Nx64/noisy_stdtrue/" #Change
+datfile = direc * "Data_" * string(numfile) * ".jld2" #Replace w SLURM array
+loaddf = load(datfile)
+true_img = loaddf["true_img"]
+init = loaddf["init"]
+
+fname_save = direc * "scratch_NM/NewWrapper/5-30/" * string(numfile) * "_try1"  #Change
+Nx=size(true_img)[1]
+filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("log", logbool), ("Invcov_matrix", ARGS_buffer[6]), ("optim_settings", optim_settings), ("eps_value_sfd", 1e-5), ("eps_value_init", 1e-10)]) #Add constraints
+
+recon_settings["datafile"] = datfile
+
+if dhc_args[:iso]
+    error("Not constructed for iso")
+else #Not iso
+    coeffmask = falses(2+Nf+Nf^2)
+    coeffmask[Nf+3:end] .= Diagonal(triu(trues(Nf, Nf)))[:]
+end
+
+
+#Weight given to terms
+lval2 = 0.0
+lval3 = 1.0
+
+println("Regularizer Lambda=", round(lval3, sigdigits=3))
+#input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, dhc_args, LossFunc, dLossFunc;
+#FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), lambda=0.001, func_specific_params=nothing
+img_guess = init
+recon_img = img_guess
+
+img_list = []
+push!(img_list, img_guess)
+num_rounds=5
+
+#if YOU HAD THE TRUE IMAGE, calculating the shift empirically
+Nr=10000
+sigma = loaddf["std"]
+empsn = []
+for n=1:Nr
+    noisyim = randn((Nx, Nx)).*sigma .+ true_img
+    push!(empsn, DHC_compute_wrapper(noisyim, filter_hash; dhc_args...))
+end
+coeffsim = hcat(empsn...)'
+ncoeffmean = mean(coeffsim, dims=1)
+scov = (coeffsim .- ncoeffmean)' * (coeffsim .- ncoeffmean)./(Nr-1)
+scov = scov[coeffmask, coeffmask]
+snmean = ncoeffmean[:][coeffmask]
+strue = DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask]
+shift_true = snmean .- strue
+s_noisy = DHC_compute_wrapper(loaddf["init"], filter_hash, norm=false; dhc_args...)[coeffmask]
+starget = strue #DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask] #
+scovinv = invert_covmat(scov, 1e-10)
+
+func_specific_params = Dict([(:reg_input=> init), (:coeff_mask1=> coeffmask), (:target1=>starget), (:invcov1=>scovinv), (:coeff_mask2=> coeffmask), (:target2=>starget), (:invcov2=>scovinv), (:lambda2=>0.0), (:lambda3=>0.0)])
+
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+
+if logbool
+    error("Not implemented here")
+end
+
+res, recon_img = image_recon_derivsum_custom(img_guess, filter_hash, dhc_args, ReconFuncs.Loss3Gaussian, ReconFuncs.dLoss3Gaussian!; optim_settings=optim_settings, func_specific_params)
+heatmap(init)
+heatmap(recon_img, title="Using true shift")
+heatmap(true_img)
+
+
+kbins=convert(Array{Float64, 1}, collect(1:32))
+apdsmoothed = imfilter(init, Kernel.gaussian(0.9))
+true_ps = calc_1dps_local(true_img, kbins)
+initps = calc_1dps_local(init, kbins)
+recps = calc_1dps_local(recon_img, kbins)
+smoothps = calc_1dps_local(apdsmoothed, kbins)
+JS1ind = J_S1indices([0, 1, 2, 3], filter_hash)
+clim= (minimum(true_img), maximum(true_img))
+p1 = heatmap(recon_img, title="Recon", clim=clim)
+p3 = plot(log.(kbins), log.(true_ps), label="True")
+plot!(log.(kbins), log.(recps), label="Recon")
+plot!(log.(kbins), log.(initps), label="Init")
+plot!(log.(kbins), log.(smoothps), label="Smoothed Init")
+plot!(title="P(k): Denoising using Shift(init)")
+xlabel!("lnk")
+ylabel!("lnP(k)")
+p2 = heatmap(true_img, title="True Img", clim=clim)
+p4= heatmap(init, title="Init Img", clim=clim)
+p5= heatmap(apdsmoothed, title="Smoothed init", clim=clim)
+residual = recon_img- true_img
+rlims = (minimum(residual), maximum(residual))
+#symmax = maximum([abs(minimum(residual)), maximum(residual)])
+#rg = cgrad(:bwr, [-symmax/2.0, symmax/2.0])
+p6 = heatmap(residual, title="Residual: Recon - True", clims=rlims, c=:bwr)
+p7 = heatmap(apdsmoothed- true_img, title="Residual: SmoothedInit - True", clims=rlims, c=:bwr)
+
+struesel = Data_Utils.fnlog(DHC_compute_wrapper(true_img, filter_hash, norm=false; dhc_args...))
+sinitsel = Data_Utils.fnlog(DHC_compute_wrapper(init, filter_hash, norm=false; dhc_args...))
+ssmoothsel = Data_Utils.fnlog(DHC_compute_wrapper(imfilter(init, Kernel.gaussian(0.8)), filter_hash, norm=false; dhc_args...))
+sreconsel = Data_Utils.fnlog(DHC_compute_wrapper(recon_img, filter_hash, norm=false; dhc_args...))
+slims = (minimum(struesel[JS1ind]), maximum(struesel[JS1ind]))
+cg = cgrad([:blue, :white, :red])
+truephi, trueomg = round(struesel[2+filter_hash["phi_index"]], sigdigits=3), round(struesel[2+filter_hash["Omega_index"]], sigdigits=3)
+reconphi, reconomg = round(sreconsel[2+filter_hash["phi_index"]], sigdigits=3), round(sreconsel[2+filter_hash["Omega_index"]], sigdigits=3)
+smoothphi, smoothomg = round(ssmoothsel[2+filter_hash["phi_index"]], sigdigits=3), round(ssmoothsel[2+filter_hash["Omega_index"]], sigdigits=3)
+
+p8 = heatmap(struesel[JS1ind], title="True Coeffs ϕ=" * string(truephi) * "Ω=" * string(trueomg) , clims=slims, c=cg)
+p9 = heatmap(sreconsel[JS1ind], title="Recon Coeffs ϕ=" * string(reconphi) * "Ω=" * string(reconomg), clims=slims, c=cg)
+p10 = heatmap(ssmoothsel[JS1ind], title="Smooth Init ϕ=" * string(smoothphi) * "Ω=" * string(smoothomg), clims=slims, c=cg)
+p = plot(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, layout=(5, 2), size=(1800, 2400))
+savefig(p, "scratch_NM/NewWrapper/5-30/denoisingwstrueS2R_trueempnoisydbn.png")
+
+##
+Nr=10000
+sigma = loaddf["std"]
+empsn = []
+for n=1:Nr
+    noisyim = randn((Nx, Nx)).*sigma .+ true_img
+    push!(empsn, DHC_compute_wrapper(noisyim, filter_hash; dhc_args...))
+end
+coeffsim = hcat(empsn...)'
+ncoeffmean = mean(coeffsim, dims=1)
+scov = (coeffsim .- ncoeffmean)' * (coeffsim .- ncoeffmean)./(Nr-1)
+scov = scov[coeffmask, coeffmask]
+snmean = ncoeffmean[:][coeffmask]
+strue = DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask]
+shift_true = snmean .- strue
+s_noisy = DHC_compute_wrapper(loaddf["init"], filter_hash, norm=false; dhc_args...)[coeffmask]
+starget = s_noisy - shift_true #DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask] #
+scovinv = invert_covmat(scov, 1e-10)
+
+
+#Code using loaddf
+loaddf = load("scratch_NM/StandardizedExp/Nx64/Data_1000.jld2")
+dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool)
+true_img = loaddf["true_img"]
+filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+truec = log.(DHC_compute_wrapper(loaddf["true_img"],filter_hash, norm=false; dhc_args...)[coeffmask])
+initc = log.(DHC_compute_wrapper(loaddf["init"], filter_hash, norm=false; dhc_args...)[coeffmask])
+#reconc = log.(DHC_compute_wrapper(recon_img, logsfddbn["filter_hash"], norm=false; dhc_args...)[coeffmask])
+ind1, ind2 = 1, 3
+
+#Theoretical noisy
+noisymean, noisycov = DHC_compute_S20r_noisy_so(loaddf["true_img"], filter_hash, fill(loaddf["std"], (Nx, Nx)); coeff_mask = coeffmask, dhc_args...)
+ncovreg = noisycov + I*1e-10
+noisydbn = MultivariateNormal(convert(Array{Float64, 1}, noisymean), ncovreg)
+noisysamp = rand(noisydbn, 10000)
+#Log theoretical noisy
+noisysamp = log.((x->maximum([x, 0])).(noisysamp'))
+p = scatter(sampssfd[:, ind1], sampssfd[:, ind2], label="Samples_SFD_Prior", legend=(0.1, 0.1))
+scatter!(noisysamp[:, ind1], noisysamp[:, ind2], label="Theoretical Noise-Dbn Using True", legend=(0.1, 0.1))
+scatter!([truec[ind1]], [truec[ind2]], label="True Coeff", legend=(0.1, 0.1), c="black")
+scatter!([initc[ind1]], [initc[ind2]], label="Init Coeff", legend=(0.1, 0.1))
+xlabel!("J=1, L=1")
+ylabel!("J=2, L=1")
+
+#Why dont init and the analytical noisy dbn match?
+#Empirical noisy
+empsn = []
+for n=1:Nr
+    noisyim = randn((Nx, Nx)).*loaddf["std"] .+ true_img
+    push!(empsn, DHC_compute_wrapper(noisyim, filter_hash;  dhc_args...))
+end
+noisymean
+coeffsim = hcat(empsn...)'
+ncoeffmean = mean(coeffsim, dims=1)
+ncoeffmean[:][coeffmask]
+
+
+#ncoeffmean: empirical mean of noisy coeffs 0.007, 0.003...
+#noisymean: analytical mean of noisy coeffs 0.01, 0.
+
+
+#Without apodization comparing theoretical / empriical
+Nx=64
+#Samples from logSFD prior
+logbool = false
+apdbool=false
+isobool = false
+filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+Nf = length(filter_hash["filt_index"])
+sfdall = readsfd(Nx, logbool=logbool)
+dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool)
+truesamps = get_dbn_coeffs(sfdall, filter_hash, dhc_args)
+truesamps = log.(truesamps)
+sampmean = mean(truesamps, dims=1)
+sampcov = (truesamps .- sampmean)' * (truesamps .- sampmean) ./ (size(truesamps)[1] - 1)
 coeffmask = falses(2+Nf+Nf^2)
 coeffmask[Nf+3:end] .= triu(trues(Nf, Nf))[:]
-thcoeffmean, thcov = DHC_compute_S20r_noisy_so(true_img, filter_hash, fill(sigma, (Nx, Nx)); coeff_mask = coeffmask, dhc_args...)
+sampmean = sampmean[:][coeffmask]
+covreg = sampcov[coeffmask, coeffmask]
+cond(covreg)
+sfddbn = MultivariateNormal(sampmean, covreg)
+sampssfd = rand(sfddbn, 10000)
+sampssfd = sampssfd'
 
-residual = thcoeffmean[:] ./ ncoeffmean[:][coeffmask]
+loaddf = load("scratch_NM/StandardizedExp/Nx64/Data_1000.jld2")
+true_img = loaddf["true_img"]
+truec = log.(DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask])
+initc = log.(DHC_compute_wrapper(loaddf["init"], filter_hash, norm=false; dhc_args...)[coeffmask])
+#reconc = log.(DHC_compute_wrapper(recon_img, logsfddbn["filter_hash"], norm=false; dhc_args...)[coeffmask])
+ind1, ind2 = 1, 595
 
+#Theoretical noisy
+ncovreg = noisycov + I*1e-10
+noisymean, noisycov = DHC_compute_S20r_noisy_so(loaddf["true_img"], filter_hash, fill(loaddf["std"], (Nx, Nx)); coeff_mask = coeffmask, dhc_args...)
+noisydbn = MultivariateNormal(convert(Array{Float64, 1}, noisymean), ncovreg)
+noisysamp = rand(noisydbn, 10000)
+#Log theoretical noisy
+noisysamp = log.((x->maximum([x, 0])).(noisysamp'))
+Nr=10000
+empsn = []
+for n=1:Nr
+    noisyim = randn((Nx, Nx)).*loaddf["std"] .+ true_img
+    push!(empsn, DHC_compute_wrapper(noisyim, filter_hash;  dhc_args...))
 end
+coeffsim = hcat(empsn...)'
+coeffsim = coeffsim[:, coeffmask]
+coeffsim = log.(coeffsim)
+ind1, ind2 = 1, 594
+p = scatter(sampssfd[:, ind1], sampssfd[:, ind2], label="Samples_SFD_Prior", legend=(0.1, 0.1))
+scatter!(coeffsim[:, ind1], coeffsim[:, ind2], label="Empirical Noise-Dbn Using True", legend=(0.1, 0.1))
+scatter!(noisysamp[:, ind1], noisysamp[:, ind2], label="Theoretical Noise-Dbn Using True", legend=(0.1, 0.1))
+scatter!([truec[ind1]], [truec[ind2]], label="True Coeff", legend=(0.1, 0.1), c="black")
+scatter!([initc[ind1]], [initc[ind2]], label="Init Coeff", legend=(0.1, 0.1))
+xlabel!("J=1, L=1")
+ylabel!("J=4,L=8-Omega")
+
+
+
+#=
+##Iterative: using theoretical noisy dbn and true
+ARGS_buffer = ["reg", "nonapd", "noiso", "scratch_NM/StandardizedExp/Nx64/", "full_3losstest", "Full+Eps"]
+ENV_buffer= "1000"
+numfile = Base.parse(Int, ENV_buffer)
+println(numfile, ARGS_buffer[1], ARGS_buffer[2])
+
+if ARGS_buffer[1]=="log"
+    logbool=true
+else
+    if ARGS_buffer[1]!="reg" error("Invalid log arg") end
+    logbool=false
+end
+
+if ARGS_buffer[2]=="apd"
+    apdbool = true
+else
+    if ARGS_buffer[2]!="nonapd" error("Invalid apd arg") end
+    apdbool=false
+end
+
+if ARGS_buffer[3]=="iso"
+    isobool = true
+else
+    if ARGS_buffer[3]!="noiso" error("Invalid iso arg") end
+    isobool=false
+end
+
+
+direc = ARGS_buffer[4] #"../StandardizedExp/Nx64/noisy_stdtrue/" #Change
+datfile = direc * "Data_" * string(numfile) * ".jld2" #Replace w SLURM array
+loaddf = load(datfile)
+true_img = loaddf["true_img"]
+init = loaddf["init"]
+
+fname_save = direc * "scratch_NM/NewWrapper/5-30/" * string(numfile) * "_try1"  #Change
+Nx=size(true_img)[1]
+filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("log", logbool), ("Invcov_matrix", ARGS_buffer[6]), ("optim_settings", optim_settings), ("eps_value_sfd", 1e-5), ("eps_value_init", 1e-10)]) #Add constraints
+
+recon_settings["datafile"] = datfile
+
+if dhc_args[:iso]
+    error("Not constructed for iso")
+else #Not iso
+    coeffmask = falses(2+Nf+Nf^2)
+    coeffmask[Nf+3:end] .= Diagonal(trues(Nf))[:] #Diagonal(triu(trues(Nf, Nf)))[:]
+end
+
+
+#Weight given to terms
+lval2 = 0.0
+lval3 = 0.0
+
+println("Regularizer Lambda=", round(lval3, sigdigits=3))
+#input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, dhc_args, LossFunc, dLossFunc;
+#FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), lambda=0.001, func_specific_params=nothing
+img_guess = init
+recon_img = img_guess
+
+img_list = []
+push!(img_list, img_guess)
+num_rounds=5
+
+#if YOU HAD THE TRUE IMAGE, calculating the shift empirically
+sproxymean, scov = DHC_compute_S20r_noisy_so(loaddf["true_img"], filter_hash, fill(loaddf["std"], (Nx, Nx)); coeff_mask = coeffmask, dhc_args...) #Cant do this because function of image
+strue = DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask]
+shift_true = sproxymean .- strue
+s_noisy = DHC_compute_wrapper(loaddf["init"], filter_hash, norm=false; dhc_args...)[coeffmask]
+starget = s_noisy - shift_true #DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask] #
+scovinv = invert_covmat(scov, 1e-10)
+
+func_specific_params = Dict([(:reg_input=> init), (:coeff_mask1=> coeffmask), (:target1=>starget), (:invcov1=>scovinv), (:coeff_mask2=> coeffmask), (:target2=>starget), (:invcov2=>scovinv), (:lambda2=>0.0), (:lambda3=>0.0)])
+
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+
+if logbool
+    error("Not implemented here")
+end
+
+res, recon_img = image_recon_derivsum_custom(img_guess, filter_hash, dhc_args, ReconFuncs.Loss3Gaussian, ReconFuncs.dLoss3Gaussian!; optim_settings=optim_settings, func_specific_params)
+
+
+#alTERNATIVE
+sproxymean, scov = DHC_compute_S20r_noisy_so(loaddf["init"], filter_hash, fill(loaddf["std"], (Nx, Nx)); coeff_mask = coeffmask, dhc_args...) #Cant do this because function of image
+sinit = DHC_compute_wrapper(loaddf["init"], filter_hash, norm=false; dhc_args...)[coeffmask]
+starget = s_noisy - (sproxymean - sinit) #DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask] #
+scovinv = invert_covmat(scov, 1e-10)
+
+func_specific_params = Dict([(:reg_input=> init), (:coeff_mask1=> coeffmask), (:target1=>starget), (:invcov1=>scovinv), (:coeff_mask2=> coeffmask), (:target2=>starget), (:invcov2=>scovinv), (:lambda2=>0.0), (:lambda3=>0.0)])
+
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+
+if logbool
+    error("Not implemented here")
+end
+
+res, recon_img = image_recon_derivsum_custom(init, filter_hash, dhc_args, ReconFuncs.Loss3Gaussian, ReconFuncs.dLoss3Gaussian!; optim_settings=optim_settings, func_specific_params)
+push!(img_list, recon_img)
+heatmap(init)
+heatmap(recon_img, title="Using true shift")
+heatmap(true_img)
+=#
+
+
+##Iterative: using empirical noisy dbn and true: with pixelwise regularization
+ARGS_buffer = ["reg", "nonapd", "noiso", "scratch_NM/StandardizedExp/Nx64/", "full_3losstest", "Full+Eps"]
+ENV_buffer= "1000"
+numfile = Base.parse(Int, ENV_buffer)
+println(numfile, ARGS_buffer[1], ARGS_buffer[2])
+
+if ARGS_buffer[1]=="log"
+    logbool=true
+else
+    if ARGS_buffer[1]!="reg" error("Invalid log arg") end
+    logbool=false
+end
+
+if ARGS_buffer[2]=="apd"
+    apdbool = true
+else
+    if ARGS_buffer[2]!="nonapd" error("Invalid apd arg") end
+    apdbool=false
+end
+
+if ARGS_buffer[3]=="iso"
+    isobool = true
+else
+    if ARGS_buffer[3]!="noiso" error("Invalid iso arg") end
+    isobool=false
+end
+
+
+direc = ARGS_buffer[4] #"../StandardizedExp/Nx64/noisy_stdtrue/" #Change
+datfile = direc * "Data_" * string(numfile) * ".jld2" #Replace w SLURM array
+loaddf = load(datfile)
+true_img = loaddf["true_img"]
+init = loaddf["init"]
+
+fname_save = direc * "scratch_NM/NewWrapper/5-30/" * string(numfile) * "_try1"  #Change
+Nx=size(true_img)[1]
+filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("log", logbool), ("Invcov_matrix", ARGS_buffer[6]), ("optim_settings", optim_settings), ("eps_value_sfd", 1e-5), ("eps_value_init", 1e-10)]) #Add constraints
+
+recon_settings["datafile"] = datfile
+
+if dhc_args[:iso]
+    error("Not constructed for iso")
+else #Not iso
+    coeffmask = falses(2+Nf+Nf^2)
+    coeffmask[Nf+3:end] .= Diagonal(trues(Nf))[:] #Diagonal(triu(trues(Nf, Nf)))[:]
+end
+
+
+#Weight given to terms
+lval2 = 0.0
+lval3 = 1.0
+
+println("Regularizer Lambda=", round(lval3, sigdigits=3))
+#input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, dhc_args, LossFunc, dLossFunc;
+#FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), lambda=0.001, func_specific_params=nothing
+img_guess = init
+recon_img = img_guess
+
+img_list = []
+push!(img_list, img_guess)
+num_rounds=5
+
+#if YOU HAD THE TRUE IMAGE, calculating the shift empirically
+Nr=10000
+sigma = loaddf["std"]
+empsn = []
+for n=1:Nr
+    noisyim = randn((Nx, Nx)).*sigma .+ true_img
+    push!(empsn, DHC_compute_wrapper(noisyim, filter_hash; dhc_args...))
+end
+coeffsim = hcat(empsn...)'
+ncoeffmean = mean(coeffsim, dims=1)
+scov = (coeffsim .- ncoeffmean)' * (coeffsim .- ncoeffmean)./(Nr-1)
+scov = scov[coeffmask, coeffmask]
+snmean = ncoeffmean[:][coeffmask]
+strue = DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask]
+shift_true = snmean .- strue
+s_noisy = DHC_compute_wrapper(loaddf["init"], filter_hash, norm=false; dhc_args...)[coeffmask]
+starget = strue #DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask] #
+scovinv = invert_covmat(scov, 1e-10)
+
+func_specific_params = Dict([(:reg_input=> init), (:coeff_mask1=> coeffmask), (:target1=>starget), (:invcov1=>scovinv), (:coeff_mask2=> coeffmask), (:target2=>starget), (:invcov2=>scovinv), (:lambda2=>0.0), (:lambda3=>0.0)])
+
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+
+if logbool
+    error("Not implemented here")
+end
+
+res, recon_img = image_recon_derivsum_custom(img_guess, filter_hash, dhc_args, ReconFuncs.Loss3Gaussian, ReconFuncs.dLoss3Gaussian!; optim_settings=optim_settings, func_specific_params)
+heatmap(init)
+heatmap(recon_img, title="Using true shift")
+heatmap(true_img)
+
+
+kbins=convert(Array{Float64, 1}, collect(1:32))
+apdsmoothed = imfilter(init, Kernel.gaussian(1.2))
+smoothps = calc_1dps_local(apdsmoothed, kbins)
+true_ps = calc_1dps_local(true_img, kbins)
+initps = calc_1dps_local(init, kbins)
+recps = calc_1dps_local(recon_img, kbins)
+
+JS1ind = J_S1indices([0, 1, 2, 3], filter_hash)
+clim= (minimum(true_img), maximum(true_img))
+p1 = heatmap(recon_img, title="Recon", clim=clim)
+p3 = plot(log.(kbins), log.(true_ps), label="True")
+plot!(log.(kbins), log.(recps), label="Recon")
+plot!(log.(kbins), log.(initps), label="Init")
+plot!(log.(kbins), log.(smoothps), label="Smoothed Init")
+plot!(title="P(k): Denoising using Shift(init)")
+xlabel!("lnk")
+ylabel!("lnP(k)")
+p2 = heatmap(true_img, title="True Img", clim=clim)
+p4= heatmap(init, title="Init Img", clim=clim)
+p5= heatmap(apdsmoothed, title="Smoothed init", clim=clim)
+residual = recon_img- true_img
+rlims = (minimum(residual), maximum(residual))
+#symmax = maximum([abs(minimum(residual)), maximum(residual)])
+#rg = cgrad(:bwr, [-symmax/2.0, symmax/2.0])
+p6 = heatmap(residual, title="Residual: Recon - True", clims=rlims, c=:bwr)
+p7 = heatmap(apdsmoothed- true_img, title="Residual: SmoothedInit - True", clims=rlims, c=:bwr)
+
+struesel = Data_Utils.fnlog(DHC_compute_wrapper(true_img, filter_hash, norm=false; dhc_args...))
+sinitsel = Data_Utils.fnlog(DHC_compute_wrapper(init, filter_hash, norm=false; dhc_args...))
+ssmoothsel = Data_Utils.fnlog(DHC_compute_wrapper(apdsmoothed, filter_hash, norm=false; dhc_args...))
+sreconsel = Data_Utils.fnlog(DHC_compute_wrapper(recon_img, filter_hash, norm=false; dhc_args...))
+slims = (minimum(struesel[JS1ind]), maximum(struesel[JS1ind]))
+cg = cgrad([:blue, :white, :red])
+truephi, trueomg = round(struesel[2+filter_hash["phi_index"]], sigdigits=3), round(struesel[2+filter_hash["Omega_index"]], sigdigits=3)
+reconphi, reconomg = round(sreconsel[2+filter_hash["phi_index"]], sigdigits=3), round(sreconsel[2+filter_hash["Omega_index"]], sigdigits=3)
+smoothphi, smoothomg = round(ssmoothsel[2+filter_hash["phi_index"]], sigdigits=3), round(ssmoothsel[2+filter_hash["Omega_index"]], sigdigits=3)
+
+p8 = heatmap(struesel[JS1ind], title="True Coeffs ϕ=" * string(truephi) * "Ω=" * string(trueomg) , clims=slims, c=cg)
+p9 = heatmap(sreconsel[JS1ind], title="Recon Coeffs ϕ=" * string(reconphi) * "Ω=" * string(reconomg), clims=slims, c=cg)
+p10 = heatmap(ssmoothsel[JS1ind], title="Smooth Init ϕ=" * string(smoothphi) * "Ω=" * string(smoothomg), clims=slims, c=cg)
+p = plot(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, layout=(5, 2), size=(1800, 2400))
+savefig(p, "scratch_NM/NewWrapper/5-30/denoisingwstrue_trueempnoisydbn.png")
+fracres = (init .- true_img)./true_img
+fps = (initps .- true_ps)./true_ps
+println("Mean Abs Frac, Init = ", round(mean(abs.(fracres)), digits=3), "Smoothed = ", round(mean(abs.((apdsmoothed .- true_img)./true_img)), digits=3), "Recon = ", round(mean(abs.((recon_img .- true_img)./true_img)), digits=3))
+println("MSE, Init = ", round(mean((init .- true_img).^2), digits=5), "Smoothed = ", round(mean((apdsmoothed .- true_img).^2), digits=5), "Recon = ", round(mean(apdsmoothed), digits=5))
+println("Power Spec Frac Res, Init = ", round(mean(abs.(fps)), digits=3), "Smoothed = ", round(mean(abs.(smoothps .- true_ps)), digits=3), "Recon = ", round(mean(abs.(recps .- true_ps)), digits=3))
+
+
+
+##5) Iterative: using empirical noisy dbn (for non-Omega) and true: with pixelwise regularization
+ARGS_buffer = ["reg", "nonapd", "noiso", "scratch_NM/StandardizedExp/Nx64/", "full_3losstest", "Full+Eps"]
+ENV_buffer= "1000"
+numfile = Base.parse(Int, ENV_buffer)
+println(numfile, ARGS_buffer[1], ARGS_buffer[2])
+
+if ARGS_buffer[1]=="log"
+    logbool=true
+else
+    if ARGS_buffer[1]!="reg" error("Invalid log arg") end
+    logbool=false
+end
+
+if ARGS_buffer[2]=="apd"
+    apdbool = true
+else
+    if ARGS_buffer[2]!="nonapd" error("Invalid apd arg") end
+    apdbool=false
+end
+
+if ARGS_buffer[3]=="iso"
+    isobool = true
+else
+    if ARGS_buffer[3]!="noiso" error("Invalid iso arg") end
+    isobool=false
+end
+
+
+direc = ARGS_buffer[4] #"../StandardizedExp/Nx64/noisy_stdtrue/" #Change
+datfile = direc * "Data_" * string(numfile) * ".jld2" #Replace w SLURM array
+loaddf = load(datfile)
+true_img = loaddf["true_img"]
+init = loaddf["init"]
+
+fname_save = direc * "scratch_NM/NewWrapper/5-30/" * string(numfile) * "_try1"  #Change
+Nx=size(true_img)[1]
+filter_hash = fink_filter_hash(1, 8, nx=Nx, t=1, wd=1, Omega=true)
+(S1iso, Nf) = size(filter_hash["S1_iso_mat"])
+(S2iso, Nfsq) = size(filter_hash["S2_iso_mat"])
+dhc_args = Dict(:doS2=>false, :doS20=>true, :apodize=>apdbool, :iso=>isobool) #Iso #CHANGE: Change sig for the sfd data since the noise model is super high and the tiny values make sense
+
+optim_settings = Dict([("iterations", 1000), ("norm", false), ("minmethod", ConjugateGradient())])
+recon_settings = Dict([("log", logbool), ("Invcov_matrix", ARGS_buffer[6]), ("optim_settings", optim_settings), ("eps_value_sfd", 1e-5), ("eps_value_init", 1e-10)]) #Add constraints
+
+recon_settings["datafile"] = datfile
+
+if dhc_args[:iso]
+    error("Not constructed for iso")
+else #Not iso
+    coeffmask = falses(2+Nf+Nf^2)
+    coeffmask[Nf+3:end] .= Diagonal(trues(Nf))[:] #Diagonal(triu(trues(Nf, Nf)))[:]
+end
+
+
+#Weight given to terms
+lval2 = 0.0
+lval3=1.0
+
+println("Regularizer Lambda=", round(lval3, sigdigits=3))
+#input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, dhc_args, LossFunc, dLossFunc;
+#FFTthreads::Int=1, optim_settings=Dict([("iterations", 10)]), lambda=0.001, func_specific_params=nothing
+img_guess = init
+recon_img = img_guess
+
+img_list = []
+push!(img_list, img_guess)
+num_rounds=5
+
+#if YOU HAD THE TRUE IMAGE, calculating the shift empirically
+Nr=10000
+sigma = loaddf["std"]
+empsn = []
+for n=1:Nr
+    noisyim = randn((Nx, Nx)).*sigma .+ true_img
+    push!(empsn, DHC_compute_wrapper(noisyim, filter_hash; dhc_args...))
+end
+coeffsim = hcat(empsn...)'
+ncoeffmean = mean(coeffsim, dims=1)
+scov = (coeffsim .- ncoeffmean)' * (coeffsim .- ncoeffmean)./(Nr-1)
+scov = scov[coeffmask, coeffmask]
+snmean = ncoeffmean[:][coeffmask]
+strue = DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask]
+shift_true = snmean .- strue
+s_noisy = DHC_compute_wrapper(loaddf["init"], filter_hash, norm=false; dhc_args...)[coeffmask]
+starget = s_noisy - shift_true #DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask] #
+scovinv = invert_covmat(scov, 1e-10)
+
+#4) Why oversmoothed
+ratio = starget./strue
+println("Shift_true omega = ", shift_true[34])
+println("Ratio = ", ratio[34])
+println("Noisy init = ", s_noisy[34], " mean = ", snmean[34], "True = ", strue[34])
+println("Omega stddev raw", sqrt(scov[34, 34]), " Post reg Omega stddev = ", sqrt(inv(scovinv[34, 34])))
+println("Starget = ", starget[34])
+zsc = (s_noisy[34] - snmean[34])/sqrt(inv(scovinv[34, 34]))
+
+func_specific_params = Dict([(:reg_input=> init), (:coeff_mask1=> coeffmask), (:target1=>starget), (:invcov1=>scovinv), (:coeff_mask2=> coeffmask), (:target2=>starget), (:invcov2=>scovinv), (:lambda2=>lval2), (:lambda3=>lval3)])
+
+recon_settings["fname_save"] = fname_save * ".jld2"
+recon_settings["optim_settings"] = optim_settings
+
+if logbool
+    error("Not implemented here")
+end
+
+res, recon_img = image_recon_derivsum_custom(img_guess, filter_hash, dhc_args, ReconFuncs.Loss3Gaussian, ReconFuncs.dLoss3Gaussian!; optim_settings=optim_settings, func_specific_params)
+heatmap(init)
+heatmap(recon_img, title="Using true shift")
+heatmap(true_img)
+
+
+kbins=convert(Array{Float64, 1}, collect(1:32))
+apdsmoothed = imfilter(init, Kernel.gaussian(1.0))
+smoothps = calc_1dps_local(apdsmoothed, kbins)
+true_ps = calc_1dps_local(true_img, kbins)
+initps = calc_1dps_local(init, kbins)
+recps = calc_1dps_local(recon_img, kbins)
+
+JS1ind = J_S1indices([0, 1, 2, 3], filter_hash)
+clim= (minimum(true_img), maximum(true_img))
+p1 = heatmap(recon_img, title="Recon", clim=clim)
+p3 = plot(log.(kbins), log.(true_ps), label="True")
+plot!(log.(kbins), log.(recps), label="Recon")
+plot!(log.(kbins), log.(initps), label="Init")
+plot!(log.(kbins), log.(smoothps), label="Smoothed Init")
+plot!(title="P(k): Denoising using Shift(init)")
+xlabel!("lnk")
+ylabel!("lnP(k)")
+p2 = heatmap(true_img, title="True Img", clim=clim)
+p4= heatmap(init, title="Init Img", clim=clim)
+p5= heatmap(apdsmoothed, title="Smoothed init", clim=clim)
+residual = recon_img- true_img
+rlims = (minimum(residual), maximum(residual))
+#symmax = maximum([abs(minimum(residual)), maximum(residual)])
+#rg = cgrad(:bwr, [-symmax/2.0, symmax/2.0])
+p6 = heatmap(residual, title="Residual: Recon - True", clims=rlims, c=:bwr)
+p7 = heatmap(apdsmoothed- true_img, title="Residual: SmoothedInit - True", clims=rlims, c=:bwr)
+
+struesel = Data_Utils.fnlog(DHC_compute_wrapper(true_img, filter_hash, norm=false; dhc_args...))
+sinitsel = Data_Utils.fnlog(DHC_compute_wrapper(init, filter_hash, norm=false; dhc_args...))
+ssmoothsel = Data_Utils.fnlog(DHC_compute_wrapper(apdsmoothed, filter_hash, norm=false; dhc_args...))
+sreconsel = Data_Utils.fnlog(DHC_compute_wrapper(recon_img, filter_hash, norm=false; dhc_args...))
+slims = (minimum(struesel[JS1ind]), maximum(struesel[JS1ind]))
+cg = cgrad([:blue, :white, :red])
+truephi, trueomg = round(struesel[2+filter_hash["phi_index"]], sigdigits=3), round(struesel[2+filter_hash["Omega_index"]], sigdigits=3)
+reconphi, reconomg = round(sreconsel[2+filter_hash["phi_index"]], sigdigits=3), round(sreconsel[2+filter_hash["Omega_index"]], sigdigits=3)
+smoothphi, smoothomg = round(ssmoothsel[2+filter_hash["phi_index"]], sigdigits=3), round(ssmoothsel[2+filter_hash["Omega_index"]], sigdigits=3)
+
+p8 = heatmap(struesel[JS1ind], title="True Coeffs ϕ=" * string(truephi) * "Ω=" * string(trueomg) , clims=slims, c=cg)
+p9 = heatmap(sreconsel[JS1ind], title="Recon Coeffs ϕ=" * string(reconphi) * "Ω=" * string(reconomg), clims=slims, c=cg)
+p10 = heatmap(ssmoothsel[JS1ind], title="Smooth Init ϕ=" * string(smoothphi) * "Ω=" * string(smoothomg), clims=slims, c=cg)
+p = plot(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, layout=(5, 2), size=(1800, 2400))
+savefig(p, "scratch_NM/NewWrapper/5-30/denoisingwstrue_trueempnoisydbn_lam100.png")
+fracres = (init .- true_img)./true_img
+fps = (initps .- true_ps)./true_ps
+println("Mean Abs Frac, Init = ", round(mean(abs.(fracres)), digits=3), "Smoothed = ", round(mean(abs.((apdsmoothed .- true_img)./true_img)), digits=3), "Recon = ", round(mean(abs.((recon_img .- true_img)./true_img)), digits=3))
+println("MSE, Init = ", round(mean((init .- true_img).^2), digits=5), "Smoothed = ", round(mean((apdsmoothed .- true_img).^2), digits=5), "Recon = ", round(mean(apdsmoothed), digits=5))
+println("Power Spec Frac Res, Init = ", round(mean(abs.(fps)), digits=3), "Smoothed = ", round(mean(abs.(smoothps .- true_ps)), digits=3), "Recon = ", round(mean(abs.(recps .- true_ps)), digits=3))
