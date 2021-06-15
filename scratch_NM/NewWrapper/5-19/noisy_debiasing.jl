@@ -4724,7 +4724,7 @@ s_noisy = DHC_compute_wrapper(loaddf["init"], filter_hash, norm=false; dhc_args.
 starget = strue #DHC_compute_wrapper(loaddf["true_img"], filter_hash, norm=false; dhc_args...)[coeffmask] #
 scovinv = invert_covmat(scov, 1e-10)
 
-func_specific_params = Dict([(:reg_input=> init), (:coeff_mask1=> coeffmask), (:target1=>starget), (:invcov1=>scovinv), (:coeff_mask2=> coeffmask), (:target2=>starget), (:invcov2=>scovinv), (:lambda2=>0.0), (:lambda3=>0.0)])
+func_specific_params = Dict([(:reg_input=> init), (:coeff_mask1=> coeffmask), (:target1=>starget), (:invcov1=>scovinv), (:coeff_mask2=> coeffmask), (:target2=>starget), (:invcov2=>scovinv), (:lambda2=>lval2), (:lambda3=>lval3)])
 
 recon_settings["fname_save"] = fname_save * ".jld2"
 recon_settings["optim_settings"] = optim_settings
@@ -4845,7 +4845,7 @@ end
 
 #Weight given to terms
 lval2 = 0.0
-lval3=1.0
+lval3=200.0
 
 println("Regularizer Lambda=", round(lval3, sigdigits=3))
 #input::Array{Float64, 2}, filter_hash::Dict, s_targ_mean::Array{Float64, 1}, s_targ_invcov, dhc_args, LossFunc, dLossFunc;
@@ -4944,6 +4944,6 @@ p = plot(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, layout=(5, 2), size=(1800, 240
 savefig(p, "scratch_NM/NewWrapper/5-30/denoisingwstrue_trueempnoisydbn_lam100.png")
 fracres = (init .- true_img)./true_img
 fps = (initps .- true_ps)./true_ps
-println("Mean Abs Frac, Init = ", round(mean(abs.(fracres)), digits=3), "Smoothed = ", round(mean(abs.((apdsmoothed .- true_img)./true_img)), digits=3), "Recon = ", round(mean(abs.((recon_img .- true_img)./true_img)), digits=3))
-println("MSE, Init = ", round(mean((init .- true_img).^2), digits=5), "Smoothed = ", round(mean((apdsmoothed .- true_img).^2), digits=5), "Recon = ", round(mean(apdsmoothed), digits=5))
-println("Power Spec Frac Res, Init = ", round(mean(abs.(fps)), digits=3), "Smoothed = ", round(mean(abs.(smoothps .- true_ps)), digits=3), "Recon = ", round(mean(abs.(recps .- true_ps)), digits=3))
+println("Mean Abs Frac, Init = ", round(mean(abs.(fracres)), digits=3), " Smoothed = ", round(mean(abs.((apdsmoothed .- true_img)./true_img)), digits=3), "Recon = ", round(mean(abs.((recon_img .- true_img)./true_img)), digits=3))
+println("MSE, Init = ", round(mean((init .- true_img).^2), digits=5), " Smoothed = ", round(mean((apdsmoothed .- true_img).^2), digits=5), "Recon = ", round(mean(apdsmoothed), digits=5))
+println("Power Spec Frac Res, Init = ", round(mean(abs.(fps)), digits=3), " Smoothed = ", round(mean(abs.(smoothps .- true_ps)./true_ps)), digits=3), "Recon = ", round(mean(abs.(recps .- true_ps)), digits=3))

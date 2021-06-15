@@ -132,7 +132,7 @@ ftargsfd = fmean[coeff_masksfd]
 if logbool
     error("Not impl for log im")
 end
-ftarginit = log.(DHC_compute_wrapper(imfilter(init, Kernel.gaussian(0.8)), filter_hash; dhc_args...))
+ftarginit = log.(DHC_compute_wrapper(imfilter(init, Kernel.gaussian(1.0)), filter_hash; dhc_args...))
 ftarginit = ftarginit[coeff_maskinit]
 
 #Weight given to terms
@@ -197,6 +197,8 @@ println("Recon", loss3(recon_img))
 
 
 
+
+
 apdsmoothed = apodizer(imfilter(init, Kernel.gaussian(0.8)))
 kbins= convert(Array{Float64}, collect(1:32))
 clim=(minimum(apodizer(true_img)), maximum(apodizer(true_img)))
@@ -236,9 +238,19 @@ p8 = heatmap(struesel[JS1ind], title="True Coeffs ϕ=" * string(truephi) * "Ω="
 p9 = heatmap(sreconsel[JS1ind], title="Recon Coeffs ϕ=" * string(reconphi) * "Ω=" * string(reconomg), clims=slims, c=cg)
 p10 = heatmap(ssmoothsel[JS1ind], title="Smooth Init ϕ=" * string(smoothphi) * "Ω=" * string(smoothomg), clims=slims, c=cg)
 p = plot(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, layout=(5, 2), size=(1800, 2400))
-savefig(p, "scratch_NM/NewWrapper/5-3/Case3j-v2.png")
+savefig(p, "scratch_NM/NewWrapper/6-6/Old_3customloss.png")
+fracres = (apodizer(init) .- apodizer(true_img))./apodizer(true_img)
+fps = (initps .- true_ps)./true_ps
+println("Mean Abs Frac, Init = ", round(mean(abs.(fracres)), digits=3), "Smoothed = ", round(mean(abs.((apdsmoothed .- true_img)./true_img)), digits=3), "Recon = ", round(mean(abs.((recon_img .- true_img)./true_img)), digits=3))
+println("MSE, Init = ", round(mean((init .- true_img).^2), digits=6), "Smoothed = ", round(mean((apdsmoothed .- true_img).^2), digits=6), "Recon = ", round(mean((recon_img .- true_img).^2), digits=6))
+println("Power Spectrum Frac Res, Init = ", round(mean(abs.(fps)), digits=3), "Smoothed = ", round(mean(abs.((smoothps .- true_ps)./true_ps)), digits=3), "Recon = ", round(mean(abs.(recps .- true_ps)./true_ps), digits=3))
+
+mean(abs.(smoothps .- true_ps))
+mean(abs.(recps .- true_ps))
+#savefig(p, "scratch_NM/NewWrapper/5-3/Case3j-v2.png")
 Visualization.plot_synth_QA(apodizer(true_img), apodizer(init), apodizer(recon_img), fname="scratch_NM/NewWrapper/4-28/1000_C5_S2sfd_highjinit.png")
 
+mean(abs.((apdsmoothed .- apodizer(true_img))./apodizer(true_img)))
 
 
 clims=(-10, -2)

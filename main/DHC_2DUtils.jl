@@ -1363,7 +1363,9 @@ module DHC_2DUtils
         Nf = size(filter_hash["filt_index"])[1]
         #Not using coeff_mask here after all. ASSUMES ANY ONE of doS12, doS2 and doS20 are true, when using coeff_mask
         #@assert !iso "Iso not implemented yet"
-
+        if !norm
+            println("Warning; not norm")
+        end
         if apodize
             ap_img = apodizer(image)
         else
